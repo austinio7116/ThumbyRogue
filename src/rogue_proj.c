@@ -9,15 +9,36 @@
 #define RGB(r,g,b) ((uint16_t)((((r)>>3)<<11)|(((g)>>2)<<5)|((b)>>3)))
 #define MAX_PROJ 10
 
+/* Per-kind appearance: body colour/size, trail colour, render glow, trail
+ * motes per tick, and impact burst size/count. Indexed by ProjKind. */
+typedef struct {
+    uint16_t body, trail;
+    float    hx, hy, hz, glow;
+    int      trail_n, impact_n;
+    float    impact_sz;
+} ProjStyle;
+static const ProjStyle PSTYLE[PROJ_KIND_COUNT] = {
+    /* ARROW   */ { RGB(230,210,120), RGB(210,185,110), 0.05f,0.04f,0.18f, 0.20f, 1,  6, 0.07f },
+    /* BOLT    */ { RGB(200,208,222), RGB(150,160,175), 0.06f,0.05f,0.22f, 0.30f, 1,  8, 0.08f },
+    /* WAND    */ { RGB(120,230,255), RGB(150,220,255), 0.08f,0.08f,0.10f, 0.75f, 2,  9, 0.08f },
+    /* SCEPTER */ { RGB(255,220,120), RGB(255,235,170), 0.09f,0.09f,0.11f, 0.75f, 2, 10, 0.09f },
+    /* STAFF   */ { RGB(190,120,255), RGB(170,110,240), 0.12f,0.12f,0.13f, 0.85f, 3, 14, 0.11f },
+};
+static const ProjStyle *style_of(int kind) {
+    if (kind < 0 || kind >= PROJ_KIND_COUNT) kind = PROJ_ARROW;
+    return &PSTYLE[kind];
+}
+
 typedef struct {
     bool  alive;
     Vec3  pos;
     float vx, vz;
     float travelled, max_range;
     int   dmg;
-    int   caster;     /* 0 = arrow, 1 = bolt (visual) */
+    int   kind;       /* ProjKind — selects PSTYLE */
     int   pierce;     /* aspect: pass through enemies */
     float hit_cd;     /* re-hit interval while piercing */
+    float spin;       /* magic motes jitter the trail for a sparkly look */
 } Proj;
 
 static Proj s_proj[MAX_PROJ];
@@ -27,7 +48,7 @@ void rogue_proj_clear(void) {
 }
 
 void rogue_proj_fire(Vec3 pos, float yaw, float speed, int dmg,
-                     int caster, float max_range, int pierce) {
+                     int kind, float max_range, int pierce) {
     for (int i = 0; i < MAX_PROJ; i++) {
         if (s_proj[i].alive) continue;
         Proj *p = &s_proj[i];
@@ -38,9 +59,10 @@ void rogue_proj_fire(Vec3 pos, float yaw, float speed, int dmg,
         p->travelled = 0;
         p->max_range = max_range;
         p->dmg = dmg;
-        p->caster = caster;
+        p->kind = kind;
         p->pierce = pierce;
         p->hit_cd = 0;
+        p->spin = 0;
         return;
     }
 }
@@ -53,19 +75,31 @@ void rogue_proj_update(float dt, int floor_y) {
     for (int i = 0; i < MAX_PROJ; i++) {
         Proj *p = &s_proj[i];
         if (!p->alive) continue;
+        const ProjStyle *st = style_of(p->kind);
         float dx = p->vx * dt, dz = p->vz * dt;
         p->pos.x += dx; p->pos.z += dz;
         p->travelled += sqrtf(dx*dx + dz*dz);
-        uint16_t tc = p->caster ? RGB(150,210,255) : RGB(230,200,120);
-        rogue_particle_spawn(p->pos, 0, 0, 0, 0.18f, tc, 0.05f, 0.0f);  /* trail */
+        p->spin += dt * 22.0f;
+        /* Trail — magic kinds emit a couple of jittered sparks for a glittery
+         * arcane look; arrows/bolts leave a single tight streak mote. */
+        for (int t = 0; t < st->trail_n; t++) {
+            float jx = 0, jy = 0, jz = 0;
+            if (st->trail_n > 1) {
+                jx = sinf(p->spin + t * 2.1f) * 0.06f;
+                jy = cosf(p->spin * 1.3f + t) * 0.06f;
+                jz = cosf(p->spin + t * 2.1f) * 0.06f;
+            }
+            Vec3 tp = p->pos; tp.x += jx; tp.y += jy; tp.z += jz;
+            rogue_particle_spawn(tp, 0, 0, 0, 0.18f, st->trail, 0.05f, 0.0f);
+        }
         if (p->travelled > p->max_range) { p->alive = false; continue; }
         if (cell_solid((int)floorf(p->pos.x), floor_y, (int)floorf(p->pos.z))) {
-            rogue_particle_burst(p->pos, 6, 4.0f, 0.30f, tc, 0.07f);    /* wall impact */
+            rogue_particle_burst(p->pos, st->impact_n - 2, 4.0f, 0.30f, st->body, st->impact_sz);
             p->alive = false; continue;
         }
         if (p->hit_cd > 0) p->hit_cd -= dt;
         if (p->hit_cd <= 0 && rogue_enemies_hit_point(p->pos.x, p->pos.z, 0.35f, p->dmg)) {
-            rogue_particle_burst(p->pos, 8, 5.0f, 0.35f, tc, 0.08f);    /* hit burst */
+            rogue_particle_burst(p->pos, st->impact_n, 5.0f, 0.35f, st->body, st->impact_sz);
             if (p->pierce) p->hit_cd = 0.12f;   /* keep flying, re-hit periodically */
             else           p->alive = false;
         }
@@ -76,12 +110,12 @@ void rogue_proj_draw(const CraftCamera *cam, uint16_t *fb) {
     for (int i = 0; i < MAX_PROJ; i++) {
         Proj *p = &s_proj[i];
         if (!p->alive) continue;
-        uint16_t c = p->caster ? RGB(120, 220, 255) : RGB(230, 210, 120);
+        const ProjStyle *st = style_of(p->kind);
         RogueCuboid body[1] = {
-            { 0.0f, 0.0f, 0.0f, 0.08f, 0.06f, 0.14f, c }
+            { 0.0f, 0.0f, 0.0f, st->hx, st->hy, st->hz, st->body }
         };
         float yaw = atan2f(p->vx, p->vz);
-        rogue_render_model(cam, fb, p->pos, yaw, body, 1, 0.15f, 0.12f,
-                           p->caster ? 0.6f : 0.2f, 256);
+        rogue_render_model(cam, fb, p->pos, yaw, body, 1,
+                           st->hz + 0.04f, 0.12f, st->glow, 256);
     }
 }

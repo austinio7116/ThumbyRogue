@@ -43,6 +43,7 @@ typedef struct {
     RogueItem   equip[SLOT_COUNT];
     RogueStats  stats;
     WeaponClass wpn_class;
+    uint8_t     wpn_type;     /* WeaponType — selects the swing/impact/projectile FX */
     float wpn_range, wpn_arc_cos, wpn_dur, wpn_proj_speed;
     int   wpn_dmg;        /* effective per-hit damage (base + stats) */
     int   gold;

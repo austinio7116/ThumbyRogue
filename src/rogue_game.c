@@ -45,6 +45,33 @@ void rogue_game_toast(const char *msg) {
     s_toast_t = 2.6f;
 }
 
+/* Per-weapon-type melee impact FX so each weapon's hit reads differently:
+ * light/quick for daggers, heavy blue for greatswords, fiery for axes, and a
+ * grey dust shock-ring for the blunt mace/warhammer. */
+static void melee_hit_fx(Vec3 hp, uint8_t wt) {
+    switch (wt) {
+    case WT_DAGGER:     rogue_particle_burst(hp, 5,  5.5f, 0.25f, RGB(230,235,255), 0.05f); break;
+    case WT_GREATSWORD: rogue_particle_burst(hp, 16, 5.5f, 0.45f, RGB(170,210,255), 0.10f); break;
+    case WT_AXE:        rogue_particle_burst(hp, 12, 5.5f, 0.40f, RGB(255,120,50),  0.09f); break;
+    case WT_SPEAR:      rogue_particle_burst(hp, 6,  6.0f, 0.30f, RGB(225,235,250), 0.06f); break;
+    case WT_MACE:
+    case WT_WARHAMMER: {
+        int big = (wt == WT_WARHAMMER);
+        rogue_particle_burst(hp, big ? 18 : 12, 3.8f, 0.50f, RGB(205,197,178), big ? 0.12f : 0.10f);
+        /* a low ground shock-ring of dust motes — the blunt-impact signature */
+        int ring = big ? 12 : 8;
+        float spd = big ? 6.5f : 5.0f;
+        Vec3 g = hp; g.y -= 0.45f;
+        for (int k = 0; k < ring; k++) {
+            float a = (float)k / ring * 6.2831853f;
+            rogue_particle_spawn(g, cosf(a) * spd, 0.4f, sinf(a) * spd,
+                                 0.40f, RGB(190,182,165), 0.08f, 5.0f);
+        }
+        break; }
+    default:            rogue_particle_burst(hp, 9,  5.0f, 0.35f, RGB(255,245,190), 0.07f); break;  /* sword */
+    }
+}
+
 /* Fog-of-war minimap: cells the hero has been near. */
 static uint8_t s_visited[CRAFT_WORLD_X * CRAFT_WORLD_Z];
 
@@ -393,7 +420,7 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
             Vec3 hp = v3(s_player.pos.x + sinf(s_player.yaw) * s_player.wpn_range * 0.7f,
                          s_player.pos.y + 0.6f,
                          s_player.pos.z + cosf(s_player.yaw) * s_player.wpn_range * 0.7f);
-            rogue_particle_burst(hp, 8, 5.0f, 0.35f, RGB(255,240,180), 0.07f);
+            melee_hit_fx(hp, s_player.wpn_type);
             int heal = s_player.stats.life_on_hit * hits;
             if (asp & (1u << ASP_LIFESTEAL)) heal += outdmg / 8;  /* Vampiric */
             if (heal) {
@@ -411,8 +438,13 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
             if (dx*dx + dz*dz < s_player.wpn_range * s_player.wpn_range)
                 aim = atan2f(dx, dz);
         }
+        int pk = (s_player.wpn_type == WT_CROSSBOW) ? PROJ_BOLT
+               : (s_player.wpn_type == WT_WAND)     ? PROJ_WAND
+               : (s_player.wpn_type == WT_SCEPTER)  ? PROJ_SCEPTER
+               : (s_player.wpn_type == WT_STAFF)    ? PROJ_STAFF
+               :                                      PROJ_ARROW;
         rogue_proj_fire(s_player.pos, aim, s_player.wpn_proj_speed,
-                        outdmg, s_player.wpn_class == WCLASS_CASTER,
+                        outdmg, pk,
                         s_player.wpn_range, (asp & (1u << ASP_PIERCE)) ? 1 : 0);
     }
 
@@ -579,6 +611,14 @@ void rogue_game_debug_weapon_sheet(void) {
         rogue_inventory_add(&it);
     }
     rogue_inventory_open();
+}
+
+/* Force-equip a specific weapon type (FX verification). */
+void rogue_game_debug_force_weapon(int wt) {
+    for (int tries = 0; tries < 400; tries++) {
+        RogueItem it; rogue_item_roll_weapon(&it, 6, loot_rng());
+        if (it.wtype == wt) { rogue_player_equip(&s_player, &it); return; }
+    }
 }
 
 /* Roll + equip one item into every slot (verify stat aggregation). */

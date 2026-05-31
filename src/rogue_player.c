@@ -82,6 +82,7 @@ void rogue_player_recompute(RoguePlayer *p) {
     rogue_stats_compute(&p->stats, p->equip);
     const RogueItem *w = &p->equip[SLOT_WEAPON];
     p->wpn_class = w->wclass;
+    p->wpn_type = w->wtype;
     p->wpn_range = w->range;
     p->wpn_arc_cos = w->arc_cos;
     p->wpn_proj_speed = w->proj_speed;
@@ -278,20 +279,45 @@ void rogue_player_draw(const RoguePlayer *p, const CraftCamera *cam,
     rogue_render_model(cam, fb, p->pos, p->yaw, parts, HERO_NPARTS,
                        0.32f, 1.15f, flash, tint_q8);
 
-    /* Readable melee swing: a bright crescent slash sweeps in front during
-     * the early part of the swing (ranged/caster show their projectile). */
+    /* Readable melee swing FX, distinct per weapon type: thin quick stabs for
+     * dagger/spear (a forward thrust line), a wide cyan crescent for swords, a
+     * huge blue arc for the greatsword, a fiery cleave for the axe, and a
+     * stubby blunt arc for mace/warhammer. (Ranged/caster show their
+     * projectile instead.) */
     if (p->atk_t > 0 && p->wpn_class == WCLASS_MELEE) {
         float ph = 1.0f - (p->atk_t / p->wpn_dur);     /* 0..1 */
-        if (ph < 0.75f) {
-            float r = p->wpn_range * 0.7f;
-            RogueCuboid slash[5];
-            for (int k = 0; k < 5; k++) {
-                float a = -0.8f + 0.4f * k;             /* arc across the facing */
-                slash[k] = (RogueCuboid){ sinf(a) * r, 0.55f, cosf(a) * r,
-                                          0.07f, 0.11f, 0.07f, 0xCEFF };  /* cyan-white */
+        if (ph < 0.8f) {
+            uint16_t col = RGB(200,250,255);
+            int   n = 5;
+            float spread = 0.80f, seg = 0.07f, rmul = 1.0f;
+            bool  thrust = false;
+            switch (p->wpn_type) {
+            case WT_DAGGER:     n=3; spread=0.30f; seg=0.05f; rmul=0.85f; thrust=true; col=RGB(225,235,255); break;
+            case WT_SWORD:      n=5; spread=0.80f;                        col=RGB(200,250,255); break;
+            case WT_GREATSWORD: n=7; spread=1.20f; seg=0.10f; rmul=1.20f; col=RGB(150,205,255); break;
+            case WT_AXE:        n=6; spread=1.05f; seg=0.10f;             col=RGB(255,150,70);  break;
+            case WT_MACE:       n=4; spread=0.55f; seg=0.11f; rmul=0.85f; col=RGB(225,225,215); break;
+            case WT_SPEAR:      n=4; spread=0.10f; seg=0.06f; rmul=1.35f; thrust=true; col=RGB(220,232,245); break;
+            case WT_WARHAMMER:  n=5; spread=0.70f; seg=0.12f; rmul=0.90f; col=RGB(212,202,182); break;
+            default: break;
             }
-            rogue_render_model(cam, fb, p->pos, p->yaw, slash, 5,
-                               r + 0.2f, 1.0f, 0.0f, 256);
+            float r = p->wpn_range * 0.7f * rmul;
+            RogueCuboid slash[7];
+            if (thrust) {
+                float reach = r * sinf(ph * (float)M_PI);   /* stab out and recover */
+                for (int k = 0; k < n; k++) {
+                    float d = reach * (k + 1) / n;
+                    slash[k] = (RogueCuboid){ 0.0f, 0.55f, 0.10f + d, seg, seg, seg + 0.03f, col };
+                }
+            } else {
+                float sweep = (ph - 0.4f);                  /* the fan rotates as it swings */
+                for (int k = 0; k < n; k++) {
+                    float a = -spread + (2.0f * spread) * k / (n - 1) + sweep;
+                    slash[k] = (RogueCuboid){ sinf(a) * r, 0.55f, cosf(a) * r, seg, seg, seg, col };
+                }
+            }
+            rogue_render_model(cam, fb, p->pos, p->yaw, slash, n,
+                               r + 0.3f, 1.0f, 0.0f, 256);
         }
     }
 }

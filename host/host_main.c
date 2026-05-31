@@ -240,6 +240,14 @@ int main(int argc, char **argv) {
             printf("[census] lava=%ld lamp(brazier)=%ld\n", lava, lamp);
         }
         for (int i = 0; i < 80; i++) rogue_game_tick(&none, 1.0f / 30.0f);
+        if (getenv("ROGUE_FXWPN")) {   /* equip a weapon, swing/fire, catch the FX mid-action */
+            extern void rogue_game_debug_force_weapon(int);
+            rogue_game_debug_force_weapon(atoi(getenv("ROGUE_FXWPN")));
+            int settle = getenv("ROGUE_FXT") ? atoi(getenv("ROGUE_FXT")) : 3;
+            CraftRawButtons a = {0}; a.a = true;
+            rogue_game_tick(&a, 1.0f / 30.0f);
+            for (int i = 0; i < settle; i++) rogue_game_tick(&none, 1.0f / 30.0f);
+        }
         if (getenv("ROGUE_DEAD")) {
             extern void rogue_game_debug_kill(void);
             rogue_game_debug_kill();
