@@ -5,6 +5,9 @@
 #include "craft_blocks.h"
 #include <math.h>
 
+#include <stdio.h>
+void rogue_game_toast(const char *msg);   /* announce pickups/chests */
+
 #define RGB(r,g,b) ((uint16_t)((((r)>>3)<<11)|(((g)>>2)<<5)|((b)>>3)))
 #define MAX_GROUND 18
 #define MAX_CHEST  8
@@ -83,7 +86,11 @@ void rogue_loot_update(RoguePlayer *p, float dt) {
             g->alive = false;
         } else if (rogue_item_is_equip(&g->item) || g->item.kind == ITEM_GEM) {
             /* gear + gems auto-collect into the backpack (managed via MENU) */
-            if (rogue_inventory_add(&g->item)) g->alive = false;
+            if (rogue_inventory_add(&g->item)) {
+                char msg[48]; snprintf(msg, sizeof msg, "Got %s", g->item.name);
+                rogue_game_toast(msg);
+                g->alive = false;
+            }
         }
     }
 }
@@ -124,11 +131,15 @@ void rogue_loot_open_chest(int index, int depth, uint32_t seed) {
     s_rng = seed ^ (0xC4E57u * (uint32_t)(index + 1) * (uint32_t)(depth + 2));
     if (!s_rng) s_rng = 1;
     Vec3 base = s_c[index].pos;
-    /* Always a weapon + some gold; sometimes a potion. */
+    /* Always a piece of gear + gold; sometimes a potion. Spills as visible
+     * (beamed) drops, and announce the gear so you know what you found. */
     RogueItem it;
     rogue_item_roll_drop(&it, depth + 1, xs());   /* chest gear skews better */
+    char msg[48]; snprintf(msg, sizeof msg, "Chest: %s", it.name);
+    rogue_game_toast(msg);
     Vec3 a = base; a.x += 0.6f; rogue_loot_drop(&it, a);
-    rogue_item_make_gold(&it, 8 + (int)(frand() * (12 + depth * 6)));
+    int g = 8 + (int)(frand() * (12 + depth * 6));
+    rogue_item_make_gold(&it, g);
     Vec3 b = base; b.x -= 0.6f; rogue_loot_drop(&it, b);
     if (frand() < 0.5f) {
         rogue_item_make_potion(&it, 35);
@@ -141,30 +152,48 @@ void rogue_loot_draw(const CraftCamera *cam, uint16_t *fb) {
     for (int i = 0; i < MAX_CHEST; i++) {
         if (!s_c[i].used) continue;
         if (!s_c[i].opened) {
-            RogueCuboid m[3] = {
-                { 0.0f, 0.16f, 0.0f, 0.30f, 0.16f, 0.22f, RGB(150, 100, 50) },
-                { 0.0f, 0.34f, 0.0f, 0.31f, 0.07f, 0.23f, RGB(120, 78, 38) },
-                { 0.0f, 0.30f, 0.23f, 0.06f, 0.05f, 0.03f, RGB(230, 200, 90) },
+            /* Clear treasure chest: wood body, dark iron bands, gold lock,
+             * domed lid — plus a faint gold "openable" glow column. */
+            RogueCuboid m[8] = {
+                { 0.0f, 0.16f, 0.0f,  0.32f, 0.16f, 0.24f, RGB(140, 92, 44) },  /* body */
+                {-0.26f,0.16f, 0.0f,  0.05f, 0.17f, 0.25f, RGB(70, 46, 22)  },  /* L iron band */
+                { 0.26f,0.16f, 0.0f,  0.05f, 0.17f, 0.25f, RGB(70, 46, 22)  },  /* R iron band */
+                { 0.0f, 0.38f, 0.0f,  0.33f, 0.09f, 0.25f, RGB(120, 78, 38) },  /* lid */
+                {-0.26f,0.38f, 0.0f,  0.05f, 0.10f, 0.26f, RGB(70, 46, 22)  },  /* lid bands */
+                { 0.26f,0.38f, 0.0f,  0.05f, 0.10f, 0.26f, RGB(70, 46, 22)  },
+                { 0.0f, 0.28f, 0.25f, 0.05f, 0.05f, 0.03f, RGB(240, 205, 70) }, /* gold lock */
+                { 0.0f, 0.85f, 0.0f,  0.04f, 0.42f, 0.04f, RGB(240, 205, 70) }, /* glow column */
             };
-            rogue_render_model(cam, fb, s_c[i].pos, 0.0f, m, 3, 0.4f, 0.6f, 0.0f, 256);
+            rogue_render_model(cam, fb, s_c[i].pos, 0.0f, m, 8, 0.4f, 1.3f, 0.0f, 256);
         } else {
-            RogueCuboid m[2] = {
-                { 0.0f, 0.14f, 0.0f, 0.30f, 0.14f, 0.22f, RGB(95, 62, 30) },
-                { 0.0f, 0.28f, 0.0f, 0.26f, 0.04f, 0.18f, RGB(20, 14, 8) },
+            /* opened: lid flipped back, dark interior */
+            RogueCuboid m[4] = {
+                { 0.0f, 0.16f, 0.0f,  0.32f, 0.16f, 0.24f, RGB(120, 78, 38) },  /* body */
+                { 0.0f, 0.30f, 0.0f,  0.27f, 0.03f, 0.19f, RGB(18, 12, 6)   },  /* dark inside */
+                { 0.0f, 0.40f,-0.24f, 0.32f, 0.09f, 0.05f, RGB(100, 64, 30) },  /* open lid (back) */
+                {-0.26f,0.16f, 0.0f,  0.05f, 0.17f, 0.25f, RGB(60, 40, 20)  },
             };
-            rogue_render_model(cam, fb, s_c[i].pos, 0.0f, m, 2, 0.4f, 0.5f, 0.0f, 256);
+            rogue_render_model(cam, fb, s_c[i].pos, 0.0f, m, 4, 0.4f, 0.6f, 0.0f, 256);
         }
     }
-    /* ground items: small spinning cuboid, rarity-tinted, bobbing. */
+    /* ground items: a spinning item cube + a Diablo-style vertical LOOT BEAM
+     * coloured by rarity (equip) or type (gold/gem/potion/torch), so drops are
+     * obvious and you can read their value from across the room. */
     for (int i = 0; i < MAX_GROUND; i++) {
         Ground *g = &s_g[i];
         if (!g->alive) continue;
         bool eq = rogue_item_is_equip(&g->item);
         uint16_t c = eq ? rogue_rarity_color(g->item.rarity) : g->item.color;
+        /* beam: a tall thin glowing column — taller for higher rarity */
+        float bh = eq ? (0.9f + 0.35f * g->item.rarity) : 0.8f;
+        RogueCuboid beam[2] = {
+            { 0.0f, bh, 0.0f, 0.05f, bh,        0.05f, c },   /* bright core */
+            { 0.0f, bh, 0.0f, 0.09f, bh * 0.9f, 0.09f, c },   /* soft halo */
+        };
+        rogue_render_model(cam, fb, g->pos, 0.0f, beam, 2, 0.12f, bh * 2.0f, 0.0f, 256);
         float bob = 0.12f + 0.05f * sinf(g->spin * 1.7f);
         Vec3 pos = g->pos; pos.y += bob;
         RogueCuboid m[1] = { { 0.0f, 0.10f, 0.0f, 0.10f, 0.10f, 0.10f, c } };
-        float flash = (eq && g->item.rarity >= RAR_RARE) ? 0.3f : 0.0f;
-        rogue_render_model(cam, fb, pos, g->spin, m, 1, 0.16f, 0.30f, flash, 256);
+        rogue_render_model(cam, fb, pos, g->spin, m, 1, 0.16f, 0.30f, 0.0f, 256);
     }
 }

@@ -35,7 +35,14 @@ static int   s_kills;
 static int   s_best_depth;
 static bool  s_title = true;
 static float s_lava_t;     /* lava-burn tick timer */
+static char  s_toast[48];  /* transient pickup/chest message */
+static float s_toast_t;
 static uint32_t s_loot_rng = 0x13572468u;
+
+void rogue_game_toast(const char *msg) {
+    snprintf(s_toast, sizeof s_toast, "%s", msg);
+    s_toast_t = 2.6f;
+}
 
 /* Spike traps — always visible (fair), damage on contact with a cooldown. */
 #define MAX_TRAPS 8
@@ -387,6 +394,7 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
     }
 
     if (s_band_banner_t > 0) s_band_banner_t -= dt;
+    if (s_toast_t > 0) s_toast_t -= dt;
 
     rogue_camera_follow(s_player.pos, dt);
     rogue_camera_update(dt);
@@ -405,6 +413,15 @@ const char *rogue_game_weapon_name(void) { return s_player.equip[SLOT_WEAPON].na
  * equip path (weapon_near -> take -> equip -> drop old). Verifies the
  * gear-defined playstyle swap end-to-end. */
 void rogue_game_debug_kill(void) { s_player.hp = 0; s_player.alive = false; s_kills = 7; }
+void rogue_game_debug_beam(void) {
+    /* plant gear of each rarity a few tiles out so the loot beams are visible */
+    for (int k = 0; k < 4; k++) {
+        RogueItem it; rogue_item_roll_drop(&it, 2 + k * 6, loot_rng());
+        it.rarity = (Rarity)k; it.color = rogue_rarity_color((Rarity)k);
+        Vec3 p = s_player.pos; p.x += 2.0f + k * 1.2f; p.z += 2.0f;
+        rogue_loot_drop(&it, p);
+    }
+}
 void rogue_game_debug_set_torch(float s) { s_player.torch_fuel = s; rogue_game_tick(&s_prev, 0.0f); }
 
 int rogue_game_player_maxhp(void) { return s_player.max_hp; }
@@ -516,6 +533,7 @@ void rogue_game_draw_overlay(uint16_t *fb) {
     if (rogue_shop_is_open()) { rogue_shop_draw(fb, &s_player); return; }
 
     rogue_hud_draw(fb, &s_player, s_depth, rogue_enemies_alive_count());
+    if (s_toast_t > 0) rogue_hud_prompt(fb, s_toast);
 
     if (!s_player.alive) {
         int best = s_depth > s_best_depth ? s_depth : s_best_depth;
