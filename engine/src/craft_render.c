@@ -164,6 +164,17 @@ void craft_render_set_groundcover(bool on) { s_groundcover = on; }
 bool craft_render_get_groundcover(void) { return s_groundcover; }
 /* Set per-frame: the game loop passes (torch_light_opt && held==TORCH). */
 void craft_render_set_player_light(bool on) { s_player_light_on = on; }
+
+#ifdef ROGUE_FULLFRAME_RENDER
+/* ThumbyRogue: the player-light bubble normally centres on the eye. With a
+ * pulled-back iso camera that puts the light in front of the hero, so allow
+ * an explicit light origin (the hero's head). */
+static float s_light_px = 0, s_light_py = 0, s_light_pz = 0;
+static bool  s_light_pos_set = false;
+void craft_render_set_light_pos(float x, float y, float z) {
+    s_light_px = x; s_light_py = y; s_light_pz = z; s_light_pos_set = true;
+}
+#endif
 float craft_render_sun_y(void) { return s_sun_y; }
 int   craft_render_brightness_q8(void) { return s_brightness_q8; }
 
@@ -1447,9 +1458,18 @@ void craft_render_strip(const CraftCamera *cam, uint16_t *fb,
                  * lightmap rebuilds. Squared distance keeps it sqrt-free;
                  * the tiers mirror the static TORCH_FLOOR gradient. */
                 if (s_player_light_on) {
+#ifdef ROGUE_FULLFRAME_RENDER
+                    float lpx = s_light_pos_set ? s_light_px : cam->pos.x;
+                    float lpy = s_light_pos_set ? s_light_py : cam->pos.y;
+                    float lpz = s_light_pos_set ? s_light_pz : cam->pos.z;
+                    float ddx = (h.fx + 0.5f) - lpx;
+                    float ddy = (h.fy + 0.5f) - lpy;
+                    float ddz = (h.fz + 0.5f) - lpz;
+#else
                     float ddx = (h.fx + 0.5f) - cam->pos.x;
                     float ddy = (h.fy + 0.5f) - cam->pos.y;
                     float ddz = (h.fz + 0.5f) - cam->pos.z;
+#endif
                     float d2 = ddx * ddx + ddy * ddy + ddz * ddz;
                     int pfloor = 0;
                     if      (d2 <  6.25f) pfloor = 220;  /* ≤ 2.5 blocks */

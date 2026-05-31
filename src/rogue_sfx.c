@@ -4,7 +4,7 @@
 
 void rogue_sfx_init(void) {
     craft_audio_init();
-    craft_audio_set_ambient(0.35f);   /* low dungeon rumble */
+    craft_audio_set_ambient(0.0f);    /* no drone — its wind layer is constant white noise */
 }
 
 /* Map roguelike events onto the engine's blocky SFX palette. */

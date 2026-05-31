@@ -100,6 +100,11 @@ bool craft_render_get_lowres(void);
 void craft_render_set_torch_light(bool on);
 bool craft_render_get_torch_light(void);
 void craft_render_set_player_light(bool on);
+#ifdef ROGUE_FULLFRAME_RENDER
+/* ThumbyRogue: set the player-light bubble origin (the hero's head) so the
+ * torch tracks the player, not the pulled-back iso camera. */
+void craft_render_set_light_pos(float x, float y, float z);
+#endif
 
 /* Drive the day/night cycle. `world_time` is seconds since world
  * start (or current cycle position — wraps every 240 s by the

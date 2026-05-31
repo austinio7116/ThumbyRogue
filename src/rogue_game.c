@@ -164,10 +164,24 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
     if (s_player.torch_fuel > 0) s_player.torch_fuel -= dt;
     if (s_player.torch_fuel < 0) s_player.torch_fuel = 0;
     craft_render_set_player_light(s_player.torch_fuel > 0);
+    /* Light the bubble around the HERO (head height), not the camera. */
+    craft_render_set_light_pos(s_player.pos.x, s_player.pos.y + 0.9f, s_player.pos.z);
     rogue_enemies_set_dark(s_player.torch_fuel <= 0);
 
+    bool starting_attack = atk_edge && s_player.atk_cd <= 0 && s_player.atk_t <= 0;
     rogue_player_update(&s_player, btn, atk_edge, dodge_edge, dt,
                         rogue_camera_snapped_yaw(), s_level.floor_y);
+
+    /* Melee auto-face: snap the swing toward the nearest enemy in lunge
+     * range so daggers/swords land where you mean them to. */
+    if (starting_attack && s_player.wpn_class == WCLASS_MELEE) {
+        float ex, ez;
+        if (rogue_enemies_nearest(s_player.pos.x, s_player.pos.z, &ex, &ez)) {
+            float dx = ex - s_player.pos.x, dz = ez - s_player.pos.z;
+            float reach = s_player.wpn_range * 1.8f;
+            if (dx*dx + dz*dz <= reach*reach) s_player.yaw = atan2f(dx, dz);
+        }
+    }
 
     /* Spike traps. */
     for (int i = 0; i < s_n_trap; i++) {
