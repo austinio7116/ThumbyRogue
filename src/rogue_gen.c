@@ -180,5 +180,9 @@ void rogue_gen_dungeon(uint32_t seed, int depth, RogueLevelInfo *out) {
     out->up_x = s_rooms[up].cx;   out->up_z = s_rooms[up].cz;
     out->down_x = s_rooms[down].cx; out->down_z = s_rooms[down].cz;
     out->n_rooms = s_n_rooms;
+    for (int i = 0; i < s_n_rooms && i < ROGUE_MAX_LEVEL_ROOMS; i++) {
+        out->room_cx[i] = (int16_t)s_rooms[i].cx;
+        out->room_cz[i] = (int16_t)s_rooms[i].cz;
+    }
     out->spawn = v3(out->up_x + 0.5f, (float)ROGUE_FLOOR_Y, out->up_z + 0.5f);
 }

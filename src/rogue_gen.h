@@ -9,12 +9,16 @@
 #include <stdint.h>
 #include "craft_types.h"
 
+#define ROGUE_MAX_LEVEL_ROOMS 48
+
 typedef struct {
     Vec3 spawn;            /* hero feet, on the up-stairs */
     int  up_x, up_z;       /* up-stairs cell (XZ) */
     int  down_x, down_z;   /* down-stairs cell (XZ) */
     int  floor_y;          /* walkable surface Y */
     int  n_rooms;
+    int16_t room_cx[ROGUE_MAX_LEVEL_ROOMS];
+    int16_t room_cz[ROGUE_MAX_LEVEL_ROOMS];
 } RogueLevelInfo;
 
 void rogue_gen_dungeon(uint32_t seed, int depth, RogueLevelInfo *out);

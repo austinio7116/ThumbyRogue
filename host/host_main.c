@@ -99,6 +99,26 @@ int main(int argc, char **argv) {
     craft_tool_models_init();
     rogue_game_init(seed);
 
+    /* Headless autopilot: hold forward + mash attack for ~12s, logging
+     * HP / depth / foes each second — verifies the combat loop end-to-end. */
+    if (getenv("ROGUE_DEMO")) {
+        extern int rogue_game_player_hp(void);
+        extern int rogue_enemies_alive_count(void);
+        extern void rogue_game_demo_step(float dt, int frame);
+        float t = 0;
+        for (int f = 0; f < 25 * 30; f++) {
+            rogue_game_demo_step(1.0f / 30.0f, f);
+            t += 1.0f / 30.0f;
+            if (f % 30 == 0)
+                printf("[demo] t=%.0fs depth=%d hp=%d foes=%d\n",
+                       t, rogue_game_depth(), rogue_game_player_hp(),
+                       rogue_enemies_alive_count());
+            if (shot_path && f == 90) { render_frame(); dump_ppm(shot_path); }
+        }
+        SDL_Quit();
+        return 0;
+    }
+
     if (shot_path) {
         /* Settle the camera follow over a few frames, then dump. */
         CraftRawButtons none = {0};

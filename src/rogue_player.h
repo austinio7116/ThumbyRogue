@@ -1,29 +1,50 @@
 #ifndef ROGUE_PLAYER_H
 #define ROGUE_PLAYER_H
 /*
- * ThumbyRogue hero — position, screen-relative movement with block
- * collision, and a multi-cuboid render. The hero walks on a flat dungeon
- * floor (no gravity yet in Phase 1); Y is the floor surface.
+ * ThumbyRogue hero — movement, melee attack arc, dodge-roll with i-frames,
+ * damage/knockback, and a posed multi-cuboid render (the sword swings on
+ * attack). Walks a flat dungeon floor (Y = floor surface).
  */
 #include <stdint.h>
+#include <stdbool.h>
 #include "craft_types.h"
 #include "craft_render.h"
 #include "craft_buttons.h"
 
 typedef struct {
-    Vec3  pos;        /* feet position */
-    float yaw;        /* facing, radians (0 = +Z) */
-    float move_phase; /* walk-cycle accumulator for limb swing */
+    Vec3  pos;            /* feet position */
+    Vec3  knock;          /* knockback velocity (decays) */
+    float yaw;            /* facing, radians (0 = +Z) */
+    float move_phase;     /* walk-cycle accumulator */
     int   hp, max_hp;
+    bool  alive;
+
+    /* combat timers */
+    float atk_t;          /* >0 while swinging */
+    float atk_cd;         /* recovery before next swing */
+    bool  atk_hit_done;   /* hit-frame already applied this swing */
+    bool  atk_hit_pending;/* set on the hit frame; game consumes to deal arc dmg */
+    float dodge_t;        /* >0 while rolling */
+    float dodge_cd;
+    float dodge_dx, dodge_dz;
+    float invuln_t;       /* i-frames remaining */
+    float hurt_flash;     /* red wash on taking damage */
+
+    /* weapon stats (gear-defined in Phase 4; fixed melee for now) */
+    float wpn_range, wpn_arc_cos, wpn_dur;
+    int   wpn_dmg;
 } RoguePlayer;
 
 void rogue_player_init(RoguePlayer *p, Vec3 spawn);
 
-/* Advance the hero. `cam_yaw` is the camera's snapped yaw so D-pad input is
- * screen-relative (UP = away from camera). Collides against solid world
- * blocks at body height `floor_y`. */
+/* atk_edge / dodge_edge are just-pressed edges computed by the caller. */
 void rogue_player_update(RoguePlayer *p, const CraftRawButtons *btn,
+                         bool atk_edge, bool dodge_edge,
                          float dt, float cam_yaw, int floor_y);
+
+/* Apply damage from a world point (knockback away from it). Respects
+ * i-frames. Returns true if the hit landed. */
+bool rogue_player_damage(RoguePlayer *p, int dmg, Vec3 from);
 
 void rogue_player_draw(const RoguePlayer *p, const CraftCamera *cam,
                        uint16_t *fb, int tint_q8);

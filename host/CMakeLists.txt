@@ -57,6 +57,8 @@ add_executable(thumbyrogue_host
     ${ROGUE_SRC}/rogue_player.c
     ${ROGUE_SRC}/rogue_render.c
     ${ROGUE_SRC}/rogue_gen.c
+    ${ROGUE_SRC}/rogue_enemy.c
+    ${ROGUE_SRC}/rogue_hud.c
     # Lean module set: only what's needed to generate + render a world.
     # ThumbyRogue has NO redstone and NO furnace/smelting, so those
     # SRAM-heavy subsystems are dropped (the three craft_redstone_* hooks
