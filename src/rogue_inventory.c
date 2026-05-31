@@ -124,7 +124,7 @@ static void hrun(uint16_t *fb, int x0, int x1, int y, uint16_t c) {
 /* Tiny per-kind glyph drawn inside a backpack cell. (ox,oy) is the top-left
  * of a ~12x9 icon box; `tint` is the rarity/item colour used to tone equip
  * gear and consumables so rarity still reads at a glance. */
-static void draw_item_icon(uint16_t *fb, int ox, int oy, const RogueItem *it, uint16_t tint) {
+void rogue_item_draw_icon(uint16_t *fb, int ox, int oy, const RogueItem *it, uint16_t tint) {
     const uint16_t SIL = RGB(205,205,215);   /* steel  */
     const uint16_t WD  = RGB(150,110,60);    /* wood   */
     const uint16_t GLD = RGB(235,200,70);    /* gold   */
@@ -133,20 +133,70 @@ static void draw_item_icon(uint16_t *fb, int ox, int oy, const RogueItem *it, ui
     #define H(a,b,j,c) hrun(fb, ox+(a), ox+(b), oy+(j), (c))
     switch (it->kind) {
     case ITEM_WEAPON:
-        if (it->wclass == WCLASS_RANGED) {            /* bow + arrow */
-            P(1,1,WD); P(0,2,WD); P(0,3,WD); P(0,4,WD); P(0,5,WD); P(1,6,WD);
-            P(2,1,SIL); P(2,6,SIL);                   /* string ends */
-            H(2,10,3,SIL);                            /* arrow shaft */
-            P(9,2,SIL); P(9,4,SIL); P(10,3,SIL);      /* head */
-        } else if (it->wclass == WCLASS_CASTER) {     /* staff + orb */
+        switch (it->wtype) {
+        case WT_DAGGER:                               /* short blade + small guard */
+            for (int j = 2; j < 6; j++) P(5,j,SIL);
+            H(4,6,6,GLD);
+            P(5,7,WD); P(5,8,WD);
+            break;
+        case WT_SWORD:                                /* medium blade + crossguard */
+            for (int j = 0; j < 6; j++) P(5,j,SIL);
+            P(6,1,SIL);
+            H(3,7,6,WD); P(5,7,WD); P(5,8,WD);
+            break;
+        case WT_GREATSWORD:                           /* long 2-wide blade, gold guard */
+            for (int j = 0; j < 6; j++) { P(5,j,SIL); P(6,j,SIL); }
+            H(3,8,6,GLD);
+            P(5,7,WD); P(6,7,WD); P(5,8,GLD); P(6,8,GLD);
+            break;
+        case WT_AXE:                                  /* haft + tapered beard-axe bit */
+            for (int j = 0; j < 9; j++) P(4,j,WD);
+            H(5,6,1,SIL); H(5,8,2,SIL); H(5,9,3,SIL); H(5,9,4,SIL);
+            H(6,8,5,SIL); P(7,6,SIL);                 /* beard tapers to a point */
+            break;
+        case WT_MACE:                                 /* haft + round spiked ball */
+            for (int j = 4; j < 9; j++) P(5,j,WD);
+            H(4,6,0,SIL); H(3,7,1,SIL); H(3,7,2,SIL); H(4,6,3,SIL);  /* ball */
+            P(2,1,SIL); P(8,1,SIL);                   /* side spikes */
+            break;
+        case WT_SPEAR:                                /* long shaft + leaf tip */
+            for (int j = 3; j < 9; j++) P(5,j,WD);
+            P(5,0,SIL); H(4,6,1,SIL); P(5,2,SIL);
+            break;
+        case WT_WARHAMMER:                            /* haft + big block head */
+            for (int j = 3; j < 9; j++) P(5,j,WD);
+            H(3,7,0,SIL); H(2,8,1,SIL); H(3,7,2,SIL);
+            break;
+        case WT_BOW:                                  /* bow with the arrow drawn THROUGH it */
+            P(7,0,WD); P(8,1,WD); P(9,2,WD);          /* upper limb, belly faces right (target) */
+            P(9,3,WD); P(9,4,WD); P(9,5,WD); P(9,6,WD);
+            P(8,7,WD); P(7,8,WD);                     /* lower limb */
+            for (int j = 1; j < 8; j++) P(7,j,SIL);   /* string chord at the tips */
+            H(2,10,4,WD);                             /* arrow shaft, pointing right */
+            P(2,3,WD); P(2,5,WD);                     /* fletching at the nock (rear) */
+            P(10,3,SIL); P(10,5,SIL); P(11,4,SIL);    /* arrowhead, out past the bow */
+            break;
+        case WT_CROSSBOW:                             /* horizontal limbs + stock + bolt */
+            H(1,9,3,WD); P(1,2,WD); P(9,2,WD);        /* bow arms + tips */
+            for (int j = 3; j < 8; j++) P(5,j,WD);    /* stock */
+            P(5,0,SIL); P(5,1,SIL); P(5,2,SIL);       /* loaded bolt */
+            H(3,7,4,SIL);                             /* rail */
+            break;
+        case WT_WAND:                                 /* short rod + spark */
+            for (int i = 0; i < 5; i++) P(3+i, 8-i, WD);
+            P(8,3,tint); P(9,2,tint); P(8,2,RGB(255,255,255));
+            break;
+        case WT_SCEPTER:                              /* ornate gold rod + gem head */
+            for (int j = 3; j < 9; j++) P(5,j,GLD);
+            P(5,0,tint); H(4,6,1,tint); P(5,2,GLD);
+            P(3,1,GLD); P(7,1,GLD);                   /* ornate arms */
+            break;
+        case WT_STAFF:                                /* diagonal shaft + orb */
+        default:
             for (int i = 0; i < 6; i++) P(2+i, 8-i, WD);
             P(8,1,tint); P(9,1,tint); P(8,2,tint); P(9,2,tint);
             P(7,0,RGB(255,255,255));
-        } else {                                      /* sword */
-            for (int j = 0; j < 6; j++) P(5,j,SIL);
-            P(6,1,SIL);
-            H(3,7,6,WD);                              /* crossguard */
-            P(5,7,WD); P(5,8,WD);                     /* grip */
+            break;
         }
         break;
     case ITEM_GEAR:
@@ -252,7 +302,7 @@ void rogue_inventory_draw(uint16_t *fb, const RoguePlayer *p) {
         box(fb, x, y, cw, ch, bdr, sel ? RGB(48,42,24) : RGB(20,18,26));
         if (has) {
             uint16_t tint = rogue_item_is_equip(&s_bag[k]) ? rogue_rarity_color(s_bag[k].rarity) : s_bag[k].color;
-            draw_item_icon(fb, x + 2, y + 2, &s_bag[k], tint);
+            rogue_item_draw_icon(fb, x + 2, y + 2, &s_bag[k], tint);
         }
     }
 

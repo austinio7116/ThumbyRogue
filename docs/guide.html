@@ -46,6 +46,12 @@
   .card b{color:#fff}
   .slotbox{display:inline-block;width:30px;height:24px;border-radius:4px;background:#1a1622;
            border:2px solid var(--dim);text-align:center;line-height:22px;font-size:11px;color:#cfc8da}
+  .icongrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:12px;margin:14px 0}
+  .iconfig{margin:0;text-align:center;background:var(--panel2);border:1px solid var(--line);
+           border-radius:7px;padding:10px 6px}
+  .iconfig svg{display:block;margin:0 auto 6px}
+  .iconfig figcaption{color:var(--dim);font-size:12px}
+  .iconfig figcaption b{color:#fff}
   .legend-aspect{color:var(--legendary);font-weight:bold}
   code{background:#221d2e;padding:1px 5px;border-radius:4px;color:#cfc8da;font-size:13px}
   footer{color:var(--dim);text-align:center;margin-top:50px;font-size:12px}
@@ -74,7 +80,8 @@
     <span class="pill"><b>LB / RB</b> rotate view ±90°</span>
     <span class="pill"><b>MENU</b> inventory</span>
     <p style="margin:8px 0 0">Reach the <span style="color:var(--teal)">teal down-stairs beacon</span> to descend. Step on the
-    <span style="color:var(--gold)">gold merchant pad</span> to shop. Walk onto chests to open them.</p>
+    <span style="color:var(--gold)">gold merchant pad</span> to shop. Walk onto chests to open them. The
+    <b>fog-of-war minimap</b> lives on the <code>MENU</code> screen (it was too big to leave up during play).</p>
   </div>
 
   <!-- ============ INVENTORY ============ -->
@@ -84,7 +91,7 @@
   open <code>MENU</code> to compare, equip, salvage and socket.</p>
 
   <div class="shotrow">
-    <figure><img class="shot" src="img/inventory.png" alt="inventory"><figcaption>Paperdoll + backpack + live stats &amp; compare</figcaption></figure>
+    <figure><img class="shot" src="img/inventory.png" alt="inventory"><figcaption>Paperdoll + icon backpack + live stats &amp; map</figcaption></figure>
     <figure><img class="shot" src="img/shop.png" alt="shop"><figcaption>Merchant — buy / gamble / reroll / upgrade</figcaption></figure>
   </div>
 
@@ -96,13 +103,112 @@
   </p>
   <table>
     <tr><th>Slot</th><th>Bases</th><th>Role</th></tr>
-    <tr><td>Weapon</td><td>Dagger, Sword, Axe, Mace (melee) · Bow (ranged) · Staff, Wand (caster)</td><td>Sets attack style + base damage</td></tr>
-    <tr><td>Off-hand</td><td>Shield, Focus</td><td>Armor / caster bonus</td></tr>
+    <tr><td>Weapon</td><td><b>12 types</b> — Dagger, Sword, Greatsword, Axe, Mace, Spear, Warhammer (melee) · Bow, Crossbow (ranged) · Wand, Scepter, Staff (caster)</td><td>Sets attack style; base damage spans 14 → 52, with faster weapons hitting lighter</td></tr>
+    <tr><td>Off-hand</td><td>Shield, Tome, Charm</td><td>Armor / caster bonus</td></tr>
     <tr><td>Helm</td><td>Cap, Helm, Crown</td><td>Armor + affixes</td></tr>
     <tr><td>Armor</td><td>Tunic, Mail, Plate</td><td>Bulk of your armor</td></tr>
     <tr><td>Amulet</td><td>Amulet, Pendant</td><td>Powerful jewel affixes</td></tr>
     <tr><td>Ring</td><td>Ring, Band</td><td>Jewel affixes</td></tr>
   </table>
+
+  <h3>Item icons</h3>
+  <p>Every weapon type and item kind has its own glyph, drawn pixel-for-pixel by the game
+  (<code>rogue_item_draw_icon</code> in <code>rogue_inventory.c</code>) and tinted by rarity so a legendary
+  still reads at a glance. The same icons appear in the backpack grid <i>and</i> beside each merchant
+  listing. These are the exact in-game icons:</p>
+  <h4 style="color:#cfc8da;margin:14px 0 4px;font-size:14px">Weapons — melee</h4>
+  <div class="icongrid">
+    <figure class="iconfig">
+      <svg viewBox="0 0 12 9" width="48" height="36" style="image-rendering:pixelated;background:#16121f;border:2px solid #2c2738;border-radius:5px"><rect x="5" y="2" width="1" height="1" fill="#cdcdd7"/><rect x="5" y="3" width="1" height="1" fill="#cdcdd7"/><rect x="5" y="4" width="1" height="1" fill="#cdcdd7"/><rect x="5" y="5" width="1" height="1" fill="#cdcdd7"/><rect x="4" y="6" width="1" height="1" fill="#ebc846"/><rect x="5" y="6" width="1" height="1" fill="#ebc846"/><rect x="6" y="6" width="1" height="1" fill="#ebc846"/><rect x="5" y="7" width="1" height="1" fill="#966e3c"/><rect x="5" y="8" width="1" height="1" fill="#966e3c"/></svg>
+      <figcaption><b>Dagger</b><br>14 dmg · fast</figcaption>
+    </figure>
+    <figure class="iconfig">
+      <svg viewBox="0 0 12 9" width="48" height="36" style="image-rendering:pixelated;background:#16121f;border:2px solid #2c2738;border-radius:5px"><rect x="5" y="0" width="1" height="1" fill="#cdcdd7"/><rect x="5" y="1" width="1" height="1" fill="#cdcdd7"/><rect x="5" y="2" width="1" height="1" fill="#cdcdd7"/><rect x="5" y="3" width="1" height="1" fill="#cdcdd7"/><rect x="5" y="4" width="1" height="1" fill="#cdcdd7"/><rect x="5" y="5" width="1" height="1" fill="#cdcdd7"/><rect x="6" y="1" width="1" height="1" fill="#cdcdd7"/><rect x="3" y="6" width="1" height="1" fill="#966e3c"/><rect x="4" y="6" width="1" height="1" fill="#966e3c"/><rect x="5" y="6" width="1" height="1" fill="#966e3c"/><rect x="6" y="6" width="1" height="1" fill="#966e3c"/><rect x="7" y="6" width="1" height="1" fill="#966e3c"/><rect x="5" y="7" width="1" height="1" fill="#966e3c"/><rect x="5" y="8" width="1" height="1" fill="#966e3c"/></svg>
+      <figcaption><b>Sword</b><br>24 dmg</figcaption>
+    </figure>
+    <figure class="iconfig">
+      <svg viewBox="0 0 12 9" width="48" height="36" style="image-rendering:pixelated;background:#16121f;border:2px solid #2c2738;border-radius:5px"><rect x="5" y="0" width="1" height="1" fill="#cdcdd7"/><rect x="6" y="0" width="1" height="1" fill="#cdcdd7"/><rect x="5" y="1" width="1" height="1" fill="#cdcdd7"/><rect x="6" y="1" width="1" height="1" fill="#cdcdd7"/><rect x="5" y="2" width="1" height="1" fill="#cdcdd7"/><rect x="6" y="2" width="1" height="1" fill="#cdcdd7"/><rect x="5" y="3" width="1" height="1" fill="#cdcdd7"/><rect x="6" y="3" width="1" height="1" fill="#cdcdd7"/><rect x="5" y="4" width="1" height="1" fill="#cdcdd7"/><rect x="6" y="4" width="1" height="1" fill="#cdcdd7"/><rect x="5" y="5" width="1" height="1" fill="#cdcdd7"/><rect x="6" y="5" width="1" height="1" fill="#cdcdd7"/><rect x="3" y="6" width="1" height="1" fill="#ebc846"/><rect x="4" y="6" width="1" height="1" fill="#ebc846"/><rect x="5" y="6" width="1" height="1" fill="#ebc846"/><rect x="6" y="6" width="1" height="1" fill="#ebc846"/><rect x="7" y="6" width="1" height="1" fill="#ebc846"/><rect x="8" y="6" width="1" height="1" fill="#ebc846"/><rect x="5" y="7" width="1" height="1" fill="#966e3c"/><rect x="6" y="7" width="1" height="1" fill="#966e3c"/><rect x="5" y="8" width="1" height="1" fill="#ebc846"/><rect x="6" y="8" width="1" height="1" fill="#ebc846"/></svg>
+      <figcaption><b>Greatsword</b><br>46 dmg · wide</figcaption>
+    </figure>
+    <figure class="iconfig">
+      <svg viewBox="0 0 12 9" width="48" height="36" style="image-rendering:pixelated;background:#16121f;border:2px solid #2c2738;border-radius:5px"><rect x="4" y="0" width="1" height="1" fill="#966e3c"/><rect x="4" y="1" width="1" height="1" fill="#966e3c"/><rect x="4" y="2" width="1" height="1" fill="#966e3c"/><rect x="4" y="3" width="1" height="1" fill="#966e3c"/><rect x="4" y="4" width="1" height="1" fill="#966e3c"/><rect x="4" y="5" width="1" height="1" fill="#966e3c"/><rect x="4" y="6" width="1" height="1" fill="#966e3c"/><rect x="4" y="7" width="1" height="1" fill="#966e3c"/><rect x="4" y="8" width="1" height="1" fill="#966e3c"/><rect x="5" y="1" width="1" height="1" fill="#cdcdd7"/><rect x="6" y="1" width="1" height="1" fill="#cdcdd7"/><rect x="5" y="2" width="1" height="1" fill="#cdcdd7"/><rect x="6" y="2" width="1" height="1" fill="#cdcdd7"/><rect x="7" y="2" width="1" height="1" fill="#cdcdd7"/><rect x="8" y="2" width="1" height="1" fill="#cdcdd7"/><rect x="5" y="3" width="1" height="1" fill="#cdcdd7"/><rect x="6" y="3" width="1" height="1" fill="#cdcdd7"/><rect x="7" y="3" width="1" height="1" fill="#cdcdd7"/><rect x="8" y="3" width="1" height="1" fill="#cdcdd7"/><rect x="9" y="3" width="1" height="1" fill="#cdcdd7"/><rect x="5" y="4" width="1" height="1" fill="#cdcdd7"/><rect x="6" y="4" width="1" height="1" fill="#cdcdd7"/><rect x="7" y="4" width="1" height="1" fill="#cdcdd7"/><rect x="8" y="4" width="1" height="1" fill="#cdcdd7"/><rect x="9" y="4" width="1" height="1" fill="#cdcdd7"/><rect x="6" y="5" width="1" height="1" fill="#cdcdd7"/><rect x="7" y="5" width="1" height="1" fill="#cdcdd7"/><rect x="8" y="5" width="1" height="1" fill="#cdcdd7"/><rect x="7" y="6" width="1" height="1" fill="#cdcdd7"/></svg>
+      <figcaption><b>Axe</b><br>36 dmg · cleave</figcaption>
+    </figure>
+    <figure class="iconfig">
+      <svg viewBox="0 0 12 9" width="48" height="36" style="image-rendering:pixelated;background:#16121f;border:2px solid #2c2738;border-radius:5px"><rect x="5" y="4" width="1" height="1" fill="#966e3c"/><rect x="5" y="5" width="1" height="1" fill="#966e3c"/><rect x="5" y="6" width="1" height="1" fill="#966e3c"/><rect x="5" y="7" width="1" height="1" fill="#966e3c"/><rect x="5" y="8" width="1" height="1" fill="#966e3c"/><rect x="4" y="0" width="1" height="1" fill="#cdcdd7"/><rect x="5" y="0" width="1" height="1" fill="#cdcdd7"/><rect x="6" y="0" width="1" height="1" fill="#cdcdd7"/><rect x="3" y="1" width="1" height="1" fill="#cdcdd7"/><rect x="4" y="1" width="1" height="1" fill="#cdcdd7"/><rect x="5" y="1" width="1" height="1" fill="#cdcdd7"/><rect x="6" y="1" width="1" height="1" fill="#cdcdd7"/><rect x="7" y="1" width="1" height="1" fill="#cdcdd7"/><rect x="3" y="2" width="1" height="1" fill="#cdcdd7"/><rect x="4" y="2" width="1" height="1" fill="#cdcdd7"/><rect x="5" y="2" width="1" height="1" fill="#cdcdd7"/><rect x="6" y="2" width="1" height="1" fill="#cdcdd7"/><rect x="7" y="2" width="1" height="1" fill="#cdcdd7"/><rect x="4" y="3" width="1" height="1" fill="#cdcdd7"/><rect x="5" y="3" width="1" height="1" fill="#cdcdd7"/><rect x="6" y="3" width="1" height="1" fill="#cdcdd7"/><rect x="2" y="1" width="1" height="1" fill="#cdcdd7"/><rect x="8" y="1" width="1" height="1" fill="#cdcdd7"/></svg>
+      <figcaption><b>Mace</b><br>30 dmg</figcaption>
+    </figure>
+    <figure class="iconfig">
+      <svg viewBox="0 0 12 9" width="48" height="36" style="image-rendering:pixelated;background:#16121f;border:2px solid #2c2738;border-radius:5px"><rect x="5" y="3" width="1" height="1" fill="#966e3c"/><rect x="5" y="4" width="1" height="1" fill="#966e3c"/><rect x="5" y="5" width="1" height="1" fill="#966e3c"/><rect x="5" y="6" width="1" height="1" fill="#966e3c"/><rect x="5" y="7" width="1" height="1" fill="#966e3c"/><rect x="5" y="8" width="1" height="1" fill="#966e3c"/><rect x="5" y="0" width="1" height="1" fill="#cdcdd7"/><rect x="4" y="1" width="1" height="1" fill="#cdcdd7"/><rect x="5" y="1" width="1" height="1" fill="#cdcdd7"/><rect x="6" y="1" width="1" height="1" fill="#cdcdd7"/><rect x="5" y="2" width="1" height="1" fill="#cdcdd7"/></svg>
+      <figcaption><b>Spear</b><br>28 dmg · reach</figcaption>
+    </figure>
+    <figure class="iconfig">
+      <svg viewBox="0 0 12 9" width="48" height="36" style="image-rendering:pixelated;background:#16121f;border:2px solid #2c2738;border-radius:5px"><rect x="5" y="3" width="1" height="1" fill="#966e3c"/><rect x="5" y="4" width="1" height="1" fill="#966e3c"/><rect x="5" y="5" width="1" height="1" fill="#966e3c"/><rect x="5" y="6" width="1" height="1" fill="#966e3c"/><rect x="5" y="7" width="1" height="1" fill="#966e3c"/><rect x="5" y="8" width="1" height="1" fill="#966e3c"/><rect x="3" y="0" width="1" height="1" fill="#cdcdd7"/><rect x="4" y="0" width="1" height="1" fill="#cdcdd7"/><rect x="5" y="0" width="1" height="1" fill="#cdcdd7"/><rect x="6" y="0" width="1" height="1" fill="#cdcdd7"/><rect x="7" y="0" width="1" height="1" fill="#cdcdd7"/><rect x="2" y="1" width="1" height="1" fill="#cdcdd7"/><rect x="3" y="1" width="1" height="1" fill="#cdcdd7"/><rect x="4" y="1" width="1" height="1" fill="#cdcdd7"/><rect x="5" y="1" width="1" height="1" fill="#cdcdd7"/><rect x="6" y="1" width="1" height="1" fill="#cdcdd7"/><rect x="7" y="1" width="1" height="1" fill="#cdcdd7"/><rect x="8" y="1" width="1" height="1" fill="#cdcdd7"/><rect x="3" y="2" width="1" height="1" fill="#cdcdd7"/><rect x="4" y="2" width="1" height="1" fill="#cdcdd7"/><rect x="5" y="2" width="1" height="1" fill="#cdcdd7"/><rect x="6" y="2" width="1" height="1" fill="#cdcdd7"/><rect x="7" y="2" width="1" height="1" fill="#cdcdd7"/></svg>
+      <figcaption><b>Warhammer</b><br>52 dmg · slow</figcaption>
+    </figure>
+  </div>
+  <h4 style="color:#cfc8da;margin:14px 0 4px;font-size:14px">Weapons — ranged &amp; caster</h4>
+  <div class="icongrid">
+    <figure class="iconfig">
+      <svg viewBox="0 0 12 9" width="48" height="36" style="image-rendering:pixelated;background:#16121f;border:2px solid #2c2738;border-radius:5px"><rect x="7" y="0" width="1" height="1" fill="#966e3c"/><rect x="8" y="1" width="1" height="1" fill="#966e3c"/><rect x="9" y="2" width="1" height="1" fill="#966e3c"/><rect x="9" y="3" width="1" height="1" fill="#966e3c"/><rect x="9" y="4" width="1" height="1" fill="#966e3c"/><rect x="9" y="5" width="1" height="1" fill="#966e3c"/><rect x="9" y="6" width="1" height="1" fill="#966e3c"/><rect x="8" y="7" width="1" height="1" fill="#966e3c"/><rect x="7" y="8" width="1" height="1" fill="#966e3c"/><rect x="7" y="1" width="1" height="1" fill="#cdcdd7"/><rect x="7" y="2" width="1" height="1" fill="#cdcdd7"/><rect x="7" y="3" width="1" height="1" fill="#cdcdd7"/><rect x="7" y="4" width="1" height="1" fill="#966e3c"/><rect x="7" y="5" width="1" height="1" fill="#cdcdd7"/><rect x="7" y="6" width="1" height="1" fill="#cdcdd7"/><rect x="7" y="7" width="1" height="1" fill="#cdcdd7"/><rect x="2" y="4" width="1" height="1" fill="#966e3c"/><rect x="3" y="4" width="1" height="1" fill="#966e3c"/><rect x="4" y="4" width="1" height="1" fill="#966e3c"/><rect x="5" y="4" width="1" height="1" fill="#966e3c"/><rect x="6" y="4" width="1" height="1" fill="#966e3c"/><rect x="8" y="4" width="1" height="1" fill="#966e3c"/><rect x="10" y="4" width="1" height="1" fill="#966e3c"/><rect x="2" y="3" width="1" height="1" fill="#966e3c"/><rect x="2" y="5" width="1" height="1" fill="#966e3c"/><rect x="10" y="3" width="1" height="1" fill="#cdcdd7"/><rect x="10" y="5" width="1" height="1" fill="#cdcdd7"/><rect x="11" y="4" width="1" height="1" fill="#cdcdd7"/></svg>
+      <figcaption><b>Bow</b><br>22 dmg</figcaption>
+    </figure>
+    <figure class="iconfig">
+      <svg viewBox="0 0 12 9" width="48" height="36" style="image-rendering:pixelated;background:#16121f;border:2px solid #2c2738;border-radius:5px"><rect x="1" y="3" width="1" height="1" fill="#966e3c"/><rect x="2" y="3" width="1" height="1" fill="#966e3c"/><rect x="3" y="3" width="1" height="1" fill="#966e3c"/><rect x="4" y="3" width="1" height="1" fill="#966e3c"/><rect x="5" y="3" width="1" height="1" fill="#966e3c"/><rect x="6" y="3" width="1" height="1" fill="#966e3c"/><rect x="7" y="3" width="1" height="1" fill="#966e3c"/><rect x="8" y="3" width="1" height="1" fill="#966e3c"/><rect x="9" y="3" width="1" height="1" fill="#966e3c"/><rect x="1" y="2" width="1" height="1" fill="#966e3c"/><rect x="9" y="2" width="1" height="1" fill="#966e3c"/><rect x="5" y="4" width="1" height="1" fill="#cdcdd7"/><rect x="5" y="5" width="1" height="1" fill="#966e3c"/><rect x="5" y="6" width="1" height="1" fill="#966e3c"/><rect x="5" y="7" width="1" height="1" fill="#966e3c"/><rect x="5" y="0" width="1" height="1" fill="#cdcdd7"/><rect x="5" y="1" width="1" height="1" fill="#cdcdd7"/><rect x="5" y="2" width="1" height="1" fill="#cdcdd7"/><rect x="3" y="4" width="1" height="1" fill="#cdcdd7"/><rect x="4" y="4" width="1" height="1" fill="#cdcdd7"/><rect x="6" y="4" width="1" height="1" fill="#cdcdd7"/><rect x="7" y="4" width="1" height="1" fill="#cdcdd7"/></svg>
+      <figcaption><b>Crossbow</b><br>34 dmg · heavy bolt</figcaption>
+    </figure>
+    <figure class="iconfig">
+      <svg viewBox="0 0 12 9" width="48" height="36" style="image-rendering:pixelated;background:#16121f;border:2px solid #2c2738;border-radius:5px"><rect x="3" y="8" width="1" height="1" fill="#966e3c"/><rect x="4" y="7" width="1" height="1" fill="#966e3c"/><rect x="5" y="6" width="1" height="1" fill="#966e3c"/><rect x="6" y="5" width="1" height="1" fill="#966e3c"/><rect x="7" y="4" width="1" height="1" fill="#966e3c"/><rect x="8" y="3" width="1" height="1" fill="#28d26e"/><rect x="9" y="2" width="1" height="1" fill="#28d26e"/><rect x="8" y="2" width="1" height="1" fill="#ffffff"/></svg>
+      <figcaption><b>Wand</b><br>16 dmg · fast</figcaption>
+    </figure>
+    <figure class="iconfig">
+      <svg viewBox="0 0 12 9" width="48" height="36" style="image-rendering:pixelated;background:#16121f;border:2px solid #2c2738;border-radius:5px"><rect x="5" y="3" width="1" height="1" fill="#ebc846"/><rect x="5" y="4" width="1" height="1" fill="#ebc846"/><rect x="5" y="5" width="1" height="1" fill="#ebc846"/><rect x="5" y="6" width="1" height="1" fill="#ebc846"/><rect x="5" y="7" width="1" height="1" fill="#ebc846"/><rect x="5" y="8" width="1" height="1" fill="#ebc846"/><rect x="5" y="0" width="1" height="1" fill="#f0dc46"/><rect x="4" y="1" width="1" height="1" fill="#f0dc46"/><rect x="5" y="1" width="1" height="1" fill="#f0dc46"/><rect x="6" y="1" width="1" height="1" fill="#f0dc46"/><rect x="5" y="2" width="1" height="1" fill="#ebc846"/><rect x="3" y="1" width="1" height="1" fill="#ebc846"/><rect x="7" y="1" width="1" height="1" fill="#ebc846"/></svg>
+      <figcaption><b>Scepter</b><br>26 dmg</figcaption>
+    </figure>
+    <figure class="iconfig">
+      <svg viewBox="0 0 12 9" width="48" height="36" style="image-rendering:pixelated;background:#16121f;border:2px solid #2c2738;border-radius:5px"><rect x="2" y="8" width="1" height="1" fill="#966e3c"/><rect x="3" y="7" width="1" height="1" fill="#966e3c"/><rect x="4" y="6" width="1" height="1" fill="#966e3c"/><rect x="5" y="5" width="1" height="1" fill="#966e3c"/><rect x="6" y="4" width="1" height="1" fill="#966e3c"/><rect x="7" y="3" width="1" height="1" fill="#966e3c"/><rect x="8" y="1" width="1" height="1" fill="#dc8228"/><rect x="9" y="1" width="1" height="1" fill="#dc8228"/><rect x="8" y="2" width="1" height="1" fill="#dc8228"/><rect x="9" y="2" width="1" height="1" fill="#dc8228"/><rect x="7" y="0" width="1" height="1" fill="#ffffff"/></svg>
+      <figcaption><b>Staff</b><br>34 dmg · slow</figcaption>
+    </figure>
+  </div>
+  <h4 style="color:#cfc8da;margin:14px 0 4px;font-size:14px">Gear, gems &amp; consumables</h4>
+  <div class="icongrid">
+    <figure class="iconfig">
+      <svg viewBox="0 0 12 9" width="48" height="36" style="image-rendering:pixelated;background:#16121f;border:2px solid #2c2738;border-radius:5px"><rect x="3" y="0" width="1" height="1" fill="#cdcdd7"/><rect x="4" y="0" width="1" height="1" fill="#cdcdd7"/><rect x="5" y="0" width="1" height="1" fill="#cdcdd7"/><rect x="6" y="0" width="1" height="1" fill="#cdcdd7"/><rect x="7" y="0" width="1" height="1" fill="#cdcdd7"/><rect x="8" y="0" width="1" height="1" fill="#cdcdd7"/><rect x="2" y="1" width="1" height="1" fill="#5a8cff"/><rect x="3" y="1" width="1" height="1" fill="#5a8cff"/><rect x="4" y="1" width="1" height="1" fill="#5a8cff"/><rect x="5" y="1" width="1" height="1" fill="#5a8cff"/><rect x="6" y="1" width="1" height="1" fill="#5a8cff"/><rect x="7" y="1" width="1" height="1" fill="#5a8cff"/><rect x="8" y="1" width="1" height="1" fill="#5a8cff"/><rect x="9" y="1" width="1" height="1" fill="#5a8cff"/><rect x="2" y="2" width="1" height="1" fill="#5a8cff"/><rect x="3" y="2" width="1" height="1" fill="#5a8cff"/><rect x="4" y="2" width="1" height="1" fill="#5a8cff"/><rect x="5" y="2" width="1" height="1" fill="#1c1a22"/><rect x="6" y="2" width="1" height="1" fill="#1c1a22"/><rect x="7" y="2" width="1" height="1" fill="#5a8cff"/><rect x="8" y="2" width="1" height="1" fill="#5a8cff"/><rect x="9" y="2" width="1" height="1" fill="#5a8cff"/><rect x="2" y="3" width="1" height="1" fill="#5a8cff"/><rect x="3" y="3" width="1" height="1" fill="#5a8cff"/><rect x="4" y="3" width="1" height="1" fill="#5a8cff"/><rect x="5" y="3" width="1" height="1" fill="#1c1a22"/><rect x="6" y="3" width="1" height="1" fill="#1c1a22"/><rect x="7" y="3" width="1" height="1" fill="#5a8cff"/><rect x="8" y="3" width="1" height="1" fill="#5a8cff"/><rect x="9" y="3" width="1" height="1" fill="#5a8cff"/><rect x="3" y="4" width="1" height="1" fill="#5a8cff"/><rect x="4" y="4" width="1" height="1" fill="#5a8cff"/><rect x="5" y="4" width="1" height="1" fill="#5a8cff"/><rect x="6" y="4" width="1" height="1" fill="#5a8cff"/><rect x="7" y="4" width="1" height="1" fill="#5a8cff"/><rect x="8" y="4" width="1" height="1" fill="#5a8cff"/><rect x="3" y="5" width="1" height="1" fill="#5a8cff"/><rect x="4" y="5" width="1" height="1" fill="#5a8cff"/><rect x="5" y="5" width="1" height="1" fill="#5a8cff"/><rect x="6" y="5" width="1" height="1" fill="#5a8cff"/><rect x="7" y="5" width="1" height="1" fill="#5a8cff"/><rect x="8" y="5" width="1" height="1" fill="#5a8cff"/><rect x="4" y="6" width="1" height="1" fill="#5a8cff"/><rect x="5" y="6" width="1" height="1" fill="#5a8cff"/><rect x="6" y="6" width="1" height="1" fill="#5a8cff"/><rect x="7" y="6" width="1" height="1" fill="#5a8cff"/><rect x="5" y="7" width="1" height="1" fill="#5a8cff"/><rect x="6" y="7" width="1" height="1" fill="#5a8cff"/></svg>
+      <figcaption><b>Shield</b><br>Off-hand</figcaption>
+    </figure>
+    <figure class="iconfig">
+      <svg viewBox="0 0 12 9" width="48" height="36" style="image-rendering:pixelated;background:#16121f;border:2px solid #2c2738;border-radius:5px"><rect x="4" y="0" width="1" height="1" fill="#cdcdd7"/><rect x="5" y="0" width="1" height="1" fill="#cdcdd7"/><rect x="6" y="0" width="1" height="1" fill="#cdcdd7"/><rect x="7" y="0" width="1" height="1" fill="#cdcdd7"/><rect x="3" y="1" width="1" height="1" fill="#cdcdd7"/><rect x="4" y="1" width="1" height="1" fill="#cdcdd7"/><rect x="5" y="1" width="1" height="1" fill="#cdcdd7"/><rect x="6" y="1" width="1" height="1" fill="#cdcdd7"/><rect x="7" y="1" width="1" height="1" fill="#cdcdd7"/><rect x="8" y="1" width="1" height="1" fill="#cdcdd7"/><rect x="2" y="2" width="1" height="1" fill="#cdcdd7"/><rect x="3" y="2" width="1" height="1" fill="#cdcdd7"/><rect x="4" y="2" width="1" height="1" fill="#cdcdd7"/><rect x="5" y="2" width="1" height="1" fill="#cdcdd7"/><rect x="6" y="2" width="1" height="1" fill="#cdcdd7"/><rect x="7" y="2" width="1" height="1" fill="#cdcdd7"/><rect x="8" y="2" width="1" height="1" fill="#cdcdd7"/><rect x="9" y="2" width="1" height="1" fill="#cdcdd7"/><rect x="2" y="3" width="1" height="1" fill="#cdcdd7"/><rect x="3" y="3" width="1" height="1" fill="#cdcdd7"/><rect x="4" y="3" width="1" height="1" fill="#1c1a22"/><rect x="5" y="3" width="1" height="1" fill="#1c1a22"/><rect x="6" y="3" width="1" height="1" fill="#1c1a22"/><rect x="7" y="3" width="1" height="1" fill="#1c1a22"/><rect x="8" y="3" width="1" height="1" fill="#cdcdd7"/><rect x="9" y="3" width="1" height="1" fill="#cdcdd7"/><rect x="1" y="4" width="1" height="1" fill="#cdcdd7"/><rect x="2" y="4" width="1" height="1" fill="#cdcdd7"/><rect x="3" y="4" width="1" height="1" fill="#cdcdd7"/><rect x="4" y="4" width="1" height="1" fill="#cdcdd7"/><rect x="5" y="4" width="1" height="1" fill="#cdcdd7"/><rect x="6" y="4" width="1" height="1" fill="#cdcdd7"/><rect x="7" y="4" width="1" height="1" fill="#cdcdd7"/><rect x="8" y="4" width="1" height="1" fill="#cdcdd7"/><rect x="9" y="4" width="1" height="1" fill="#cdcdd7"/><rect x="10" y="4" width="1" height="1" fill="#cdcdd7"/></svg>
+      <figcaption><b>Helm</b><br>Head</figcaption>
+    </figure>
+    <figure class="iconfig">
+      <svg viewBox="0 0 12 9" width="48" height="36" style="image-rendering:pixelated;background:#16121f;border:2px solid #2c2738;border-radius:5px"><rect x="2" y="0" width="1" height="1" fill="#cdcdd7"/><rect x="3" y="0" width="1" height="1" fill="#cdcdd7"/><rect x="8" y="0" width="1" height="1" fill="#cdcdd7"/><rect x="9" y="0" width="1" height="1" fill="#cdcdd7"/><rect x="1" y="1" width="1" height="1" fill="#cdcdd7"/><rect x="2" y="1" width="1" height="1" fill="#cdcdd7"/><rect x="3" y="1" width="1" height="1" fill="#cdcdd7"/><rect x="4" y="1" width="1" height="1" fill="#cdcdd7"/><rect x="5" y="1" width="1" height="1" fill="#cdcdd7"/><rect x="6" y="1" width="1" height="1" fill="#cdcdd7"/><rect x="7" y="1" width="1" height="1" fill="#cdcdd7"/><rect x="8" y="1" width="1" height="1" fill="#cdcdd7"/><rect x="9" y="1" width="1" height="1" fill="#cdcdd7"/><rect x="10" y="1" width="1" height="1" fill="#cdcdd7"/><rect x="2" y="2" width="1" height="1" fill="#5a8cff"/><rect x="3" y="2" width="1" height="1" fill="#5a8cff"/><rect x="4" y="2" width="1" height="1" fill="#5a8cff"/><rect x="5" y="2" width="1" height="1" fill="#1c1a22"/><rect x="6" y="2" width="1" height="1" fill="#1c1a22"/><rect x="7" y="2" width="1" height="1" fill="#5a8cff"/><rect x="8" y="2" width="1" height="1" fill="#5a8cff"/><rect x="9" y="2" width="1" height="1" fill="#5a8cff"/><rect x="2" y="3" width="1" height="1" fill="#5a8cff"/><rect x="3" y="3" width="1" height="1" fill="#5a8cff"/><rect x="4" y="3" width="1" height="1" fill="#5a8cff"/><rect x="5" y="3" width="1" height="1" fill="#5a8cff"/><rect x="6" y="3" width="1" height="1" fill="#5a8cff"/><rect x="7" y="3" width="1" height="1" fill="#5a8cff"/><rect x="8" y="3" width="1" height="1" fill="#5a8cff"/><rect x="9" y="3" width="1" height="1" fill="#5a8cff"/><rect x="3" y="4" width="1" height="1" fill="#5a8cff"/><rect x="4" y="4" width="1" height="1" fill="#5a8cff"/><rect x="5" y="4" width="1" height="1" fill="#5a8cff"/><rect x="6" y="4" width="1" height="1" fill="#5a8cff"/><rect x="7" y="4" width="1" height="1" fill="#5a8cff"/><rect x="8" y="4" width="1" height="1" fill="#5a8cff"/><rect x="4" y="5" width="1" height="1" fill="#5a8cff"/><rect x="5" y="5" width="1" height="1" fill="#5a8cff"/><rect x="6" y="5" width="1" height="1" fill="#5a8cff"/><rect x="7" y="5" width="1" height="1" fill="#5a8cff"/><rect x="5" y="6" width="1" height="1" fill="#5a8cff"/><rect x="6" y="6" width="1" height="1" fill="#5a8cff"/></svg>
+      <figcaption><b>Chestplate</b><br>Body</figcaption>
+    </figure>
+    <figure class="iconfig">
+      <svg viewBox="0 0 12 9" width="48" height="36" style="image-rendering:pixelated;background:#16121f;border:2px solid #2c2738;border-radius:5px"><rect x="3" y="0" width="1" height="1" fill="#ebc846"/><rect x="4" y="1" width="1" height="1" fill="#ebc846"/><rect x="5" y="2" width="1" height="1" fill="#ebc846"/><rect x="8" y="0" width="1" height="1" fill="#ebc846"/><rect x="7" y="1" width="1" height="1" fill="#ebc846"/><rect x="6" y="2" width="1" height="1" fill="#ebc846"/><rect x="6" y="3" width="1" height="1" fill="#f0dc46"/><rect x="5" y="4" width="1" height="1" fill="#f0dc46"/><rect x="6" y="4" width="1" height="1" fill="#f0dc46"/><rect x="7" y="4" width="1" height="1" fill="#f0dc46"/><rect x="6" y="5" width="1" height="1" fill="#f0dc46"/></svg>
+      <figcaption><b>Amulet</b><br>Neck</figcaption>
+    </figure>
+    <figure class="iconfig">
+      <svg viewBox="0 0 12 9" width="48" height="36" style="image-rendering:pixelated;background:#16121f;border:2px solid #2c2738;border-radius:5px"><rect x="5" y="2" width="1" height="1" fill="#28d26e"/><rect x="6" y="2" width="1" height="1" fill="#28d26e"/><rect x="4" y="3" width="1" height="1" fill="#ebc846"/><rect x="7" y="3" width="1" height="1" fill="#ebc846"/><rect x="4" y="4" width="1" height="1" fill="#ebc846"/><rect x="7" y="4" width="1" height="1" fill="#ebc846"/><rect x="5" y="5" width="1" height="1" fill="#ebc846"/><rect x="6" y="5" width="1" height="1" fill="#ebc846"/></svg>
+      <figcaption><b>Ring</b><br>Finger</figcaption>
+    </figure>
+    <figure class="iconfig">
+      <svg viewBox="0 0 12 9" width="48" height="36" style="image-rendering:pixelated;background:#16121f;border:2px solid #2c2738;border-radius:5px"><rect x="5" y="0" width="1" height="1" fill="#dc283c"/><rect x="6" y="0" width="1" height="1" fill="#dc283c"/><rect x="4" y="1" width="1" height="1" fill="#ffffff"/><rect x="5" y="1" width="1" height="1" fill="#dc283c"/><rect x="6" y="1" width="1" height="1" fill="#dc283c"/><rect x="7" y="1" width="1" height="1" fill="#dc283c"/><rect x="3" y="2" width="1" height="1" fill="#dc283c"/><rect x="4" y="2" width="1" height="1" fill="#dc283c"/><rect x="5" y="2" width="1" height="1" fill="#dc283c"/><rect x="6" y="2" width="1" height="1" fill="#dc283c"/><rect x="7" y="2" width="1" height="1" fill="#dc283c"/><rect x="8" y="2" width="1" height="1" fill="#dc283c"/><rect x="4" y="3" width="1" height="1" fill="#dc283c"/><rect x="5" y="3" width="1" height="1" fill="#dc283c"/><rect x="6" y="3" width="1" height="1" fill="#dc283c"/><rect x="7" y="3" width="1" height="1" fill="#dc283c"/><rect x="5" y="4" width="1" height="1" fill="#dc283c"/><rect x="6" y="4" width="1" height="1" fill="#dc283c"/></svg>
+      <figcaption><b>Gem</b><br>Socketable</figcaption>
+    </figure>
+    <figure class="iconfig">
+      <svg viewBox="0 0 12 9" width="48" height="36" style="image-rendering:pixelated;background:#16121f;border:2px solid #2c2738;border-radius:5px"><rect x="5" y="0" width="1" height="1" fill="#966e3c"/><rect x="6" y="0" width="1" height="1" fill="#966e3c"/><rect x="5" y="1" width="1" height="1" fill="#b4c8d2"/><rect x="6" y="1" width="1" height="1" fill="#b4c8d2"/><rect x="4" y="2" width="1" height="1" fill="#b4c8d2"/><rect x="5" y="2" width="1" height="1" fill="#b4c8d2"/><rect x="6" y="2" width="1" height="1" fill="#b4c8d2"/><rect x="7" y="2" width="1" height="1" fill="#b4c8d2"/><rect x="3" y="3" width="1" height="1" fill="#dc283c"/><rect x="4" y="3" width="1" height="1" fill="#ffffff"/><rect x="5" y="3" width="1" height="1" fill="#dc283c"/><rect x="6" y="3" width="1" height="1" fill="#dc283c"/><rect x="7" y="3" width="1" height="1" fill="#dc283c"/><rect x="8" y="3" width="1" height="1" fill="#dc283c"/><rect x="3" y="4" width="1" height="1" fill="#dc283c"/><rect x="4" y="4" width="1" height="1" fill="#dc283c"/><rect x="5" y="4" width="1" height="1" fill="#dc283c"/><rect x="6" y="4" width="1" height="1" fill="#dc283c"/><rect x="7" y="4" width="1" height="1" fill="#dc283c"/><rect x="8" y="4" width="1" height="1" fill="#dc283c"/><rect x="3" y="5" width="1" height="1" fill="#dc283c"/><rect x="4" y="5" width="1" height="1" fill="#dc283c"/><rect x="5" y="5" width="1" height="1" fill="#dc283c"/><rect x="6" y="5" width="1" height="1" fill="#dc283c"/><rect x="7" y="5" width="1" height="1" fill="#dc283c"/><rect x="8" y="5" width="1" height="1" fill="#dc283c"/><rect x="4" y="6" width="1" height="1" fill="#dc283c"/><rect x="5" y="6" width="1" height="1" fill="#dc283c"/><rect x="6" y="6" width="1" height="1" fill="#dc283c"/><rect x="7" y="6" width="1" height="1" fill="#dc283c"/></svg>
+      <figcaption><b>Potion</b><br>Heals HP</figcaption>
+    </figure>
+    <figure class="iconfig">
+      <svg viewBox="0 0 12 9" width="48" height="36" style="image-rendering:pixelated;background:#16121f;border:2px solid #2c2738;border-radius:5px"><rect x="5" y="4" width="1" height="1" fill="#966e3c"/><rect x="5" y="5" width="1" height="1" fill="#966e3c"/><rect x="5" y="6" width="1" height="1" fill="#966e3c"/><rect x="5" y="7" width="1" height="1" fill="#966e3c"/><rect x="5" y="8" width="1" height="1" fill="#966e3c"/><rect x="5" y="0" width="1" height="1" fill="#ffeb78"/><rect x="4" y="1" width="1" height="1" fill="#ffb428"/><rect x="5" y="1" width="1" height="1" fill="#ffb428"/><rect x="6" y="1" width="1" height="1" fill="#ffb428"/><rect x="4" y="2" width="1" height="1" fill="#ff8c1e"/><rect x="5" y="2" width="1" height="1" fill="#ff8c1e"/><rect x="6" y="2" width="1" height="1" fill="#ff8c1e"/><rect x="5" y="3" width="1" height="1" fill="#ff7814"/></svg>
+      <figcaption><b>Torch</b><br>Refuels light</figcaption>
+    </figure>
+    <figure class="iconfig">
+      <svg viewBox="0 0 12 9" width="48" height="36" style="image-rendering:pixelated;background:#16121f;border:2px solid #2c2738;border-radius:5px"><rect x="4" y="1" width="1" height="1" fill="#ebc846"/><rect x="5" y="1" width="1" height="1" fill="#ebc846"/><rect x="6" y="1" width="1" height="1" fill="#ebc846"/><rect x="7" y="1" width="1" height="1" fill="#ebc846"/><rect x="3" y="2" width="1" height="1" fill="#ebc846"/><rect x="4" y="2" width="1" height="1" fill="#fff5b4"/><rect x="5" y="2" width="1" height="1" fill="#ebc846"/><rect x="6" y="2" width="1" height="1" fill="#ebc846"/><rect x="7" y="2" width="1" height="1" fill="#ebc846"/><rect x="8" y="2" width="1" height="1" fill="#ebc846"/><rect x="3" y="3" width="1" height="1" fill="#ebc846"/><rect x="4" y="3" width="1" height="1" fill="#ebc846"/><rect x="5" y="3" width="1" height="1" fill="#ebc846"/><rect x="6" y="3" width="1" height="1" fill="#ebc846"/><rect x="7" y="3" width="1" height="1" fill="#ebc846"/><rect x="8" y="3" width="1" height="1" fill="#ebc846"/><rect x="3" y="4" width="1" height="1" fill="#ebc846"/><rect x="4" y="4" width="1" height="1" fill="#ebc846"/><rect x="5" y="4" width="1" height="1" fill="#ebc846"/><rect x="6" y="4" width="1" height="1" fill="#ebc846"/><rect x="7" y="4" width="1" height="1" fill="#ebc846"/><rect x="8" y="4" width="1" height="1" fill="#ebc846"/><rect x="4" y="5" width="1" height="1" fill="#ebc846"/><rect x="5" y="5" width="1" height="1" fill="#ebc846"/><rect x="6" y="5" width="1" height="1" fill="#ebc846"/><rect x="7" y="5" width="1" height="1" fill="#ebc846"/></svg>
+      <figcaption><b>Coin</b><br>Gold</figcaption>
+    </figure>
+  </div>
 
   <h3>Rarity</h3>
   <div class="grid">
@@ -162,8 +268,9 @@
   <!-- ============ LEVEL GEN ============ -->
   <h2>Level Generation</h2>
   <p>Every floor is carved fresh into a static <b>64×64×64</b> voxel space and rendered through a DDA
-  raycaster at a fixed isometric tilt. The layout is BSP rooms + corridors with a guaranteed,
-  flood-fill-verified path from the up-stairs to the down-stairs — so every permadeath floor is solvable.</p>
+  raycaster at a fixed isometric tilt. The layout is a <b>BSP partition</b> — each split carves a corridor
+  between its two halves, so the room graph is always fully connected and the down-stairs is always
+  reachable. Every permadeath floor is solvable.</p>
 
   <div class="shotrow">
     <figure><img class="shot" src="img/platforms.png" alt="platforms"><figcaption>Moving platforms &amp; depth scaling</figcaption></figure>
@@ -186,32 +293,46 @@
   <h3>What's in a floor</h3>
   <div class="grid">
     <div class="card"><b>Rooms &amp; corridors</b><br><span class="c">BSP partition; thin 1-block ruined walls with ~18% gaps, not solid mazes</span></div>
-    <div class="card"><b>Background terrain</b><br><span class="c">rolling value-noise hills fill the open space beyond the rooms</span></div>
-    <div class="card"><b>Lava pits + bridges</b><br><span class="c">glowing 1-deep trenches with a safe cross-bridge; burn on contact, jump out</span></div>
+    <div class="card"><b>Flagstone floors</b><br><span class="c">4 scattered flagstone variants for texture variety; brick (cobble) walls</span></div>
+    <div class="card"><b>Background terrain</b><br><span class="c">a low <span style="color:#6ec86e">green grass lip</span> rings the dungeon — a colour contrast, kept short so it never occludes the iso camera</span></div>
+    <div class="card"><b>Organic lava chasms</b><br><span class="c"><b>instant death</b> on contact — no longer just square pits; carved as organic chasms spanned by a safe cross-bridge</span></div>
+    <div class="card"><b>Dank water</b><br><span class="c">shallow murky-green pools you wade through (slowed) — crypt water, not clear blue</span></div>
+    <div class="card"><b>Moving platforms</b><br><span class="c">oscillating slabs — the <b>only</b> crossing to a marooned bonus-chest island over lava, not an optional shortcut</span></div>
     <div class="card"><b>Elevated pedestals</b><br><span class="c">chests you must jump onto (height-gated to open)</span></div>
-    <div class="card"><b>Moving platforms</b><br><span class="c">oscillating slabs that carry you across hazards</span></div>
-    <div class="card"><b>Braziers</b><br><span class="c">lit-lamp blocks light ~2/3 of rooms via the lightmap</span></div>
+    <div class="card"><b>Torches</b><br><span class="c">Minecraft-style wall/floor torches are the room light sources (lightmap BFS)</span></div>
     <div class="card"><b>Spike traps</b><br><span class="c">telegraphed floor spikes, contact damage scaling with depth</span></div>
-    <div class="card"><b>Chests &amp; merchant</b><br><span class="c">loot containers + one shop pad per floor</span></div>
+    <div class="card"><b>Chests &amp; merchant</b><br><span class="c">more loot containers per floor + one shop pad</span></div>
+    <div class="card"><b>Loot beams</b><br><span class="c">dropped gear projects a vertical light beacon coloured by rarity (Diablo-style)</span></div>
     <div class="card"><b>Up / down stairs</b><br><span class="c">glowing beacons visible across the room for navigation</span></div>
   </div>
 
   <h3>Enemies</h3>
   <p>Cuboid creatures with wander → chase → <b>telegraphed wind-up</b> → strike AI (every hit is fair —
-  foes flash white-hot before they swing). Stats scale with depth.</p>
-  <p>
-    <span class="pill">Rat — fast, weak</span>
-    <span class="pill">Slime — tanky hopper</span>
-    <span class="pill">Skeleton — sturdy</span>
-    <span class="pill">Spider — fast melee</span>
-    <span class="pill" style="border-color:#dc4040;color:#ff8080">Champion — 3× HP, 1.7× size, boss floors</span>
-  </p>
+  foes flash white-hot before they swing). Stats scale with depth, and each type drops a different
+  kind of loot — not just gold. Ranged foes fire projectiles and kite; flyers ignore the floor.</p>
+  <table>
+    <tr><th>Foe</th><th>Behaviour</th><th>Drops</th></tr>
+    <tr><td>Rat</td><td>Fast, weak swarmer</td><td class="c">gold</td></tr>
+    <tr><td>Slime</td><td>Slow tanky hopper</td><td class="c">potion</td></tr>
+    <tr><td>Skeleton</td><td>Sturdy melee</td><td class="c">gear</td></tr>
+    <tr><td>Spider</td><td>Fast melee</td><td class="c">gold</td></tr>
+    <tr><td>Bat</td><td><b>Flyer</b>, very fast, fragile</td><td class="c">gold</td></tr>
+    <tr><td>Kobold</td><td>Quick skirmisher</td><td class="c">gear</td></tr>
+    <tr><td>Goblin</td><td>Sturdy bruiser</td><td class="c">gear</td></tr>
+    <tr><td>Zombie</td><td>Very slow, very tanky</td><td class="c">potion</td></tr>
+    <tr><td>Skeleton Archer</td><td><b>Ranged</b> — fires arrows &amp; kites</td><td class="c">gear</td></tr>
+    <tr><td>Fire Sprite</td><td><b>Ranged flyer</b> — lobs fire</td><td class="c">gem</td></tr>
+    <tr><td style="color:#ff8080">Demon</td><td>Big, hard-hitting elite</td><td class="c">rare gear</td></tr>
+  </table>
+  <p><span class="pill" style="border-color:#dc4040;color:#ff8080">Champion — 3× HP, 1.7× size, boss floors</span>
+  Rosters vary per depth band, so deeper floors mix in the deadlier foes.</p>
 
   <h3>Tension systems</h3>
   <div class="grid">
-    <div class="card"><b>Light as a resource</b><br><span class="c">a smooth torch glow that <b>dims &amp; shrinks as fuel drains</b>; out of fuel, foes sense you farther &amp; hit harder</span></div>
-    <div class="card"><b>Lava &amp; falls</b><br><span class="c">burning lava + fall damage from big drops</span></div>
+    <div class="card"><b>Light as a resource</b><br><span class="c">a smooth torch glow that <b>dims &amp; shrinks as fuel drains</b>, with wall-blocked shadows for real depth; out of fuel, foes sense you farther &amp; hit harder</span></div>
+    <div class="card"><b>Lava = instant death</b><br><span class="c">touching lava kills outright — chasms are crossed only by the bridge or a moving platform; falls still bruise</span></div>
     <div class="card"><b>Permadeath</b><br><span class="c">one life — gear &amp; gold lost on death; depth is your score</span></div>
+    <div class="card"><b>Suspend &amp; resume</b><br><span class="c">an in-progress run auto-saves on descent (host file / device flash) and resumes on launch; <b>wiped on death</b></span></div>
   </div>
 
 <footer>

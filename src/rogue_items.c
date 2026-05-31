@@ -12,16 +12,25 @@ typedef struct {
     const char *name; WeaponClass wclass; int dmg;
     float range, arc_cos, cooldown, proj_speed; uint16_t color;
 } WeaponBase;
-static const WeaponBase WBASE[] = {
-    { "Dagger", WCLASS_MELEE, 16, 1.4f, 0.55f, 0.22f, 0,    RGB(200,200,210) },
-    { "Sword",  WCLASS_MELEE, 26, 1.8f, 0.40f, 0.32f, 0,    RGB(210,215,225) },
-    { "Axe",    WCLASS_MELEE, 38, 1.9f, 0.15f, 0.46f, 0,    RGB(180,150,90)  },
-    { "Mace",   WCLASS_MELEE, 32, 1.7f, 0.35f, 0.42f, 0,    RGB(150,150,160) },
-    { "Bow",    WCLASS_RANGED, 22, 14.f, 0.0f,  0.40f, 26.f, RGB(150,110,60) },
-    { "Staff",  WCLASS_CASTER, 30, 13.f, 0.0f,  0.55f, 20.f, RGB(120,90,200) },
-    { "Wand",   WCLASS_CASTER, 18, 12.f, 0.0f,  0.30f, 24.f, RGB(90,200,200) },
+/* Order MUST match enum WeaponType (the index is stored as it->wtype and
+ * selects the icon). Damage spans 14 (fast dagger) → 52 (warhammer);
+ * faster weapons hit lighter, slow ones hit hard. arc_cos: higher = a
+ * narrower swing cone; range is in tiles; proj_speed only for ranged/caster. */
+static const WeaponBase WBASE[WT_COUNT] = {
+    [WT_DAGGER]     = { "Dagger",     WCLASS_MELEE,  14, 1.3f, 0.50f, 0.20f, 0,    RGB(200,200,210) },
+    [WT_SWORD]      = { "Sword",      WCLASS_MELEE,  24, 1.8f, 0.40f, 0.32f, 0,    RGB(210,215,225) },
+    [WT_GREATSWORD] = { "Greatsword", WCLASS_MELEE,  46, 2.1f, 0.25f, 0.60f, 0,    RGB(220,225,235) },
+    [WT_AXE]        = { "Axe",        WCLASS_MELEE,  36, 1.8f, 0.15f, 0.46f, 0,    RGB(180,150,90)  },
+    [WT_MACE]       = { "Mace",       WCLASS_MELEE,  30, 1.7f, 0.35f, 0.42f, 0,    RGB(150,150,160) },
+    [WT_SPEAR]      = { "Spear",      WCLASS_MELEE,  28, 2.6f, 0.70f, 0.40f, 0,    RGB(190,180,150) },
+    [WT_WARHAMMER]  = { "Warhammer",  WCLASS_MELEE,  52, 1.7f, 0.30f, 0.66f, 0,    RGB(170,160,150) },
+    [WT_BOW]        = { "Bow",        WCLASS_RANGED, 22, 14.f, 0.0f,  0.40f, 26.f, RGB(150,110,60)  },
+    [WT_CROSSBOW]   = { "Crossbow",   WCLASS_RANGED, 34, 16.f, 0.0f,  0.62f, 32.f, RGB(140,120,90)  },
+    [WT_WAND]       = { "Wand",       WCLASS_CASTER, 16, 12.f, 0.0f,  0.28f, 24.f, RGB(90,200,200)  },
+    [WT_SCEPTER]    = { "Scepter",    WCLASS_CASTER, 26, 12.f, 0.0f,  0.44f, 22.f, RGB(220,180,90)  },
+    [WT_STAFF]      = { "Staff",      WCLASS_CASTER, 34, 13.f, 0.0f,  0.58f, 20.f, RGB(120,90,200)  },
 };
-#define N_WBASE ((int)(sizeof(WBASE)/sizeof(WBASE[0])))
+#define N_WBASE WT_COUNT
 
 /* --- gear bases (per non-weapon slot) ---------------------------- */
 typedef struct { const char *name; int armor; uint16_t color; } GearBase;
@@ -199,8 +208,8 @@ static void roll_affixes_and_extras(RogueItem *it, EquipSlot slot, int depth, ui
 
 void rogue_item_starter(RogueItem *it) {
     memset(it,0,sizeof *it);
-    const WeaponBase *b=&WBASE[0];
-    it->kind=ITEM_WEAPON; it->slot=SLOT_WEAPON; it->wclass=b->wclass;
+    const WeaponBase *b=&WBASE[WT_DAGGER];
+    it->kind=ITEM_WEAPON; it->slot=SLOT_WEAPON; it->wclass=b->wclass; it->wtype=WT_DAGGER;
     it->rarity=RAR_COMMON; it->base_dmg=b->dmg; it->range=b->range;
     it->arc_cos=b->arc_cos; it->cooldown=b->cooldown; it->proj_speed=b->proj_speed;
     it->color=b->color; snprintf(it->name,sizeof it->name,"%s",b->name);
@@ -209,8 +218,9 @@ void rogue_item_starter(RogueItem *it) {
 void rogue_item_roll_weapon(RogueItem *it, int depth, uint32_t seed) {
     memset(it,0,sizeof *it);
     uint32_t s = seed?seed:1;
-    const WeaponBase *b=&WBASE[xs(&s)%N_WBASE];
-    it->kind=ITEM_WEAPON; it->slot=SLOT_WEAPON; it->wclass=b->wclass;
+    int wt = (int)(xs(&s)%N_WBASE);
+    const WeaponBase *b=&WBASE[wt];
+    it->kind=ITEM_WEAPON; it->slot=SLOT_WEAPON; it->wclass=b->wclass; it->wtype=(uint8_t)wt;
     it->rarity=roll_rarity(&s, depth);
     float sc=1.0f+0.22f*(int)it->rarity+0.07f*depth;
     it->base_dmg=(int16_t)(b->dmg*sc);

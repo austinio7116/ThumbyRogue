@@ -81,7 +81,7 @@ static bool s_have_keep;
 int rogue_plat_save(const uint8_t *data, int len);   /* platform-provided */
 int rogue_plat_load(uint8_t *data, int max);
 
-#define ROGUE_SAVE_MAGIC 0x52475631u   /* 'RGV1' */
+#define ROGUE_SAVE_MAGIC 0x52475632u   /* 'RGV2' — bumped: RogueItem gained wtype */
 typedef struct {
     uint32_t magic, version;
     uint32_t seed;
@@ -96,7 +96,7 @@ typedef struct {
 void rogue_game_save(int run_active) {
     RogueSave s;
     memset(&s, 0, sizeof s);
-    s.magic = ROGUE_SAVE_MAGIC; s.version = 1;
+    s.magic = ROGUE_SAVE_MAGIC; s.version = 2;
     s.seed = s_seed;
     s.depth = run_active ? s_depth : -1;
     s.kills = s_kills;
@@ -563,6 +563,21 @@ void rogue_game_debug_fill_bag(void) {
         rogue_inventory_add(&it);
     }
     RogueItem pot; rogue_item_make_potion(&pot, 40); rogue_inventory_add(&pot);
+    rogue_inventory_open();
+}
+
+/* One of every weapon type into the bag + open inventory (icon check). */
+void rogue_game_debug_weapon_sheet(void) {
+    rogue_inventory_clear();
+    for (int wt = 0; wt < WT_COUNT && wt < ROGUE_BAG_N; wt++) {
+        RogueItem it;
+        /* roll until we land on this weapon type so base stats/name are real */
+        for (int tries = 0; tries < 200; tries++) {
+            rogue_item_roll_weapon(&it, 6, loot_rng());
+            if (it.wtype == wt) break;
+        }
+        rogue_inventory_add(&it);
+    }
     rogue_inventory_open();
 }
 

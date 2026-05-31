@@ -16,6 +16,16 @@ typedef enum {
 } EquipSlot;
 
 typedef enum { WCLASS_MELEE, WCLASS_RANGED, WCLASS_CASTER } WeaponClass;
+
+/* Concrete weapon bases — indexes WBASE[] in rogue_items.c. Each has its own
+ * icon (draw_item_icon) and a distinct base-damage / reach / speed profile,
+ * grouped melee → ranged → caster. */
+typedef enum {
+    WT_DAGGER, WT_SWORD, WT_GREATSWORD, WT_AXE, WT_MACE, WT_SPEAR, WT_WARHAMMER,
+    WT_BOW, WT_CROSSBOW,
+    WT_WAND, WT_SCEPTER, WT_STAFF,
+    WT_COUNT
+} WeaponType;
 typedef enum { ITEM_NONE, ITEM_WEAPON, ITEM_GEAR, ITEM_GOLD, ITEM_POTION, ITEM_TORCH, ITEM_GEM } ItemKind;
 typedef enum { RAR_COMMON, RAR_MAGIC, RAR_RARE, RAR_LEGENDARY, RAR_COUNT } Rarity;
 
@@ -40,6 +50,7 @@ typedef struct {
     uint8_t  kind;        /* ItemKind */
     uint8_t  slot;        /* EquipSlot (equip kinds) */
     uint8_t  wclass;      /* WeaponClass (weapons) */
+    uint8_t  wtype;       /* WeaponType  (weapons) — selects the icon */
     uint8_t  rarity;
     uint8_t  aspect;      /* AspectId (legendaries) */
     uint8_t  n_affix;

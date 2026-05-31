@@ -112,16 +112,23 @@ static void fr(uint16_t *fb,int x,int y,int w,int h,uint16_t c){
         for(int i=x;i<x+w;i++) if((unsigned)i<CRAFT_FB_W) fb[j*CRAFT_FB_W+i]=c; }
 }
 
-/* Draw one selectable row with a clear highlight bar + cursor. */
+/* Draw one selectable row with a clear highlight bar + cursor. If `icon` is
+ * non-NULL its item glyph is drawn before the label (merchant stock rows). */
 static void shop_row(uint16_t *fb, int y, bool sel, bool dim,
-                     const char *label, uint16_t lc, int price) {
+                     const char *label, uint16_t lc, int price,
+                     const RogueItem *icon) {
     if (sel) {
         fr(fb, 0, y - 1, CRAFT_FB_W, 9, RGB(60, 52, 18));   /* highlight bar */
         fr(fb, 0, y - 1, 2, 9, RGB(240, 210, 60));          /* gold edge */
         craft_font_draw(fb, ">", 4, y, RGB(255, 255, 255));
     }
+    int lx = 11;
+    if (icon) {
+        rogue_item_draw_icon(fb, 11, y - 1, icon, dim ? RGB(110,105,95) : lc);
+        lx = 25;                                            /* leave room for the glyph */
+    }
     uint16_t c = dim ? RGB(95, 90, 80) : (sel ? RGB(255, 255, 255) : lc);
-    craft_font_draw(fb, label, 11, y, c);
+    craft_font_draw(fb, label, lx, y, c);
     if (price >= 0) {
         char pb[12]; snprintf(pb, sizeof pb, "%d", price);
         uint16_t pc = dim ? RGB(120,70,60) : RGB(240, 210, 60);
@@ -141,11 +148,12 @@ void rogue_shop_draw(uint16_t *fb, const RoguePlayer *p) {
     for (int i = 0; i < N_STOCK; i++) {
         bool sel = (s_cur == i);
         if (s_sold[i]) {
-            shop_row(fb, y, sel, true, "- sold -", RGB(90,90,90), -1);
+            shop_row(fb, y, sel, true, "- sold -", RGB(90,90,90), -1, NULL);
         } else {
             bool dim = p->gold < s_price[i];
-            shop_row(fb, y, sel, dim, s_stock[i].name,
-                     rogue_rarity_color(s_stock[i].rarity), s_price[i]);
+            uint16_t lc = rogue_item_is_equip(&s_stock[i])
+                        ? rogue_rarity_color(s_stock[i].rarity) : s_stock[i].color;
+            shop_row(fb, y, sel, dim, s_stock[i].name, lc, s_price[i], &s_stock[i]);
         }
         y += 10;
     }
@@ -159,7 +167,7 @@ void rogue_shop_draw(uint16_t *fb, const RoguePlayer *p) {
     for (int i = 0; i < 3; i++) {
         bool sel = (s_cur == opt[i].id);
         bool dim = p->gold < opt[i].cost;
-        shop_row(fb, y, sel, dim, opt[i].t, RGB(200,200,210), opt[i].cost);
+        shop_row(fb, y, sel, dim, opt[i].t, RGB(200,200,210), opt[i].cost, NULL);
         y += 10;
     }
 

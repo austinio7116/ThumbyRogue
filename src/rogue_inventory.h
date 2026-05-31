@@ -30,4 +30,8 @@ void rogue_inventory_input(RoguePlayer *p, const CraftRawButtons *btn,
                            const CraftRawButtons *prev);
 void rogue_inventory_draw(uint16_t *fb, const RoguePlayer *p);
 
+/* Tiny per-item-type glyph into a ~12x9 box at (ox,oy); tint = rarity/item
+ * colour. Shared by the backpack grid and the merchant shop. */
+void rogue_item_draw_icon(uint16_t *fb, int ox, int oy, const RogueItem *it, uint16_t tint);
+
 #endif /* ROGUE_INVENTORY_H */
