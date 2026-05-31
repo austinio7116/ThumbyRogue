@@ -9,13 +9,13 @@
  * fire sprite) plus, where it fits, a flyer (bat). Toughness escalates with
  * depth, and across the five bands every one of the 11 enemy types appears. */
 static const RogueBand BANDS[] = {
-    { "THE CRYPT",   BLK_RFLOOR,   BLK_COBBLE,    BLK_PLANK,          /* vermin & risen dead */
+    { "THE CRYPT",   BLK_PLANK,    BLK_COBBLE,    BLK_STONE,          /* vermin & risen dead — warm wood floor vs grey cobble */
       { EN_RAT, EN_BAT, EN_SKELETON, EN_ARCHER }, 4, RGB(180,180,190) },
     { "THE CAVERNS", BLK_GRAVEL,   BLK_STONE,     BLK_OBSIDIAN,       /* cave beasts & raiders */
       { EN_SPIDER, EN_KOBOLD, EN_GOBLIN, EN_BAT, EN_SLIME }, 5, RGB(150,140,120) },
     { "FUNGAL DEEP", BLK_DIRT,     BLK_COBBLE,    BLK_SLIME_BLOCK,    /* toxic spore horrors */
       { EN_SLIME, EN_ZOMBIE, EN_FIRESPRITE, EN_SPIDER, EN_KOBOLD }, 5, RGB(110,200,110) },
-    { "FROSTVAULT",  BLK_SNOW,     BLK_ICE,       BLK_SNOWY_ROCK,     /* frozen undead */
+    { "FROSTVAULT",  BLK_RFLOOR,   BLK_ICE,       BLK_SNOWY_ROCK,     /* frozen undead — flagstone vault floor under icy walls */
       { EN_SKELETON, EN_ARCHER, EN_ZOMBIE, EN_BAT }, 4, RGB(170,210,240) },
     { "THE INFERNO", BLK_OBSIDIAN, BLK_COBBLE,    BLK_REDSTONE_BLOCK, /* hell's legions */
       { EN_DEMON, EN_FIRESPRITE, EN_GOBLIN, EN_ARCHER, EN_KOBOLD }, 5, RGB(240,120,60) },
