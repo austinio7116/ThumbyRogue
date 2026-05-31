@@ -14,7 +14,8 @@ you find this run *is* your build. How deep you get is your score.
 > loot, Spelunky's guaranteed-solvable procedural floors, Angband's one-life
 > depth obsession, Dead-Cells/Hades combat readability.
 
-See **[PLAN.md](PLAN.md)** for the full design and phased roadmap.
+See **[PLAN.md](PLAN.md)** for the full design and phased roadmap, and
+**[docs/guide.html](docs/guide.html)** for an illustrated loot & level-gen guide.
 
 ## Status
 

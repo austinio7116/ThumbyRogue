@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ThumbyRogue — Loot &amp; Dungeon Guide</title>
+<style>
+  :root{
+    --bg:#0c0a12; --panel:#15121d; --panel2:#1d1928; --ink:#e8e4dc; --dim:#9a93a8;
+    --teal:#28e6d2; --gold:#f0d23c; --line:#2c2738;
+    --common:#dcdcdc; --magic:#5a8cff; --rare:#f0dc46; --legendary:#dc8228;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font-family:"Trebuchet MS",Verdana,sans-serif;line-height:1.55}
+  .wrap{max-width:920px;margin:0 auto;padding:24px 18px 80px}
+  header{text-align:center;padding:34px 10px 18px;
+         background:radial-gradient(120% 120% at 50% 0%,#241b10 0%,#0c0a12 70%);
+         border-bottom:1px solid var(--line)}
+  h1{font-size:40px;margin:0;letter-spacing:2px;color:var(--gold);
+     text-shadow:0 0 14px rgba(240,210,60,.35)}
+  .sub{color:var(--teal);letter-spacing:3px;text-transform:uppercase;font-size:13px;margin-top:6px}
+  .tag{color:var(--dim);font-size:13px;margin-top:10px}
+  h2{margin:38px 0 12px;font-size:24px;color:#fff;border-left:4px solid var(--teal);
+     padding-left:10px}
+  h3{margin:22px 0 8px;font-size:17px;color:var(--gold)}
+  p{color:#d6d1c8}
+  a{color:var(--teal)}
+  .shotrow{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;margin:16px 0}
+  figure{margin:0;text-align:center}
+  img.shot{width:230px;height:230px;image-rendering:pixelated;
+           border:2px solid var(--line);border-radius:6px;background:#000}
+  figcaption{color:var(--dim);font-size:12px;margin-top:6px}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+         padding:14px 16px;margin:12px 0}
+  table{border-collapse:collapse;width:100%;margin:10px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top}
+  th{background:var(--panel2);color:#fff}
+  td.c{color:var(--dim)}
+  .sw{display:inline-block;width:13px;height:13px;border-radius:3px;
+      vertical-align:-2px;margin-right:6px;border:1px solid rgba(255,255,255,.25)}
+  .pill{display:inline-block;padding:1px 8px;border-radius:10px;font-size:12px;
+        border:1px solid var(--line);background:var(--panel2);margin:2px 4px 2px 0}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:10px 0}
+  .card{background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:10px}
+  .card b{color:#fff}
+  .slotbox{display:inline-block;width:30px;height:24px;border-radius:4px;background:#1a1622;
+           border:2px solid var(--dim);text-align:center;line-height:22px;font-size:11px;color:#cfc8da}
+  .legend-aspect{color:var(--legendary);font-weight:bold}
+  code{background:#221d2e;padding:1px 5px;border-radius:4px;color:#cfc8da;font-size:13px}
+  footer{color:var(--dim);text-align:center;margin-top:50px;font-size:12px}
+</style>
+</head>
+<body>
+<header>
+  <h1>THUMBYROGUE</h1>
+  <div class="sub">An Endless Voxel Descent</div>
+  <div class="tag">A real-time isometric hack-n-slash roguelike for the Thumby Color · 128×128 · RP2350<br>
+  This guide covers the <b>loot / inventory</b> and <b>level-generation</b> systems implemented so far.</div>
+</header>
+<div class="wrap">
+
+  <div class="shotrow">
+    <figure><img class="shot" src="img/title.png" alt="title"><figcaption>Title</figcaption></figure>
+    <figure><img class="shot" src="img/dungeon.png" alt="dungeon"><figcaption>The Crypt — thin ruined walls, hills beyond</figcaption></figure>
+    <figure><img class="shot" src="img/lava.png" alt="lava"><figcaption>Lava pit &amp; bridge</figcaption></figure>
+  </div>
+
+  <h2>Controls</h2>
+  <div class="panel">
+    <span class="pill"><b>D-pad</b> move (screen-relative)</span>
+    <span class="pill"><b>A</b> attack — swing / fire</span>
+    <span class="pill"><b>B</b> jump</span>
+    <span class="pill"><b>LB / RB</b> rotate view ±90°</span>
+    <span class="pill"><b>MENU</b> inventory</span>
+    <p style="margin:8px 0 0">Reach the <span style="color:var(--teal)">teal down-stairs beacon</span> to descend. Step on the
+    <span style="color:var(--gold)">gold merchant pad</span> to shop. Walk onto chests to open them.</p>
+  </div>
+
+  <!-- ============ INVENTORY ============ -->
+  <h2>Loot &amp; Inventory (Diablo-4-lite)</h2>
+  <p>The hero has no fixed class — the <b>equipped weapon defines your playstyle</b> (melee / ranged / caster),
+  and a full 6-slot paperdoll of gear shapes the rest of your build. Loot vacuums into a 15-slot backpack;
+  open <code>MENU</code> to compare, equip, salvage and socket.</p>
+
+  <div class="shotrow">
+    <figure><img class="shot" src="img/inventory.png" alt="inventory"><figcaption>Paperdoll + backpack + live stats &amp; compare</figcaption></figure>
+    <figure><img class="shot" src="img/shop.png" alt="shop"><figcaption>Merchant — buy / gamble / reroll / upgrade</figcaption></figure>
+  </div>
+
+  <h3>Equipment slots</h3>
+  <p>
+    <span class="slotbox">Wp</span> <span class="slotbox">Of</span>
+    <span class="slotbox">Hl</span> <span class="slotbox">Ar</span>
+    <span class="slotbox">Am</span> <span class="slotbox">Rg</span>
+  </p>
+  <table>
+    <tr><th>Slot</th><th>Bases</th><th>Role</th></tr>
+    <tr><td>Weapon</td><td>Dagger, Sword, Axe, Mace (melee) · Bow (ranged) · Staff, Wand (caster)</td><td>Sets attack style + base damage</td></tr>
+    <tr><td>Off-hand</td><td>Shield, Focus</td><td>Armor / caster bonus</td></tr>
+    <tr><td>Helm</td><td>Cap, Helm, Crown</td><td>Armor + affixes</td></tr>
+    <tr><td>Armor</td><td>Tunic, Mail, Plate</td><td>Bulk of your armor</td></tr>
+    <tr><td>Amulet</td><td>Amulet, Pendant</td><td>Powerful jewel affixes</td></tr>
+    <tr><td>Ring</td><td>Ring, Band</td><td>Jewel affixes</td></tr>
+  </table>
+
+  <h3>Rarity</h3>
+  <div class="grid">
+    <div class="card"><b><span class="sw" style="background:var(--common)"></span>Common</b><br><span class="c">no affixes</span></div>
+    <div class="card"><b><span class="sw" style="background:var(--magic)"></span>Magic</b><br><span class="c">1 affix</span></div>
+    <div class="card"><b><span class="sw" style="background:var(--rare)"></span>Rare</b><br><span class="c">2–3 affixes · maybe a socket</span></div>
+    <div class="card"><b><span class="sw" style="background:var(--legendary)"></span>Legendary</b><br><span class="c">2–3 affixes + an Aspect + 1–2 sockets</span></div>
+  </div>
+  <p class="c">Rarity odds climb with depth; affix magnitudes scale with both depth and rarity.</p>
+
+  <h3>Affixes</h3>
+  <div class="grid">
+    <div class="card">+Damage <span class="c">flat</span></div>
+    <div class="card">+% Damage</div>
+    <div class="card">+Life</div>
+    <div class="card">+Armor</div>
+    <div class="card">+% Crit Chance</div>
+    <div class="card">+% Crit Damage</div>
+    <div class="card">+% Attack Speed</div>
+    <div class="card">+% Move Speed</div>
+    <div class="card">+Life on Hit</div>
+    <div class="card">+% Resist</div>
+  </div>
+  <p class="c">All equipped affixes aggregate into your character: max life, armor (a diminishing-returns
+  damage-reduction curve), crit (base 5% / 150%), attack &amp; move speed, life-on-hit and resist.</p>
+
+  <h3 class="legend-aspect">Legendary Aspects</h3>
+  <p>The build-defining powers — gameplay modifiers, not just numbers:</p>
+  <table>
+    <tr><th>Aspect</th><th>Effect</th></tr>
+    <tr><td class="legend-aspect">Chaining</td><td>Melee hits add a cleave AoE around the hero</td></tr>
+    <tr><td class="legend-aspect">Piercing</td><td>Projectiles pass through enemies, re-hitting as they fly</td></tr>
+    <tr><td class="legend-aspect">Nightstalker</td><td>+40% damage while your torch is out (in darkness)</td></tr>
+    <tr><td class="legend-aspect">Vampiric</td><td>Heal a fraction of your melee damage on hit</td></tr>
+    <tr><td class="legend-aspect">Thorns</td><td>Reflect a chunk of damage back at melee attackers</td></tr>
+  </table>
+
+  <h3>Sockets &amp; Gems</h3>
+  <p>Rare and legendary gear roll sockets. Gems drop into your backpack; equipping one (A) slots it into the
+  first geared item with a free hole.</p>
+  <div class="grid">
+    <div class="card"><b><span class="sw" style="background:#dc283c"></span>Ruby</b><br><span class="c">+20 Life</span></div>
+    <div class="card"><b><span class="sw" style="background:#3c6ee6"></span>Sapphire</b><br><span class="c">+8% Resist</span></div>
+    <div class="card"><b><span class="sw" style="background:#28d26e"></span>Emerald</b><br><span class="c">+4% Crit</span></div>
+    <div class="card"><b><span class="sw" style="background:#f0d23c"></span>Topaz</b><br><span class="c">+10 Armor</span></div>
+  </div>
+
+  <h3>Economy — salvage &amp; the merchant</h3>
+  <p>Salvage unwanted gear (B in the inventory) into gold. The <b>merchant pad</b> (one per floor) opens a shop:</p>
+  <ul>
+    <li><b>Buy</b> — four rolled items at prices scaled by rarity &amp; depth</li>
+    <li><b>Gamble</b> — pay gold for a random item</li>
+    <li><b>Reroll</b> — re-roll your equipped weapon's affixes</li>
+    <li><b>Upgrade</b> — raise your equipped weapon's base damage</li>
+  </ul>
+
+  <!-- ============ LEVEL GEN ============ -->
+  <h2>Level Generation</h2>
+  <p>Every floor is carved fresh into a static <b>64×64×64</b> voxel space and rendered through a DDA
+  raycaster at a fixed isometric tilt. The layout is BSP rooms + corridors with a guaranteed,
+  flood-fill-verified path from the up-stairs to the down-stairs — so every permadeath floor is solvable.</p>
+
+  <div class="shotrow">
+    <figure><img class="shot" src="img/platforms.png" alt="platforms"><figcaption>Moving platforms &amp; depth scaling</figcaption></figure>
+    <figure><img class="shot" src="img/frostvault.png" alt="frostvault"><figcaption>Frostvault band reskin</figcaption></figure>
+    <figure><img class="shot" src="img/death.png" alt="death"><figcaption>Permadeath run summary</figcaption></figure>
+  </div>
+
+  <h3>Depth bands</h3>
+  <p>The theme shifts every 4 floors — reskinning blocks, swapping the enemy roster, and ending on a
+  <b>champion</b> mini-boss. After the last band the sequence loops while enemy stats keep climbing: an endless descent.</p>
+  <table>
+    <tr><th>Band</th><th>Floor / Wall</th><th>Roster lean</th></tr>
+    <tr><td><span class="sw" style="background:#b4b4be"></span>The Crypt</td><td>Stone / Cobble</td><td>Skeletons &amp; rats</td></tr>
+    <tr><td><span class="sw" style="background:#968c78"></span>The Caverns</td><td>Gravel / Stone</td><td>Slimes &amp; spiders</td></tr>
+    <tr><td><span class="sw" style="background:#6ec86e"></span>Fungal Deep</td><td>Dirt / Cobble</td><td>Slimes &amp; spiders</td></tr>
+    <tr><td><span class="sw" style="background:#aad2f0"></span>Frostvault</td><td>Snow / Ice</td><td>Skeletons</td></tr>
+    <tr><td><span class="sw" style="background:#f0783c"></span>The Inferno</td><td>Obsidian / Cobble</td><td>Skeletons &amp; spiders</td></tr>
+  </table>
+
+  <h3>What's in a floor</h3>
+  <div class="grid">
+    <div class="card"><b>Rooms &amp; corridors</b><br><span class="c">BSP partition; thin 1-block ruined walls with ~18% gaps, not solid mazes</span></div>
+    <div class="card"><b>Background terrain</b><br><span class="c">rolling value-noise hills fill the open space beyond the rooms</span></div>
+    <div class="card"><b>Lava pits + bridges</b><br><span class="c">glowing 1-deep trenches with a safe cross-bridge; burn on contact, jump out</span></div>
+    <div class="card"><b>Elevated pedestals</b><br><span class="c">chests you must jump onto (height-gated to open)</span></div>
+    <div class="card"><b>Moving platforms</b><br><span class="c">oscillating slabs that carry you across hazards</span></div>
+    <div class="card"><b>Braziers</b><br><span class="c">lit-lamp blocks light ~2/3 of rooms via the lightmap</span></div>
+    <div class="card"><b>Spike traps</b><br><span class="c">telegraphed floor spikes, contact damage scaling with depth</span></div>
+    <div class="card"><b>Chests &amp; merchant</b><br><span class="c">loot containers + one shop pad per floor</span></div>
+    <div class="card"><b>Up / down stairs</b><br><span class="c">glowing beacons visible across the room for navigation</span></div>
+  </div>
+
+  <h3>Enemies</h3>
+  <p>Cuboid creatures with wander → chase → <b>telegraphed wind-up</b> → strike AI (every hit is fair —
+  foes flash white-hot before they swing). Stats scale with depth.</p>
+  <p>
+    <span class="pill">Rat — fast, weak</span>
+    <span class="pill">Slime — tanky hopper</span>
+    <span class="pill">Skeleton — sturdy</span>
+    <span class="pill">Spider — fast melee</span>
+    <span class="pill" style="border-color:#dc4040;color:#ff8080">Champion — 3× HP, 1.7× size, boss floors</span>
+  </p>
+
+  <h3>Tension systems</h3>
+  <div class="grid">
+    <div class="card"><b>Light as a resource</b><br><span class="c">torch fuel drains; in the dark, foes sense you farther &amp; hit harder</span></div>
+    <div class="card"><b>Lava &amp; falls</b><br><span class="c">burning lava + fall damage from big drops</span></div>
+    <div class="card"><b>Permadeath</b><br><span class="c">one life — gear &amp; gold lost on death; depth is your score</span></div>
+  </div>
+
+<footer>
+  ThumbyRogue · built on a vendored ThumbyCraft voxel engine · screenshots are live captures from the host build.
+</footer>
+</div>
+</body>
+</html>
