@@ -1,0 +1,9 @@
+build_host/
+build_device/
+*.o
+*.elf
+*.bin
+*.dis
+*.map
+*.uf2.tmp
+*.sav
