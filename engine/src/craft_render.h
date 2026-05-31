@@ -104,6 +104,10 @@ void craft_render_set_player_light(bool on);
 /* ThumbyRogue: set the player-light bubble origin (the hero's head) so the
  * torch tracks the player, not the pulled-back iso camera. */
 void craft_render_set_light_pos(float x, float y, float z);
+/* Torch intensity 0..1 (game dims it as fuel burns low) and light radius in
+ * blocks. The bubble falls off smoothly to the radius. */
+void craft_render_set_light_intensity(float i);
+void craft_render_set_light_radius(float r);
 #endif
 
 /* Drive the day/night cycle. `world_time` is seconds since world

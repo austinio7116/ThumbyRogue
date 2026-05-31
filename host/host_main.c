@@ -173,6 +173,7 @@ int main(int argc, char **argv) {
         /* Settle (past the band banner ~2.2s), then dump. */
         CraftRawButtons none = {0};
         if (!getenv("ROGUE_TITLE")) press_start();
+        if (getenv("ROGUE_TORCH")) { extern void rogue_game_debug_set_torch(float); rogue_game_debug_set_torch((float)atof(getenv("ROGUE_TORCH"))); }
         if (getenv("ROGUE_SHOPUI")) { extern void rogue_game_debug_open_shop(void); rogue_game_debug_open_shop(); }
         if (getenv("ROGUE_INV")) {
             extern void rogue_game_debug_fill_bag(void);

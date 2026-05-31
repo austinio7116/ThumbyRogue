@@ -171,8 +171,17 @@ void craft_render_set_player_light(bool on) { s_player_light_on = on; }
  * an explicit light origin (the hero's head). */
 static float s_light_px = 0, s_light_py = 0, s_light_pz = 0;
 static bool  s_light_pos_set = false;
+static float s_light_intensity = 1.0f;   /* 0..1, dims as torch fuel runs low */
+static float s_light_radius2 = 72.0f;     /* squared light radius (~8.5 blocks) */
 void craft_render_set_light_pos(float x, float y, float z) {
     s_light_px = x; s_light_py = y; s_light_pz = z; s_light_pos_set = true;
+}
+void craft_render_set_light_intensity(float i) {
+    s_light_intensity = (i < 0.0f) ? 0.0f : (i > 1.0f ? 1.0f : i);
+}
+void craft_render_set_light_radius(float r) {
+    if (r < 1.0f) r = 1.0f;
+    s_light_radius2 = r * r;
 }
 #endif
 float craft_render_sun_y(void) { return s_sun_y; }
@@ -1472,9 +1481,22 @@ void craft_render_strip(const CraftCamera *cam, uint16_t *fb,
 #endif
                     float d2 = ddx * ddx + ddy * ddy + ddz * ddz;
                     int pfloor = 0;
+#ifdef ROGUE_FULLFRAME_RENDER
+                    /* Smooth, continuous torch falloff (light is a core
+                     * mechanic — many gradations read far better than 3
+                     * hard rings). Brightness fades quadratically from the
+                     * hero out to the light radius, scaled by torch
+                     * intensity (which the game lowers as fuel burns down). */
+                    float R2 = s_light_radius2;
+                    if (d2 < R2) {
+                        float t = 1.0f - d2 / R2;          /* 1 at hero → 0 at edge */
+                        pfloor = (int)(250.0f * t * s_light_intensity);
+                    }
+#else
                     if      (d2 <  6.25f) pfloor = 220;  /* ≤ 2.5 blocks */
                     else if (d2 < 20.25f) pfloor = 165;  /* ≤ 4.5 blocks */
                     else if (d2 < 42.25f) pfloor = 110;  /* ≤ 6.5 blocks */
+#endif
                     if (face_shade_v < pfloor) face_shade_v = pfloor;
                 }
                 c = shade(c, face_shade_v);

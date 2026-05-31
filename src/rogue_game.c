@@ -200,6 +200,14 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
     if (s_player.torch_fuel > 0) s_player.torch_fuel -= dt;
     if (s_player.torch_fuel < 0) s_player.torch_fuel = 0;
     craft_render_set_player_light(s_player.torch_fuel > 0);
+    /* Torch dims + shrinks as fuel runs low — brightness is a resource you
+     * watch drain. Full above 14s, fading to a dim ember by 0. */
+    {
+        float f = s_player.torch_fuel;
+        float lvl = f >= 14.0f ? 1.0f : 0.35f + 0.65f * (f / 14.0f);
+        craft_render_set_light_intensity(lvl);
+        craft_render_set_light_radius(5.0f + 4.0f * lvl);   /* ~9 blocks → ~6.4 */
+    }
     /* Light the bubble around the HERO (head height), not the camera. */
     craft_render_set_light_pos(s_player.pos.x, s_player.pos.y + 0.9f, s_player.pos.z);
     rogue_enemies_set_dark(s_player.torch_fuel <= 0);
@@ -358,6 +366,7 @@ const char *rogue_game_weapon_name(void) { return s_player.equip[SLOT_WEAPON].na
  * equip path (weapon_near -> take -> equip -> drop old). Verifies the
  * gear-defined playstyle swap end-to-end. */
 void rogue_game_debug_kill(void) { s_player.hp = 0; s_player.alive = false; s_kills = 7; }
+void rogue_game_debug_set_torch(float s) { s_player.torch_fuel = s; rogue_game_tick(&s_prev, 0.0f); }
 
 int rogue_game_player_maxhp(void) { return s_player.max_hp; }
 int rogue_game_player_armor(void) { return s_player.stats.armor; }

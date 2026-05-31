@@ -19,7 +19,7 @@ make no sense upstream, so we vendor rather than fork in place.
 
 | File | Change | Phase |
 |------|--------|-------|
-| `src/craft_render.{c,h}` | `ROGUE_FULLFRAME_RENDER` guard, three changes: (1) raycaster no longer skips the bottom hotbar-plate rows → world renders edge-to-edge (removes the toolbar gap); (2) `trace_ray` advances rays from an OUT-OF-WORLD origin to the world-AABB entry point and seeds the DDA there, so the iso camera can sit back beyond the world edge and the hero stays centred (no camera clamping); (3) `craft_render_set_light_pos(x,y,z)` sets the player-light bubble origin (the hero's head) so the torch tracks the player not the pulled-back camera. All no-ops when the macro is off → identical to upstream. Defined in both CMakeLists. | 1, 2, 6 |
+| `src/craft_render.{c,h}` | `ROGUE_FULLFRAME_RENDER` guard, three changes: (1) raycaster no longer skips the bottom hotbar-plate rows → world renders edge-to-edge (removes the toolbar gap); (2) `trace_ray` advances rays from an OUT-OF-WORLD origin to the world-AABB entry point and seeds the DDA there, so the iso camera can sit back beyond the world edge and the hero stays centred (no camera clamping); (3) `craft_render_set_light_pos(x,y,z)` sets the player-light bubble origin (the hero's head) so the torch tracks the player not the pulled-back camera; (4) `craft_render_set_light_intensity()`/`_radius()` + a smooth quadratic torch falloff (replaces the 3 hard rings with a continuous gradient that dims/shrinks as torch fuel drops). All no-ops when the macro is off → identical to upstream. Defined in both CMakeLists. | 1, 2, 6 |
 
 Planned patch points (filled in as phases land):
 - `craft_render.{c,h}` — fixed-pitch iso camera helper, 90° snap-yaw.
