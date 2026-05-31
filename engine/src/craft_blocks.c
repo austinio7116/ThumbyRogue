@@ -267,19 +267,18 @@ static void cave_rock_pattern(uint16_t *dst, uint32_t seed) {
         }
 }
 
-/* Fungal floor: dark blue-purple mycelium speckled with bright bio-
- * luminescent teal spores + a little green moss. */
+/* Fungal floor: calm dark purple mycelium with a FEW dim teal spore specks —
+ * kept low-contrast so gameplay (enemies, drops, the hero) stays readable. */
 static void mycelium_pattern(uint16_t *dst, uint32_t seed) {
     uint32_t s = seed;
     for (int y = 0; y < CRAFT_TEX_SIZE; y++)
         for (int x = 0; x < CRAFT_TEX_SIZE; x++) {
             uint32_t h = (uint32_t)((x+3)*40503) ^ (uint32_t)((y+7)*12289) ^ seed;
             h ^= h >> 13; h *= 0x9E3779B1u; h ^= h >> 16;
-            int j = ((int)(xs32(&s) & 0xf) - 8);
-            int r = 52 + j, g = 40 + j, b = 72 + j;                 /* dark purple */
-            if ((h & 0xf) == 0)        { r = 90; g = 240; b = 200; }    /* glowing spore */
-            else if ((h % 17u) == 0)   { r = 60; g = 130; b = 80;  }    /* moss fleck */
-            else if ((h % 13u) == 0)   { r += 26; g += 12; b += 32; }   /* lighter mottle */
+            int j = ((int)(xs32(&s) & 0x7) - 4);                    /* gentle grain */
+            int r = 56 + j, g = 46 + j, b = 76 + j;                 /* dark purple base */
+            if ((h % 53u) == 0)        { r = 64; g = 150; b = 130; }    /* rare, dim spore */
+            else if ((h % 29u) == 0)   { r += 10; g += 8; b += 14; }    /* faint mottle */
             dst[y * CRAFT_TEX_SIZE + x] = rgb565(r, g, b);
         }
 }
