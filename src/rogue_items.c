@@ -177,11 +177,20 @@ static Affix roll_affix(uint32_t *s, EquipSlot slot, int depth, Rarity rar) {
     return a;
 }
 
+/* Rarity is deliberately stingy early so the descent feels like progression.
+ * Per-mille chances that climb with depth (capped):
+ *   depth 1  -> legendary ~0.5%, rare ~2.9%, magic ~21%
+ *   depth 5  -> legendary ~1.7%, rare ~6.5%, magic ~27%
+ *   depth 10 -> legendary ~3.2%, rare ~11%,  magic ~34%
+ *   depth 20 -> legendary ~6.2%, rare ~18%,  magic ~48% */
 static Rarity roll_rarity(uint32_t *s, int depth) {
-    int roll = (int)(xs(s) % 100) + depth * 2;
-    if (roll > 95) return RAR_LEGENDARY;
-    if (roll > 80) return RAR_RARE;
-    if (roll > 52) return RAR_MAGIC;
+    int roll = (int)(xs(s) % 1000);
+    int leg  = 2  + depth * 3;   if (leg  > 90)  leg  = 90;
+    int rare = 20 + depth * 9;   if (rare > 240) rare = 240;
+    int mag  = 200 + depth * 14; if (mag  > 520) mag  = 520;
+    if (roll < leg)             return RAR_LEGENDARY;
+    if (roll < leg + rare)      return RAR_RARE;
+    if (roll < leg + rare + mag) return RAR_MAGIC;
     return RAR_COMMON;
 }
 

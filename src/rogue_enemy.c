@@ -1,6 +1,7 @@
 #include "rogue_enemy.h"
 #include "rogue_render.h"
 #include "rogue_band.h"
+#include "rogue_dmgnum.h"
 #include "craft_world.h"
 #include "craft_blocks.h"
 #include <math.h>
@@ -215,6 +216,7 @@ void rogue_enemies_clear(void) {
 static void en_apply_damage(Enemy *e, int dmg, float fromx, float fromz) {
     e->hp -= dmg;
     e->hurt_flash = 0.22f;
+    rogue_dmgnum_spawn(e->pos, dmg, false);   /* green — damage you dealt */
     float dx = e->pos.x - fromx, dz = e->pos.z - fromz;
     float l = sqrtf(dx*dx + dz*dz);
     if (l > 0.001f) { e->pos.x += dx/l * 0.30f; e->pos.z += dz/l * 0.30f; }

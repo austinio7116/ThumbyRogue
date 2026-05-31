@@ -263,6 +263,10 @@ int main(int argc, char **argv) {
             rogue_game_tick(&a, 1.0f / 30.0f);
             for (int i = 0; i < settle; i++) rogue_game_tick(&none, 1.0f / 30.0f);
         }
+        if (getenv("ROGUE_DMGNUM")) {
+            extern void rogue_game_debug_dmgnum(void);
+            rogue_game_debug_dmgnum();
+        }
         if (getenv("ROGUE_DEAD")) {
             extern void rogue_game_debug_kill(void);
             rogue_game_debug_kill();

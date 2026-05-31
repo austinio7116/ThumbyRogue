@@ -1,6 +1,7 @@
 #include "rogue_player.h"
 #include "rogue_render.h"
 #include "rogue_platform.h"
+#include "rogue_dmgnum.h"
 #include "craft_world.h"
 #include "craft_blocks.h"
 #include <math.h>
@@ -249,6 +250,7 @@ bool rogue_player_damage(RoguePlayer *p, int dmg, Vec3 from) {
     dmg = (int)(dmg * (1.0f - red) * (1.0f - p->stats.resist * 0.01f));
     if (dmg < 1) dmg = 1;
     p->hp -= dmg;
+    rogue_dmgnum_spawn(p->pos, dmg, true);   /* red — damage you took */
     p->hurt_flash = 0.30f;
     p->invuln_t = 0.45f;   /* brief mercy i-frames after a hit */
     float dx = p->pos.x - from.x, dz = p->pos.z - from.z;

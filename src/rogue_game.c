@@ -14,6 +14,7 @@
 #include "rogue_inventory.h"
 #include "rogue_shop.h"
 #include "rogue_particle.h"
+#include "rogue_dmgnum.h"
 #include "craft_world.h"
 #include "craft_blocks.h"
 #include "craft_render.h"
@@ -164,6 +165,7 @@ static bool try_resume(void) {
 static void load_level(void) {
     memset(s_visited, 0, sizeof s_visited);
     rogue_particle_clear();
+    rogue_dmgnum_clear();
     rogue_gen_dungeon(s_seed, s_depth, &s_level);
     rogue_player_init(&s_player, s_level.spawn);
     if (s_have_keep) {
@@ -452,6 +454,7 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
     rogue_proj_update(dt, s_level.floor_y);
     rogue_loot_update(&s_player, dt);
     rogue_particle_update(dt);
+    rogue_dmgnum_update(dt);
 
     /* Drop loot from anything that died this frame — weighted by the slain
      * creature's loot class (goblins/kobolds → gear, fire sprites → gems,
@@ -613,6 +616,16 @@ void rogue_game_debug_weapon_sheet(void) {
     rogue_inventory_open();
 }
 
+/* Spawn a spread of floating damage numbers near the hero (FX verification). */
+void rogue_game_debug_dmgnum(void) {
+    Vec3 p = s_player.pos;
+    rogue_dmgnum_spawn(v3(p.x + 1.2f, p.y, p.z + 0.6f), 12,  false);
+    rogue_dmgnum_spawn(v3(p.x - 1.1f, p.y, p.z + 1.2f), 37,  false);
+    rogue_dmgnum_spawn(v3(p.x + 0.4f, p.y, p.z - 1.1f), 144, false);
+    rogue_dmgnum_spawn(v3(p.x,        p.y, p.z),          8,  true);
+    rogue_dmgnum_update(0.18f);   /* let them rise a touch before the shot */
+}
+
 /* Set up the item-detail page demo: equip a socketed legendary weapon and
  * drop a couple of gems in the bag, cursor on the weapon. */
 void rogue_game_debug_detail_setup(void) {
@@ -721,6 +734,7 @@ void rogue_game_draw_overlay(uint16_t *fb) {
     rogue_enemies_draw(&s_cam, fb);
     rogue_player_draw(&s_player, &s_cam, fb, 256);
     rogue_particle_draw(&s_cam, fb);
+    rogue_dmgnum_draw(&s_cam, fb);
 
     if (s_title) { rogue_hud_title(fb, s_best_depth); return; }
     if (rogue_inventory_is_open()) {
