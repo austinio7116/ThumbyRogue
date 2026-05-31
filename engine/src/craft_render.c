@@ -189,12 +189,13 @@ void craft_render_set_light_radius(float r) {
  * (below feet_y) and walls behind the hero are left solid. Disabled when
  * radius <= 0. */
 static bool  s_xray_on = false;
-static float s_xray_x = 0, s_xray_z = 0;
+static float s_xray_x = 0, s_xray_hy = 0, s_xray_z = 0;  /* hero body point */
 static int   s_xray_fy = 0;          /* hero feet cell-y; cells with by >= fy are walls */
-static float s_xray_r2 = 0;
+static float s_xray_r2 = 0;          /* cylinder radius^2 around the cam->hero sightline */
 void craft_render_set_xray(float x, float feet_y, float z, float radius) {
     s_xray_on = (radius > 0.0f);
     s_xray_x = x; s_xray_z = z;
+    s_xray_hy = feet_y + 0.6f;        /* aim at the hero's body, not the floor */
     s_xray_fy = (int)feet_y;
     s_xray_r2 = radius * radius;
 }
@@ -939,19 +940,23 @@ INLINE_HOT TraceHit trace_ray(Vec3 origin, Vec3 dir, bool stop_at_water) {
         }
 
 #ifdef ROGUE_FULLFRAME_RENDER
-        /* X-ray near walls: turn camera-side wall cells inside the hero sphere
-         * translucent (pass the ray through to the floor/hero behind). Floor
-         * cells (by < feet) and walls beyond the hero are left solid. */
+        /* X-ray near walls: only fade a wall cell if it actually sits on the
+         * line of sight between the camera and the hero (a thin cylinder along
+         * cam->hero), so just the blocks covering the character go translucent
+         * — not every near wall. Floor cells (by < feet) are left solid. */
         if (s_xray_on && !stop_at_water && vy >= s_xray_fy) {
-            float hdx = (float)vx + 0.5f - s_xray_x;
-            float hdz = (float)vz + 0.5f - s_xray_z;
-            if (hdx * hdx + hdz * hdz <= s_xray_r2) {
-                float cox = (float)vx + 0.5f - origin.x, coy = (float)vy + 0.5f - origin.y,
-                      coz = (float)vz + 0.5f - origin.z;
-                float hox = s_xray_x - origin.x, hoy = (float)s_xray_fy + 0.5f - origin.y,
-                      hoz = s_xray_z - origin.z;
-                if (cox*cox + coy*coy + coz*coz < hox*hox + hoy*hoy + hoz*hoz) {
-                    h.passed_xray = true;     /* see through this near wall cell */
+            float sx = s_xray_x - origin.x, sy = s_xray_hy - origin.y, sz = s_xray_z - origin.z;
+            float seg2 = sx*sx + sy*sy + sz*sz;
+            float cx = (float)vx + 0.5f, cyc = (float)vy + 0.5f, cz = (float)vz + 0.5f;
+            float vox = cx - origin.x, voy = cyc - origin.y, voz = cz - origin.z;
+            float tt = vox*sx + voy*sy + voz*sz;          /* projection onto the sightline */
+            if (tt > 0.0f && tt < seg2 && seg2 > 0.0001f) {   /* between camera and hero */
+                float inv = tt / seg2;
+                float dx = cx - (origin.x + sx*inv);
+                float dy = cyc - (origin.y + sy*inv);
+                float dz = cz - (origin.z + sz*inv);
+                if (dx*dx + dy*dy + dz*dz <= s_xray_r2) {
+                    h.passed_xray = true;     /* this wall covers the hero — see through it */
                     continue;
                 }
             }
