@@ -613,6 +613,21 @@ void rogue_game_debug_weapon_sheet(void) {
     rogue_inventory_open();
 }
 
+/* Set up the item-detail page demo: equip a socketed legendary weapon and
+ * drop a couple of gems in the bag, cursor on the weapon. */
+void rogue_game_debug_detail_setup(void) {
+    rogue_inventory_clear();
+    RogueItem w;
+    for (int t = 0; t < 200; t++) { rogue_item_roll_weapon(&w, 8, loot_rng()); if (w.wtype == WT_SWORD) break; }
+    w.rarity = RAR_LEGENDARY; w.aspect = ASP_CHAIN; w.sockets = 2;
+    w.gem[0] = GEM_NONE; w.gem[1] = GEM_NONE;
+    w.color = rogue_rarity_color(RAR_LEGENDARY);
+    rogue_player_equip(&s_player, &w);
+    RogueItem g1, g2; rogue_item_make_gem(&g1, GEM_RUBY); rogue_item_make_gem(&g2, GEM_EMERALD);
+    rogue_inventory_add(&g1); rogue_inventory_add(&g2);
+    rogue_inventory_open();
+}
+
 /* Force-equip a specific weapon type (FX verification). */
 void rogue_game_debug_force_weapon(int wt) {
     for (int tries = 0; tries < 400; tries++) {
@@ -710,7 +725,8 @@ void rogue_game_draw_overlay(uint16_t *fb) {
     if (s_title) { rogue_hud_title(fb, s_best_depth); return; }
     if (rogue_inventory_is_open()) {
         rogue_inventory_draw(fb, &s_player);
-        draw_minimap(fb);   /* map lives on the inventory screen only */
+        /* map shares the inventory grid only — hide it on the detail sub-pages */
+        if (!rogue_inventory_detail_open()) draw_minimap(fb);
         return;
     }
     if (rogue_shop_is_open()) { rogue_shop_draw(fb, &s_player); return; }

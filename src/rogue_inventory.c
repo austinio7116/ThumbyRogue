@@ -12,17 +12,27 @@ static int  s_bag_n;
 static bool s_open;
 static int  s_cur;        /* 0..5 = paperdoll, 6.. = backpack item */
 
+/* Item-detail sub-screen (opened with B on a selected item): a focused page
+ * with Equip/Unequip, Socket-a-gem and Salvage. Salvage asks to confirm. */
+static bool s_detail;     /* detail page open */
+static int  s_dopt;       /* highlighted action on the detail page */
+static bool s_confirm;    /* salvage confirmation pending */
+static bool s_gempick;    /* gem-picker open (choosing a gem to socket) */
+static int  s_gemcur;     /* cursor within the gem list */
+
 /* Paperdoll display order (row-major, 2 cols × 3 rows). */
 static const EquipSlot PD[6] = {
     SLOT_WEAPON, SLOT_HELM, SLOT_OFFHAND, SLOT_AMULET, SLOT_ARMOR, SLOT_RING
 };
 
-void rogue_inventory_clear(void) { s_bag_n = 0; s_open = false; s_cur = 0; }
+static void detail_reset(void) { s_detail = s_confirm = s_gempick = false; s_dopt = 0; }
+void rogue_inventory_clear(void) { s_bag_n = 0; s_open = false; s_cur = 0; detail_reset(); }
 int  rogue_inventory_count(void) { return s_bag_n; }
 bool rogue_inventory_full(void)  { return s_bag_n >= ROGUE_BAG_N; }
 bool rogue_inventory_is_open(void){ return s_open; }
-void rogue_inventory_open(void)  { s_open = true; s_cur = 0; }
-void rogue_inventory_close(void) { s_open = false; }
+bool rogue_inventory_detail_open(void) { return s_detail || s_gempick || s_confirm; }
+void rogue_inventory_open(void)  { s_open = true; s_cur = 0; detail_reset(); }
+void rogue_inventory_close(void) { s_open = false; detail_reset(); }
 
 int rogue_inventory_export(RogueItem *out, int max) {
     int n = s_bag_n < max ? s_bag_n : max;
@@ -51,18 +61,147 @@ static int salvage_gold(const RogueItem *it) {
 
 static bool edge(bool n, bool p) { return n && !p; }
 
+/* Item currently selected in the grid (NULL for an empty paperdoll cell). */
+static RogueItem *viewed(RoguePlayer *p) {
+    if (s_cur < 6) { RogueItem *e = &p->equip[PD[s_cur]]; return (e->kind != ITEM_NONE) ? e : NULL; }
+    int k = s_cur - 6;
+    return (k < s_bag_n) ? &s_bag[k] : NULL;
+}
+static int gem_count(void) {
+    int c = 0; for (int k = 0; k < s_bag_n; k++) if (s_bag[k].kind == ITEM_GEM) c++;
+    return c;
+}
+static int gem_bag_index(int nth) {
+    int c = 0; for (int k = 0; k < s_bag_n; k++)
+        if (s_bag[k].kind == ITEM_GEM) { if (c == nth) return k; c++; }
+    return -1;
+}
+static int item_free_sockets(const RogueItem *it) {
+    int f = 0; for (int g = 0; g < it->sockets && g < 2; g++) if (it->gem[g] == GEM_NONE) f++;
+    return f;
+}
+
+/* Actions offered on the detail page for the viewed item. */
+enum { ACT_EQUIP, ACT_UNEQUIP, ACT_USE, ACT_SOCKET, ACT_SALVAGE, ACT_BACK };
+static int build_actions(const RoguePlayer *p, int *acts) {
+    int n = 0; bool eq = (s_cur < 6);
+    const RogueItem *it = eq ? &p->equip[PD[s_cur]] : &s_bag[s_cur - 6];
+    if (rogue_item_is_equip(it)) {
+        acts[n++] = eq ? ACT_UNEQUIP : ACT_EQUIP;
+        if (item_free_sockets(it) > 0) acts[n++] = ACT_SOCKET;
+        acts[n++] = ACT_SALVAGE;
+    } else if (it->kind == ITEM_POTION || it->kind == ITEM_TORCH) {
+        acts[n++] = ACT_USE;
+    } else if (it->kind == ITEM_GEM) {
+        acts[n++] = ACT_SALVAGE;
+    }
+    acts[n++] = ACT_BACK;
+    return n;
+}
+
+static void clamp_cur(void) {
+    int total = 6 + s_bag_n;
+    if (s_cur >= total) s_cur = total - 1;
+    if (s_cur < 0) s_cur = 0;
+}
+
 void rogue_inventory_input(RoguePlayer *p, const CraftRawButtons *btn,
                            const CraftRawButtons *prev) {
-    int total = 6 + s_bag_n;
-    if (total < 6) total = 6;
-    if (edge(btn->left,  prev->left)  || edge(btn->up,   prev->up))   s_cur--;
-    if (edge(btn->right, prev->right) || edge(btn->down, prev->down)) s_cur++;
+    bool up = edge(btn->up,prev->up), dn = edge(btn->down,prev->down);
+    bool lf = edge(btn->left,prev->left), rt = edge(btn->right,prev->right);
+    bool a = edge(btn->a,prev->a), b = edge(btn->b,prev->b);
+
+    /* --- gem picker (socket a gem into the viewed item) --- */
+    if (s_gempick) {
+        int ng = gem_count();
+        if (up || lf) s_gemcur--;
+        if (dn || rt) s_gemcur++;
+        if (ng <= 0) s_gemcur = 0;
+        else { if (s_gemcur < 0) s_gemcur = ng - 1; if (s_gemcur >= ng) s_gemcur = 0; }
+        if (a && ng > 0) {
+            int gi = gem_bag_index(s_gemcur);
+            RogueItem *it = viewed(p);
+            if (gi >= 0 && it && rogue_item_is_equip(it)) {
+                GemType g = (GemType)s_bag[gi].amount;
+                bool done = false;
+                for (int s = 0; s < it->sockets && s < 2; s++)
+                    if (it->gem[s] == GEM_NONE) { it->gem[s] = (uint8_t)g; done = true; break; }
+                if (done) {
+                    bool eq = (s_cur < 6); int bi = eq ? -1 : s_cur - 6;
+                    bag_remove(gi);
+                    if (!eq && gi < bi) s_cur--;     /* viewed bag item shifted down */
+                    if (eq) rogue_player_recompute(p);
+                    s_gempick = false;
+                }
+            }
+        }
+        if (b) s_gempick = false;
+        return;
+    }
+
+    /* --- salvage confirmation --- */
+    if (s_confirm) {
+        if (a) {
+            if (s_cur < 6) { EquipSlot sl = PD[s_cur];
+                p->gold += salvage_gold(&p->equip[sl]);
+                p->equip[sl].kind = ITEM_NONE; rogue_player_recompute(p);
+            } else { int k = s_cur - 6;
+                p->gold += salvage_gold(&s_bag[k]); bag_remove(k);
+            }
+            s_confirm = false; s_detail = false; clamp_cur();
+        }
+        if (b) s_confirm = false;
+        return;
+    }
+
+    /* --- detail page --- */
+    if (s_detail) {
+        if (!viewed(p)) { s_detail = false; return; }
+        int acts[6]; int na = build_actions(p, acts);
+        if (up || lf) s_dopt--;
+        if (dn || rt) s_dopt++;
+        if (s_dopt < 0) s_dopt = na - 1;
+        if (s_dopt >= na) s_dopt = 0;
+        if (a) {
+            switch (acts[s_dopt]) {
+            case ACT_EQUIP: { int k = s_cur - 6; RogueItem in = s_bag[k];
+                RogueItem old = p->equip[in.slot]; bag_remove(k);
+                rogue_player_equip(p, &in);
+                if (rogue_item_is_equip(&old)) rogue_inventory_add(&old);
+                s_detail = false; } break;
+            case ACT_UNEQUIP: { EquipSlot sl = PD[s_cur];
+                if (!rogue_inventory_full()) {
+                    rogue_inventory_add(&p->equip[sl]);
+                    p->equip[sl].kind = ITEM_NONE; rogue_player_recompute(p);
+                }
+                s_detail = false; } break;
+            case ACT_USE: { int k = s_cur - 6;
+                if (s_bag[k].kind == ITEM_POTION) {
+                    p->hp += s_bag[k].amount; if (p->hp > p->max_hp) p->hp = p->max_hp;
+                } else if (s_bag[k].kind == ITEM_TORCH) {
+                    p->torch_fuel += s_bag[k].amount;
+                }
+                bag_remove(k); s_detail = false; } break;
+            case ACT_SOCKET:  s_gempick = true; s_gemcur = 0; break;
+            case ACT_SALVAGE: s_confirm = true; break;
+            case ACT_BACK:    s_detail = false; break;
+            }
+            clamp_cur();
+        }
+        if (b) s_detail = false;
+        return;
+    }
+
+    /* --- grid navigation (default) --- */
+    int total = 6 + s_bag_n; if (total < 6) total = 6;
+    if (lf || up) s_cur--;
+    if (rt || dn) s_cur++;
     if (s_cur < 0) s_cur = total - 1;
     if (s_cur >= total) s_cur = 0;
 
-    if (edge(btn->a, prev->a)) {
+    /* A = quick equip / unequip / use (fast path). */
+    if (a) {
         if (s_cur < 6) {
-            /* unequip paperdoll slot -> backpack */
             EquipSlot sl = PD[s_cur];
             if (rogue_item_is_equip(&p->equip[sl]) && !rogue_inventory_full()) {
                 rogue_inventory_add(&p->equip[sl]);
@@ -81,25 +220,12 @@ void rogue_inventory_input(RoguePlayer *p, const CraftRawButtons *btn,
                 p->hp += s_bag[k].amount;
                 if (p->hp > p->max_hp) p->hp = p->max_hp;
                 bag_remove(k);
-            } else if (k < s_bag_n && s_bag[k].kind == ITEM_GEM) {
-                /* Socket the gem into the first equipped item with a free hole. */
-                GemType g = (GemType)s_bag[k].amount;
-                for (int sl = 0; sl < SLOT_COUNT; sl++) {
-                    RogueItem *e = &p->equip[sl];
-                    if (!rogue_item_is_equip(e)) continue;
-                    bool done = false;
-                    for (int gi = 0; gi < e->sockets && gi < 2; gi++) {
-                        if (e->gem[gi] == GEM_NONE) { e->gem[gi] = (uint8_t)g; done = true; break; }
-                    }
-                    if (done) { bag_remove(k); rogue_player_recompute(p); break; }
-                }
             }
         }
+        clamp_cur();
     }
-    if (edge(btn->b, prev->b) && s_cur >= 6) {
-        int k = s_cur - 6;
-        if (k < s_bag_n) { p->gold += salvage_gold(&s_bag[k]); bag_remove(k); }
-    }
+    /* B = open the detail page for the selected item (socket / salvage live there). */
+    if (b && viewed(p)) { s_detail = true; s_dopt = 0; }
 }
 
 /* ---- drawing ---- */
@@ -254,7 +380,131 @@ static const char *slot_abbrev(EquipSlot s) {
     return A[s];
 }
 
+static const char *gem_effect(GemType g) {
+    static const char *gd[GEM_COUNT] = { "", "+20 Life", "+8% Resist", "+4% Crit", "+10 Armor" };
+    return gd[g % GEM_COUNT];
+}
+
+/* The gem-picker overlay: choose which bag gem to drop into a free socket. */
+static void draw_gem_pick(uint16_t *fb) {
+    fr(fb, 0, 0, CRAFT_FB_W, CRAFT_FB_H, RGB(10, 9, 16));
+    craft_font_draw(fb, "SOCKET A GEM", 4, 3, RGB(220, 200, 120));
+    fr(fb, 0, 12, CRAFT_FB_W, 1, RGB(60, 52, 30));
+    int y = 17, shown = 0;
+    for (int k = 0; k < s_bag_n; k++) {
+        if (s_bag[k].kind != ITEM_GEM) continue;
+        bool sel = (shown == s_gemcur);
+        if (sel) { fr(fb, 0, y - 1, CRAFT_FB_W, 13, RGB(40, 40, 60));
+                   craft_font_draw(fb, ">", 2, y + 2, RGB(255,255,255)); }
+        rogue_item_draw_icon(fb, 10, y, &s_bag[k],
+                             rogue_gem_color((GemType)(s_bag[k].amount % GEM_COUNT)));
+        char nm[40];
+        snprintf(nm, sizeof nm, "%s  %s", s_bag[k].name,
+                 gem_effect((GemType)(s_bag[k].amount % GEM_COUNT)));
+        craft_font_draw(fb, nm, 26, y + 2, sel ? RGB(255,255,255) : RGB(190,190,200));
+        y += 14; shown++;
+    }
+    if (shown == 0)
+        craft_font_draw(fb, "No gems in your bag.", 6, 22, RGB(190,150,150));
+    craft_font_draw(fb, "A socket   B back", 4, CRAFT_FB_H - 9, RGB(140,140,155));
+}
+
+/* The detail page for the viewed item: full stats + sockets + an action list
+ * (Equip/Unequip, Socket, Salvage, Back). Salvage asks to confirm. */
+static void draw_item_detail(uint16_t *fb, const RoguePlayer *p) {
+    fr(fb, 0, 0, CRAFT_FB_W, CRAFT_FB_H, RGB(10, 9, 16));
+    bool eq = (s_cur < 6);
+    const RogueItem *it = eq ? &p->equip[PD[s_cur]] : &s_bag[s_cur - 6];
+    bool gear = rogue_item_is_equip(it);
+    uint16_t rc = gear ? rogue_rarity_color(it->rarity) : it->color;
+    char line[48];
+
+    /* header: icon box + name + type */
+    box(fb, 4, 4, 22, 18, rc, RGB(20,18,28));
+    rogue_item_draw_icon(fb, 9, 8, it, rc);
+    craft_font_draw(fb, it->name, 30, 5, rc);
+    static const char *RAR[RAR_COUNT] = { "Common","Magic","Rare","Legendary" };
+    if (gear) snprintf(line, sizeof line, "%s %s", RAR[it->rarity % RAR_COUNT],
+                       rogue_slot_name((EquipSlot)it->slot));
+    else if (it->kind == ITEM_POTION) snprintf(line, sizeof line, "Potion");
+    else if (it->kind == ITEM_GEM)    snprintf(line, sizeof line, "Gem");
+    else if (it->kind == ITEM_TORCH)  snprintf(line, sizeof line, "Torch");
+    else snprintf(line, sizeof line, "Item");
+    craft_font_draw(fb, line, 30, 14, RGB(160,160,175));
+
+    int y = 26;
+    if (it->kind == ITEM_WEAPON) {
+        snprintf(line, sizeof line, "Damage  %d", it->base_dmg);
+        craft_font_draw(fb, line, 6, y, RGB(230,120,80)); y += 9;
+    }
+    if (it->armor > 0) {
+        snprintf(line, sizeof line, "Armor  %d", it->armor);
+        craft_font_draw(fb, line, 6, y, RGB(170,170,200)); y += 9;
+    }
+    for (int a = 0; a < it->n_affix; a++) {
+        char ab[24]; rogue_affix_label(ab, sizeof ab, &it->affix[a]);
+        craft_font_draw(fb, ab, 6, y, RGB(150,210,150)); y += 8;
+    }
+    if (gear && it->aspect) {
+        snprintf(line, sizeof line, "%s: %s", rogue_aspect_name((AspectId)it->aspect),
+                 rogue_aspect_desc((AspectId)it->aspect));
+        craft_font_draw(fb, line, 6, y, RGB(220,130,40)); y += 9;
+    }
+    if (it->kind == ITEM_POTION) { snprintf(line,sizeof line,"Restores %d health", it->amount);
+        craft_font_draw(fb, line, 6, y, RGB(150,210,150)); y += 9; }
+    else if (it->kind == ITEM_GEM) { snprintf(line,sizeof line,"%s (socket into gear)",
+        gem_effect((GemType)(it->amount % GEM_COUNT)));
+        craft_font_draw(fb, line, 6, y, RGB(150,210,150)); y += 9; }
+    else if (it->kind == ITEM_TORCH) { snprintf(line,sizeof line,"Relights torch +%ds", it->amount);
+        craft_font_draw(fb, line, 6, y, RGB(150,210,150)); y += 9; }
+
+    /* sockets row */
+    if (gear && it->sockets > 0) {
+        craft_font_draw(fb, "Sockets", 6, y, RGB(160,160,175));
+        int sxp = 6 + craft_font_width("Sockets") + 5;
+        for (int g = 0; g < it->sockets && g < 2; g++) {
+            uint16_t gc = it->gem[g] ? rogue_gem_color((GemType)it->gem[g]) : RGB(36,34,44);
+            box(fb, sxp + g * 12, y - 1, 9, 9, RGB(90,90,100), gc);
+        }
+        y += 11;
+    }
+
+    /* action list, stacked just above the bottom hint */
+    int acts[6]; int na = build_actions(p, acts);
+    int ay = CRAFT_FB_H - 11 - na * 10;
+    for (int i = 0; i < na; i++) {
+        const char *lbl = "Back";
+        switch (acts[i]) {
+        case ACT_EQUIP:   lbl = "Equip"; break;
+        case ACT_UNEQUIP: lbl = "Unequip"; break;
+        case ACT_USE:     lbl = (it->kind == ITEM_POTION) ? "Drink" : "Use"; break;
+        case ACT_SOCKET:  lbl = "Socket a gem"; break;
+        case ACT_SALVAGE: lbl = "Salvage"; break;
+        case ACT_BACK:    lbl = "Back"; break;
+        }
+        bool sel = (i == s_dopt);
+        uint16_t lc = (acts[i] == ACT_SALVAGE) ? RGB(230,120,110) : RGB(200,200,210);
+        if (sel) { fr(fb, 0, ay - 1, CRAFT_FB_W, 10, RGB(60,52,18));
+                   fr(fb, 0, ay - 1, 2, 10, RGB(240,210,60));
+                   craft_font_draw(fb, ">", 4, ay, RGB(255,255,255)); }
+        craft_font_draw(fb, lbl, 12, ay, sel ? RGB(255,255,255) : lc);
+        ay += 10;
+    }
+    craft_font_draw(fb, "A select   B back", 4, CRAFT_FB_H - 9, RGB(120,120,135));
+
+    /* salvage confirmation overlay */
+    if (s_confirm) {
+        int bx = 10, by = 46, bwc = CRAFT_FB_W - 20, bhc = 30;
+        box(fb, bx, by, bwc, bhc, RGB(220,90,80), RGB(30,16,16));
+        snprintf(line, sizeof line, "Salvage for %d gold?", salvage_gold(it));
+        craft_font_draw(fb, line, bx + 6, by + 6, RGB(255,210,205));
+        craft_font_draw(fb, "A  Yes        B  No", bx + 6, by + 17, RGB(255,255,255));
+    }
+}
+
 void rogue_inventory_draw(uint16_t *fb, const RoguePlayer *p) {
+    if (s_gempick) { draw_gem_pick(fb); return; }
+    if (s_detail)  { draw_item_detail(fb, p); return; }
     fr(fb, 0, 0, CRAFT_FB_W, CRAFT_FB_H, RGB(12, 10, 18));
     char buf[40];
 
@@ -352,18 +602,18 @@ void rogue_inventory_draw(uint16_t *fb, const RoguePlayer *p) {
             int ed = (eq->kind==ITEM_WEAPON? eq->base_dmg:0) + eq->armor;
             if (s_cur >= 6 && rogue_item_is_equip(eq)) {
                 int d = sd - ed;
-                snprintf(buf, sizeof buf, "A equip (%s%d %s)  B salvage",
+                snprintf(buf, sizeof buf, "A equip (%s%d %s)  B details",
                          d>=0?"+":"", d, rogue_slot_name(ssl));
             } else if (s_cur >= 6) {
-                snprintf(buf, sizeof buf, "A equip %s  B salvage", rogue_slot_name(ssl));
+                snprintf(buf, sizeof buf, "A equip %s  B details", rogue_slot_name(ssl));
             } else {
-                snprintf(buf, sizeof buf, "A unequip to bag");
+                snprintf(buf, sizeof buf, "A unequip   B details");
             }
             craft_font_draw(fb, buf, 3, dy + 16, RGB(200,200,210));
         } else if (sel->kind == ITEM_POTION) {
-            craft_font_draw(fb, "A drink", 3, dy + 16, RGB(200,200,210));
+            craft_font_draw(fb, "A drink   B details", 3, dy + 16, RGB(200,200,210));
         } else if (sel->kind == ITEM_GEM) {
-            craft_font_draw(fb, "A socket   B salvage", 3, dy + 16, RGB(200,200,210));
+            craft_font_draw(fb, "B details (socket / salvage)", 3, dy + 16, RGB(200,200,210));
         }
     } else {
         craft_font_draw(fb, "MENU close   dpad move", 3, dy + 8, RGB(150,150,160));

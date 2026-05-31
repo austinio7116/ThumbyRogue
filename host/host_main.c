@@ -210,6 +210,21 @@ int main(int argc, char **argv) {
         if (getenv("ROGUE_BEAM")) { extern void rogue_game_debug_beam(void); rogue_game_debug_beam(); }
         if (getenv("ROGUE_TORCH")) { extern void rogue_game_debug_set_torch(float); rogue_game_debug_set_torch((float)atof(getenv("ROGUE_TORCH"))); }
         if (getenv("ROGUE_SHOPUI")) { extern void rogue_game_debug_open_shop(void); rogue_game_debug_open_shop(); }
+        if (getenv("ROGUE_DETAIL") || getenv("ROGUE_GEMPICK") || getenv("ROGUE_SOCKET")) {
+            extern void rogue_game_debug_detail_setup(void);
+            rogue_game_debug_detail_setup();
+            CraftRawButtons z = {0}, t;
+            t = z; t.b = true; rogue_game_tick(&t, 1/30.f); rogue_game_tick(&z, 1/30.f);  /* B -> detail */
+            if (getenv("ROGUE_GEMPICK") || getenv("ROGUE_SOCKET")) {
+                t = z; t.down = true; rogue_game_tick(&t, 1/30.f); rogue_game_tick(&z, 1/30.f); /* -> Socket */
+                t = z; t.a = true;    rogue_game_tick(&t, 1/30.f); rogue_game_tick(&z, 1/30.f); /* open gem pick */
+            }
+            if (getenv("ROGUE_SOCKET")) {
+                extern int rogue_game_player_maxhp(void);
+                t = z; t.a = true;    rogue_game_tick(&t, 1/30.f); rogue_game_tick(&z, 1/30.f); /* socket ruby */
+                printf("[socket] after socketing ruby: maxhp=%d (expect +20)\n", rogue_game_player_maxhp());
+            }
+        }
         if (getenv("ROGUE_WEAPONS")) {
             extern void rogue_game_debug_weapon_sheet(void);
             rogue_game_debug_weapon_sheet();

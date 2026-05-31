@@ -22,6 +22,7 @@ int  rogue_inventory_export(RogueItem *out, int max);
 void rogue_inventory_import(const RogueItem *in, int n);
 
 bool rogue_inventory_is_open(void);
+bool rogue_inventory_detail_open(void);   /* item-detail / gem-pick / confirm sub-screen */
 void rogue_inventory_open(void);
 void rogue_inventory_close(void);
 
