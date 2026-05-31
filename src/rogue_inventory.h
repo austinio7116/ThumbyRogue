@@ -10,7 +10,7 @@
 #include "rogue_player.h"
 #include "craft_buttons.h"
 
-#define ROGUE_BAG_N 15
+#define ROGUE_BAG_N 21   /* 7 columns x 3 rows in the backpack grid */
 
 void rogue_inventory_clear(void);
 bool rogue_inventory_add(const RogueItem *it);   /* false if backpack full */

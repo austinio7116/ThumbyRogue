@@ -87,8 +87,9 @@
   <!-- ============ INVENTORY ============ -->
   <h2>Loot &amp; Inventory (Diablo-4-lite)</h2>
   <p>The hero has no fixed class — the <b>equipped weapon defines your playstyle</b> (melee / ranged / caster),
-  and a full 6-slot paperdoll of gear shapes the rest of your build. Loot vacuums into a 15-slot backpack;
-  open <code>MENU</code> to compare, equip, salvage and socket.</p>
+  and a full 6-slot paperdoll of gear shapes the rest of your build. Loot vacuums into a 21-slot backpack;
+  open <code>MENU</code> to compare, equip, salvage and socket. The paperdoll cells show each equipped
+  item's <b>icon</b>, your live stats sit beside them, and the fog-of-war map tucks into the top-right.</p>
 
   <div class="shotrow">
     <figure><img class="shot" src="img/inventory.png" alt="inventory"><figcaption>Paperdoll + icon backpack + live stats &amp; map</figcaption></figure>
@@ -150,7 +151,7 @@
   <h4 style="color:#cfc8da;margin:14px 0 4px;font-size:14px">Weapons — ranged &amp; caster</h4>
   <div class="icongrid">
     <figure class="iconfig">
-      <svg viewBox="0 0 12 9" width="48" height="36" style="image-rendering:pixelated;background:#16121f;border:2px solid #2c2738;border-radius:5px"><rect x="7" y="0" width="1" height="1" fill="#966e3c"/><rect x="8" y="1" width="1" height="1" fill="#966e3c"/><rect x="9" y="2" width="1" height="1" fill="#966e3c"/><rect x="9" y="3" width="1" height="1" fill="#966e3c"/><rect x="9" y="4" width="1" height="1" fill="#966e3c"/><rect x="9" y="5" width="1" height="1" fill="#966e3c"/><rect x="9" y="6" width="1" height="1" fill="#966e3c"/><rect x="8" y="7" width="1" height="1" fill="#966e3c"/><rect x="7" y="8" width="1" height="1" fill="#966e3c"/><rect x="7" y="1" width="1" height="1" fill="#cdcdd7"/><rect x="7" y="2" width="1" height="1" fill="#cdcdd7"/><rect x="7" y="3" width="1" height="1" fill="#cdcdd7"/><rect x="7" y="4" width="1" height="1" fill="#966e3c"/><rect x="7" y="5" width="1" height="1" fill="#cdcdd7"/><rect x="7" y="6" width="1" height="1" fill="#cdcdd7"/><rect x="7" y="7" width="1" height="1" fill="#cdcdd7"/><rect x="2" y="4" width="1" height="1" fill="#966e3c"/><rect x="3" y="4" width="1" height="1" fill="#966e3c"/><rect x="4" y="4" width="1" height="1" fill="#966e3c"/><rect x="5" y="4" width="1" height="1" fill="#966e3c"/><rect x="6" y="4" width="1" height="1" fill="#966e3c"/><rect x="8" y="4" width="1" height="1" fill="#966e3c"/><rect x="10" y="4" width="1" height="1" fill="#966e3c"/><rect x="2" y="3" width="1" height="1" fill="#966e3c"/><rect x="2" y="5" width="1" height="1" fill="#966e3c"/><rect x="10" y="3" width="1" height="1" fill="#cdcdd7"/><rect x="10" y="5" width="1" height="1" fill="#cdcdd7"/><rect x="11" y="4" width="1" height="1" fill="#cdcdd7"/></svg>
+      <svg viewBox="0 0 12 9" width="48" height="36" style="image-rendering:pixelated;background:#16121f;border:2px solid #2c2738;border-radius:5px"><rect x="4" y="0" width="1" height="1" fill="#966e3c"/><rect x="5" y="1" width="1" height="1" fill="#966e3c"/><rect x="6" y="2" width="1" height="1" fill="#966e3c"/><rect x="6" y="3" width="1" height="1" fill="#966e3c"/><rect x="6" y="4" width="1" height="1" fill="#966e3c"/><rect x="6" y="5" width="1" height="1" fill="#966e3c"/><rect x="6" y="6" width="1" height="1" fill="#966e3c"/><rect x="5" y="7" width="1" height="1" fill="#966e3c"/><rect x="4" y="8" width="1" height="1" fill="#966e3c"/><rect x="4" y="1" width="1" height="1" fill="#cdcdd7"/><rect x="4" y="2" width="1" height="1" fill="#cdcdd7"/><rect x="4" y="3" width="1" height="1" fill="#cdcdd7"/><rect x="4" y="4" width="1" height="1" fill="#cdcdd7"/><rect x="4" y="5" width="1" height="1" fill="#cdcdd7"/><rect x="4" y="6" width="1" height="1" fill="#cdcdd7"/><rect x="4" y="7" width="1" height="1" fill="#cdcdd7"/></svg>
       <figcaption><b>Bow</b><br>22 dmg</figcaption>
     </figure>
     <figure class="iconfig">
@@ -299,14 +300,16 @@
 
   <h3>Depth bands</h3>
   <p>The theme shifts every 4 floors — reskinning blocks, swapping the enemy roster, and ending on a
-  <b>champion</b> mini-boss. After the last band the sequence loops while enemy stats keep climbing: an endless descent.</p>
+  <b>champion</b> mini-boss. Each band has a distinct identity and includes a ranged threat (archer or
+  fire sprite) plus, where it fits, a flyer (bat); together the five bands use <b>all 11 enemy types</b>.
+  After the last band the sequence loops while enemy stats keep climbing: an endless descent.</p>
   <table>
-    <tr><th>Band</th><th>Floor / Wall</th><th>Roster lean</th></tr>
-    <tr><td><span class="sw" style="background:#b4b4be"></span>The Crypt</td><td>Stone / Cobble</td><td>Skeletons &amp; rats</td></tr>
-    <tr><td><span class="sw" style="background:#968c78"></span>The Caverns</td><td>Gravel / Stone</td><td>Slimes &amp; spiders</td></tr>
-    <tr><td><span class="sw" style="background:#6ec86e"></span>Fungal Deep</td><td>Dirt / Cobble</td><td>Slimes &amp; spiders</td></tr>
-    <tr><td><span class="sw" style="background:#aad2f0"></span>Frostvault</td><td>Snow / Ice</td><td>Skeletons</td></tr>
-    <tr><td><span class="sw" style="background:#f0783c"></span>The Inferno</td><td>Obsidian / Cobble</td><td>Skeletons &amp; spiders</td></tr>
+    <tr><th>Band</th><th>Floor / Wall</th><th>Theme</th><th>Roster</th></tr>
+    <tr><td><span class="sw" style="background:#b4b4be"></span>The Crypt</td><td>Flagstone / Cobble</td><td>Vermin &amp; risen dead</td><td>Rat · Bat · Skeleton · Skeleton Archer</td></tr>
+    <tr><td><span class="sw" style="background:#968c78"></span>The Caverns</td><td>Gravel / Stone</td><td>Cave beasts &amp; raiders</td><td>Spider · Kobold · Goblin · Bat · Slime</td></tr>
+    <tr><td><span class="sw" style="background:#6ec86e"></span>Fungal Deep</td><td>Dirt / Cobble</td><td>Toxic spore horrors</td><td>Slime · Zombie · Fire Sprite · Spider · Kobold</td></tr>
+    <tr><td><span class="sw" style="background:#aad2f0"></span>Frostvault</td><td>Snow / Ice</td><td>Frozen undead</td><td>Skeleton · Skeleton Archer · Zombie · Bat</td></tr>
+    <tr><td><span class="sw" style="background:#f0783c"></span>The Inferno</td><td>Obsidian / Cobble</td><td>Hell's legions</td><td>Demon · Fire Sprite · Goblin · Skeleton Archer · Kobold</td></tr>
   </table>
 
   <h3>What's in a floor</h3>

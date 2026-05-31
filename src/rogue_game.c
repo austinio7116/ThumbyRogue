@@ -108,7 +108,7 @@ static bool s_have_keep;
 int rogue_plat_save(const uint8_t *data, int len);   /* platform-provided */
 int rogue_plat_load(uint8_t *data, int max);
 
-#define ROGUE_SAVE_MAGIC 0x52475632u   /* 'RGV2' — bumped: RogueItem gained wtype */
+#define ROGUE_SAVE_MAGIC 0x52475633u   /* 'RGV3' — bumped: backpack grew to 21 slots */
 typedef struct {
     uint32_t magic, version;
     uint32_t seed;
@@ -123,7 +123,7 @@ typedef struct {
 void rogue_game_save(int run_active) {
     RogueSave s;
     memset(&s, 0, sizeof s);
-    s.magic = ROGUE_SAVE_MAGIC; s.version = 2;
+    s.magic = ROGUE_SAVE_MAGIC; s.version = 3;
     s.seed = s_seed;
     s.depth = run_active ? s_depth : -1;
     s.kills = s_kills;
@@ -529,7 +529,7 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
  * large to leave on during play), tucked into the free area to the right
  * of the paperdoll's stat column. */
 static void draw_minimap(uint16_t *fb) {
-    const int MS = 40, MX = CRAFT_FB_W - MS - 1, MY = 14;
+    const int MS = 36, MX = CRAFT_FB_W - MS - 1, MY = 12;
     craft_font_draw(fb, "MAP", MX, MY - 9, RGB(150,150,160));
     for (int j = -1; j <= MS; j++)
         for (int i = -1; i <= MS; i++) {

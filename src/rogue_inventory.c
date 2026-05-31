@@ -167,14 +167,11 @@ void rogue_item_draw_icon(uint16_t *fb, int ox, int oy, const RogueItem *it, uin
             for (int j = 3; j < 9; j++) P(5,j,WD);
             H(3,7,0,SIL); H(2,8,1,SIL); H(3,7,2,SIL);
             break;
-        case WT_BOW:                                  /* bow with the arrow drawn THROUGH it */
-            P(7,0,WD); P(8,1,WD); P(9,2,WD);          /* upper limb, belly faces right (target) */
-            P(9,3,WD); P(9,4,WD); P(9,5,WD); P(9,6,WD);
-            P(8,7,WD); P(7,8,WD);                     /* lower limb */
-            for (int j = 1; j < 8; j++) P(7,j,SIL);   /* string chord at the tips */
-            H(2,10,4,WD);                             /* arrow shaft, pointing right */
-            P(2,3,WD); P(2,5,WD);                     /* fletching at the nock (rear) */
-            P(10,3,SIL); P(10,5,SIL); P(11,4,SIL);    /* arrowhead, out past the bow */
+        case WT_BOW:                                  /* a clean recurve bow (no arrow) */
+            P(4,0,WD); P(5,1,WD); P(6,2,WD);          /* upper limb */
+            P(6,3,WD); P(6,4,WD); P(6,5,WD);          /* riser belly */
+            P(6,6,WD); P(5,7,WD); P(4,8,WD);          /* lower limb */
+            for (int j = 1; j < 8; j++) P(4,j,SIL);   /* string chord across the tips */
             break;
         case WT_CROSSBOW:                             /* horizontal limbs + stock + bolt */
             H(1,9,3,WD); P(1,2,WD); P(9,2,WD);        /* bow arms + tips */
@@ -260,36 +257,38 @@ static const char *slot_abbrev(EquipSlot s) {
 void rogue_inventory_draw(uint16_t *fb, const RoguePlayer *p) {
     fr(fb, 0, 0, CRAFT_FB_W, CRAFT_FB_H, RGB(12, 10, 18));
     char buf[40];
-    craft_font_draw(fb, "INVENTORY", 3, 2, RGB(240, 230, 200));
-    snprintf(buf, sizeof buf, "G %d", p->gold);
-    craft_font_draw(fb, buf, CRAFT_FB_W - craft_font_width(buf) - 3, 2, RGB(240, 210, 60));
 
-    /* paperdoll 2x3 */
-    int px0 = 4, py0 = 12, bw = 18, bh = 14, gap = 2;
+    /* Paperdoll 2x3 at the very top (no title bar). Every cell ALWAYS shows
+     * its slot label at the top so you know what goes where even before it's
+     * filled; the equipped item's icon sits below the label. */
+    int px0 = 4, py0 = 2, bw = 18, bh = 16, gap = 2;
     for (int i = 0; i < 6; i++) {
         int col = i % 2, row = i / 2;
         int x = px0 + col * (bw + gap), y = py0 + row * (bh + gap);
         const RogueItem *it = &p->equip[PD[i]];
+        bool equipped = rogue_item_is_equip(it);
         bool sel = (s_cur == i);
         uint16_t bdr = sel ? RGB(255,255,255)
-                     : rogue_item_is_equip(it) ? rogue_rarity_color(it->rarity) : RGB(70,70,80);
+                     : equipped ? rogue_rarity_color(it->rarity) : RGB(70,70,80);
         if (sel) box(fb, x-1, y-1, bw+2, bh+2, RGB(240,210,60), RGB(60,52,18));  /* gold cursor frame */
         box(fb, x, y, bw, bh, bdr, sel ? RGB(48,42,24) : RGB(24,22,30));
-        craft_font_draw(fb, slot_abbrev(PD[i]), x + 2, y + 1, RGB(150,150,160));
-        if (rogue_item_is_equip(it))
-            craft_font_draw(fb, "*", x + bw - 6, y + bh - 7, rogue_rarity_color(it->rarity));
+        craft_font_draw(fb, slot_abbrev(PD[i]), x + 4, y + 1,
+                        equipped ? RGB(175,175,190) : RGB(115,115,130));  /* always label the slot */
+        if (equipped)
+            rogue_item_draw_icon(fb, x + 3, y + 7, it, rogue_rarity_color(it->rarity));
     }
 
-    /* stat column */
-    int sx = px0 + 2 * (bw + gap) + 4, sy = 12;
-    snprintf(buf, sizeof buf, "HP %d", p->max_hp);   craft_font_draw(fb, buf, sx, sy, RGB(80,220,90));
-    snprintf(buf, sizeof buf, "ARM %d", p->stats.armor); craft_font_draw(fb, buf, sx, sy+8, RGB(170,170,200));
-    snprintf(buf, sizeof buf, "DMG %d", p->wpn_dmg); craft_font_draw(fb, buf, sx, sy+16, RGB(230,120,80));
-    snprintf(buf, sizeof buf, "CRT %d", p->stats.crit); craft_font_draw(fb, buf, sx, sy+24, RGB(240,220,80));
+    /* Stat column (gold folded in as the final line). */
+    int sx = px0 + 2 * (bw + gap) + 3, sy = 2;
+    snprintf(buf, sizeof buf, "HP %d", p->max_hp);        craft_font_draw(fb, buf, sx, sy,    RGB(80,220,90));
+    snprintf(buf, sizeof buf, "ARM %d", p->stats.armor);  craft_font_draw(fb, buf, sx, sy+8,  RGB(170,170,200));
+    snprintf(buf, sizeof buf, "DMG %d", p->wpn_dmg);      craft_font_draw(fb, buf, sx, sy+16, RGB(230,120,80));
+    snprintf(buf, sizeof buf, "CRT %d", p->stats.crit);   craft_font_draw(fb, buf, sx, sy+24, RGB(240,220,80));
     snprintf(buf, sizeof buf, "RES %d", p->stats.resist); craft_font_draw(fb, buf, sx, sy+32, RGB(120,200,220));
+    snprintf(buf, sizeof buf, "G %d", p->gold);           craft_font_draw(fb, buf, sx, sy+40, RGB(240,210,60));
 
-    /* backpack 5xN */
-    int gx0 = 4, gy0 = 58, cw = 16, ch = 13, gp = 2, cols = 5;
+    /* Backpack 7xN — wider grid, with a clear gap below the paperdoll. */
+    int gx0 = 3, gy0 = 56, cw = 15, ch = 13, gp = 2, cols = 7;
     for (int k = 0; k < ROGUE_BAG_N; k++) {
         int col = k % cols, row = k / cols;
         int x = gx0 + col * (cw + gp), y = gy0 + row * (ch + gp);
@@ -302,7 +301,7 @@ void rogue_inventory_draw(uint16_t *fb, const RoguePlayer *p) {
         box(fb, x, y, cw, ch, bdr, sel ? RGB(48,42,24) : RGB(20,18,26));
         if (has) {
             uint16_t tint = rogue_item_is_equip(&s_bag[k]) ? rogue_rarity_color(s_bag[k].rarity) : s_bag[k].color;
-            rogue_item_draw_icon(fb, x + 2, y + 2, &s_bag[k], tint);
+            rogue_item_draw_icon(fb, x + 1, y + 2, &s_bag[k], tint);
         }
     }
 

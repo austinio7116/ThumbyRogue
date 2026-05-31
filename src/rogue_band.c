@@ -5,18 +5,20 @@
 #define RGB(r,g,b) ((uint16_t)((((r)>>3)<<11)|(((g)>>2)<<5)|((b)>>3)))
 
 /* Authored bands; the sequence loops after the last (depth keeps scaling).
- * Each band draws enemies from its own roster, so the descent feels varied. */
+ * Each band has a distinct identity and includes a ranged threat (archer /
+ * fire sprite) plus, where it fits, a flyer (bat). Toughness escalates with
+ * depth, and across the five bands every one of the 11 enemy types appears. */
 static const RogueBand BANDS[] = {
-    { "THE CRYPT",   BLK_RFLOOR,   BLK_COBBLE,    BLK_PLANK,
-      { EN_SKELETON, EN_ARCHER, EN_RAT, EN_ZOMBIE }, 4, RGB(180,180,190) },
-    { "THE CAVERNS", BLK_GRAVEL,   BLK_STONE,     BLK_OBSIDIAN,
-      { EN_BAT, EN_KOBOLD, EN_SPIDER, EN_SLIME }, 4, RGB(150,140,120) },
-    { "FUNGAL DEEP", BLK_DIRT,     BLK_COBBLE,    BLK_SLIME_BLOCK,
-      { EN_SLIME, EN_KOBOLD, EN_FIRESPRITE, EN_ZOMBIE, EN_SPIDER }, 5, RGB(110,200,110) },
-    { "FROSTVAULT",  BLK_SNOW,     BLK_ICE,       BLK_SNOWY_ROCK,
+    { "THE CRYPT",   BLK_RFLOOR,   BLK_COBBLE,    BLK_PLANK,          /* vermin & risen dead */
+      { EN_RAT, EN_BAT, EN_SKELETON, EN_ARCHER }, 4, RGB(180,180,190) },
+    { "THE CAVERNS", BLK_GRAVEL,   BLK_STONE,     BLK_OBSIDIAN,       /* cave beasts & raiders */
+      { EN_SPIDER, EN_KOBOLD, EN_GOBLIN, EN_BAT, EN_SLIME }, 5, RGB(150,140,120) },
+    { "FUNGAL DEEP", BLK_DIRT,     BLK_COBBLE,    BLK_SLIME_BLOCK,    /* toxic spore horrors */
+      { EN_SLIME, EN_ZOMBIE, EN_FIRESPRITE, EN_SPIDER, EN_KOBOLD }, 5, RGB(110,200,110) },
+    { "FROSTVAULT",  BLK_SNOW,     BLK_ICE,       BLK_SNOWY_ROCK,     /* frozen undead */
       { EN_SKELETON, EN_ARCHER, EN_ZOMBIE, EN_BAT }, 4, RGB(170,210,240) },
-    { "THE INFERNO", BLK_OBSIDIAN, BLK_COBBLE,    BLK_REDSTONE_BLOCK,
-      { EN_DEMON, EN_FIRESPRITE, EN_GOBLIN, EN_ARCHER }, 4, RGB(240,120,60) },
+    { "THE INFERNO", BLK_OBSIDIAN, BLK_COBBLE,    BLK_REDSTONE_BLOCK, /* hell's legions */
+      { EN_DEMON, EN_FIRESPRITE, EN_GOBLIN, EN_ARCHER, EN_KOBOLD }, 5, RGB(240,120,60) },
 };
 #define N_BANDS ((int)(sizeof(BANDS)/sizeof(BANDS[0])))
 
