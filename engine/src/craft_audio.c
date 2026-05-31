@@ -99,7 +99,7 @@ static inline float sine_lookup(float phase) {
 }
 
 /* --- Delay reverb ------------------------------------------------ */
-#define DELAY_SIZE   2048              /* power of 2 → 92.9 ms */
+#define DELAY_SIZE   1024              /* ThumbyRogue: shorter reverb tail, saves 2KB */
 #define DELAY_MASK   (DELAY_SIZE - 1)
 #define DELAY_TAP    1500              /* 68 ms — feels spacious */
 static int16_t s_delay_ring[DELAY_SIZE];

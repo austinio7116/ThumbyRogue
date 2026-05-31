@@ -35,7 +35,11 @@ uint8_t  craft_world_biome[CRAFT_WORLD_X * CRAFT_WORLD_Z];
 #define CRAFT_EDGE_MARGIN 16   /* shift triggers within this many cells of edge */
 
 /* --- Mod hash table ----------------------------------------------- */
-#define MOD_TABLE_SIZE 2048     /* power of 2 — open addressing */
+/* ThumbyRogue reclaim: the mod table is for the open sandbox where the player
+ * places/breaks blocks. ThumbyRogue regenerates each bounded floor and never
+ * edits via craft_world_set (it uses craft_world_set_byte, which bypasses the
+ * table), so it stays empty — 2048 -> 64 reclaims ~23KB SRAM. */
+#define MOD_TABLE_SIZE 64       /* power of 2 — open addressing */
 #define MOD_TABLE_MASK (MOD_TABLE_SIZE - 1)
 #define MOD_FREE_KEY   INT32_MIN
 
@@ -495,7 +499,7 @@ static inline bool is_light_source(uint8_t b) {
  * invariant world coords + a strip scan); craft_world_set keeps it
  * current for single-cell edits; the lava tick invalidates it. If it
  * ever overflows (a huge lava field) we drop to the full scan. */
-#define LIGHTSRC_MAX 1024
+#define LIGHTSRC_MAX 512   /* ThumbyRogue reclaim: plenty for our torches+lava (~6KB saved) */
 static struct { int32_t wx, wz; int16_t wy; } s_lightsrc[LIGHTSRC_MAX];
 static int  s_lightsrc_n     = 0;
 static bool s_lightsrc_valid = false;   /* false → rebuild must full-scan */

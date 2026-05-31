@@ -97,30 +97,9 @@ static void bsp(int x, int z, int w, int h, int depth, int *cx, int *cz) {
     *cx = ccx; *cz = ccz;
 }
 
-/* Flood-fill reachable floor from (sx,sz); returns true if (tx,tz) reached. */
-static bool reachable(int sx, int sz, int tx, int tz) {
-    static uint8_t seen[GW * GD];
-    static uint16_t stack[GW * GD];   /* indices < 4096 fit in 16 bits */
-    for (int i = 0; i < GW * GD; i++) seen[i] = 0;
-    int sp = 0;
-    stack[sp++] = (uint16_t)(sz * GW + sx);
-    seen[sz * GW + sx] = 1;
-    const int dx[4] = { 1, -1, 0, 0 }, dz[4] = { 0, 0, 1, -1 };
-    while (sp > 0) {
-        int idx = stack[--sp];
-        int x = idx % GW, z = idx / GW;
-        if (x == tx && z == tz) return true;
-        for (int d = 0; d < 4; d++) {
-            int nx = x + dx[d], nz = z + dz[d];
-            if ((unsigned)nx >= GW || (unsigned)nz >= GD) continue;
-            int ni = nz * GW + nx;
-            if (seen[ni] || !s_walk[ni]) continue;
-            seen[ni] = 1;
-            stack[sp++] = (uint16_t)ni;
-        }
-    }
-    return false;
-}
+/* (A flood-fill reachability validator used to live here. Dropped to reclaim
+ * 12KB SRAM: the BSP recursion connects every sibling region with a corridor,
+ * so the room graph is always fully connected and the down-stairs reachable.) */
 
 /* Pick the room centre farthest (Manhattan) from the up-stairs. */
 static int farthest_room(int from) {
@@ -245,13 +224,6 @@ void rogue_gen_dungeon(uint32_t seed, int depth, RogueLevelInfo *out) {
 
     int up = 0;
     int down = farthest_room(up);
-    /* Safety: if the (always-connected) graph somehow leaves down
-     * unreachable, bore a direct corridor. */
-    if (!reachable(s_rooms[up].cx, s_rooms[up].cz,
-                   s_rooms[down].cx, s_rooms[down].cz)) {
-        carve_corridor(s_rooms[up].cx, s_rooms[up].cz,
-                       s_rooms[down].cx, s_rooms[down].cz);
-    }
 
     apply_to_world(seed, depth);
 

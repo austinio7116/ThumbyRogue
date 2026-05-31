@@ -114,6 +114,93 @@ static void box(uint16_t *fb, int x, int y, int w, int h, uint16_t border, uint1
     fr(fb, x, y, w, h, border);
     fr(fb, x + 1, y + 1, w - 2, h - 2, fill);
 }
+static void px(uint16_t *fb, int x, int y, uint16_t c) {
+    if ((unsigned)x < CRAFT_FB_W && (unsigned)y < CRAFT_FB_H) fb[y * CRAFT_FB_W + x] = c;
+}
+static void hrun(uint16_t *fb, int x0, int x1, int y, uint16_t c) {
+    for (int x = x0; x <= x1; x++) px(fb, x, y, c);
+}
+
+/* Tiny per-kind glyph drawn inside a backpack cell. (ox,oy) is the top-left
+ * of a ~12x9 icon box; `tint` is the rarity/item colour used to tone equip
+ * gear and consumables so rarity still reads at a glance. */
+static void draw_item_icon(uint16_t *fb, int ox, int oy, const RogueItem *it, uint16_t tint) {
+    const uint16_t SIL = RGB(205,205,215);   /* steel  */
+    const uint16_t WD  = RGB(150,110,60);    /* wood   */
+    const uint16_t GLD = RGB(235,200,70);    /* gold   */
+    const uint16_t DK  = RGB(28,26,34);      /* shadow */
+    #define P(i,j,c) px(fb, ox+(i), oy+(j), (c))
+    #define H(a,b,j,c) hrun(fb, ox+(a), ox+(b), oy+(j), (c))
+    switch (it->kind) {
+    case ITEM_WEAPON:
+        if (it->wclass == WCLASS_RANGED) {            /* bow + arrow */
+            P(1,1,WD); P(0,2,WD); P(0,3,WD); P(0,4,WD); P(0,5,WD); P(1,6,WD);
+            P(2,1,SIL); P(2,6,SIL);                   /* string ends */
+            H(2,10,3,SIL);                            /* arrow shaft */
+            P(9,2,SIL); P(9,4,SIL); P(10,3,SIL);      /* head */
+        } else if (it->wclass == WCLASS_CASTER) {     /* staff + orb */
+            for (int i = 0; i < 6; i++) P(2+i, 8-i, WD);
+            P(8,1,tint); P(9,1,tint); P(8,2,tint); P(9,2,tint);
+            P(7,0,RGB(255,255,255));
+        } else {                                      /* sword */
+            for (int j = 0; j < 6; j++) P(5,j,SIL);
+            P(6,1,SIL);
+            H(3,7,6,WD);                              /* crossguard */
+            P(5,7,WD); P(5,8,WD);                     /* grip */
+        }
+        break;
+    case ITEM_GEAR:
+        if (it->slot == SLOT_OFFHAND) {               /* shield */
+            H(3,8,0,SIL); H(2,9,1,tint); H(2,9,2,tint); H(2,9,3,tint);
+            H(3,8,4,tint); H(3,8,5,tint); H(4,7,6,tint); H(5,6,7,tint);
+            P(5,2,DK); P(6,2,DK); P(5,3,DK); P(6,3,DK);   /* boss */
+        } else if (it->slot == SLOT_HELM) {           /* helm */
+            H(4,7,0,SIL); H(3,8,1,SIL); H(2,9,2,SIL);
+            H(2,9,3,SIL); P(4,3,DK); P(5,3,DK); P(6,3,DK); P(7,3,DK); /* visor */
+            H(1,10,4,SIL);                            /* brim */
+        } else if (it->slot == SLOT_AMULET) {         /* amulet */
+            P(3,0,GLD); P(4,1,GLD); P(5,2,GLD);       /* chain */
+            P(8,0,GLD); P(7,1,GLD); P(6,2,GLD);
+            P(6,3,tint); P(5,4,tint); P(6,4,tint); P(7,4,tint); P(6,5,tint);
+        } else if (it->slot == SLOT_RING) {           /* ring + gem */
+            P(5,2,tint); P(6,2,tint);                 /* gem */
+            P(4,3,GLD); P(7,3,GLD); P(4,4,GLD); P(7,4,GLD);
+            P(5,5,GLD); P(6,5,GLD);                   /* band */
+        } else {                                      /* armour / chestplate */
+            H(2,3,0,SIL); H(8,9,0,SIL);               /* pauldrons */
+            H(1,10,1,SIL); H(2,9,2,tint); H(2,9,3,tint);
+            H(3,8,4,tint); H(4,7,5,tint); H(5,6,6,tint);
+            P(5,2,DK); P(6,2,DK);                     /* neckline */
+        }
+        break;
+    case ITEM_GEM: {
+        uint16_t g = rogue_gem_color((GemType)(it->amount % GEM_COUNT));
+        H(5,6,0,g); H(4,7,1,g); H(3,8,2,g); H(4,7,3,g); H(5,6,4,g);
+        P(4,1,RGB(255,255,255));                      /* facet glint */
+        break; }
+    case ITEM_POTION:
+        P(5,0,WD); P(6,0,WD);                         /* cork */
+        P(5,1,RGB(180,200,210)); P(6,1,RGB(180,200,210));
+        H(4,7,2,RGB(180,200,210));
+        H(3,8,3,tint); H(3,8,4,tint); H(3,8,5,tint); H(4,7,6,tint);
+        P(4,3,RGB(255,255,255));                      /* glass highlight */
+        break;
+    case ITEM_TORCH:
+        for (int j = 4; j <= 8; j++) P(5,j,WD);       /* handle */
+        P(5,0,RGB(255,235,120));                      /* flame */
+        H(4,6,1,RGB(255,180,40)); H(4,6,2,RGB(255,140,30)); P(5,3,RGB(255,120,20));
+        break;
+    case ITEM_GOLD:
+        H(4,7,1,GLD); H(3,8,2,GLD); H(3,8,3,GLD); H(3,8,4,GLD); H(4,7,5,GLD);
+        P(4,2,RGB(255,245,180));                      /* shine */
+        break;
+    default:
+        fr(fb, ox + 2, oy + 1, 8, 7, tint);
+        break;
+    }
+    #undef P
+    #undef H
+}
 
 static const char *slot_abbrev(EquipSlot s) {
     static const char *A[SLOT_COUNT] = { "Wp","Of","Hl","Ar","Am","Rg" };
@@ -164,8 +251,8 @@ void rogue_inventory_draw(uint16_t *fb, const RoguePlayer *p) {
         if (sel) box(fb, x-1, y-1, cw+2, ch+2, RGB(240,210,60), RGB(60,52,18));  /* gold cursor frame */
         box(fb, x, y, cw, ch, bdr, sel ? RGB(48,42,24) : RGB(20,18,26));
         if (has) {
-            uint16_t ic = rogue_item_is_equip(&s_bag[k]) ? rogue_rarity_color(s_bag[k].rarity) : s_bag[k].color;
-            fr(fb, x + 4, y + 3, cw - 8, ch - 6, ic);
+            uint16_t tint = rogue_item_is_equip(&s_bag[k]) ? rogue_rarity_color(s_bag[k].rarity) : s_bag[k].color;
+            draw_item_icon(fb, x + 2, y + 2, &s_bag[k], tint);
         }
     }
 

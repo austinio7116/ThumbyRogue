@@ -323,10 +323,13 @@ static void bake_water_frame(uint16_t *out_top, uint16_t *out_side, int variant)
     int band_shift = variant ? 1 : 0;
     for (int y = 0; y < CRAFT_TEX_SIZE; y++) {
         int phase = ((y + band_shift) / 2) & 1;
-        int band  = phase ? 18 : -6;
+        int band  = phase ? 16 : -8;
         for (int x = 0; x < CRAFT_TEX_SIZE; x++) {
             int j = ((int)(xs32(&s) & 0x1f) - 16) / 2;
-            uint16_t c = rgb565(30 + j, 90 + j, 180 + band + j);
+            /* Dank crypt water — stagnant murky green, not clear blue.
+             * Green dominant, low blue, dark overall; the band shimmer
+             * rides the green channel for a slick, scummy surface. */
+            uint16_t c = rgb565(22 + j, 64 + band + j, 40 + j);
             out_side[y * CRAFT_TEX_SIZE + x] = c;
             out_top [y * CRAFT_TEX_SIZE + x] = c;
         }

@@ -20,7 +20,7 @@
 #define SAMPLE_RATE     22050
 #define PWM_WRAP        4096      /* 12-bit DAC */
 
-#define RING_SIZE 4096
+#define RING_SIZE 2048   /* ~93ms @22050Hz — ample vs the 33ms frame pump (was 4096; saves 4KB) */
 #define RING_MASK (RING_SIZE - 1)
 
 static volatile int16_t  ring[RING_SIZE];

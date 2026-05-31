@@ -17,6 +17,7 @@
 #include "craft_world.h"
 #include "craft_blocks.h"
 #include "craft_render.h"
+#include "craft_font.h"
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -492,9 +493,12 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
     s_prev = *btn;
 }
 
-/* Fog-of-war minimap in the top-right corner. */
+/* Fog-of-war minimap. Shown only on the inventory/menu screen (it's too
+ * large to leave on during play), tucked into the free area to the right
+ * of the paperdoll's stat column. */
 static void draw_minimap(uint16_t *fb) {
-    const int MS = 42, MX = CRAFT_FB_W - MS - 2, MY = 19;
+    const int MS = 40, MX = CRAFT_FB_W - MS - 1, MY = 14;
+    craft_font_draw(fb, "MAP", MX, MY - 9, RGB(150,150,160));
     for (int j = -1; j <= MS; j++)
         for (int i = -1; i <= MS; i++) {
             int sx = MX + i, sy = MY + j;
@@ -649,11 +653,14 @@ void rogue_game_draw_overlay(uint16_t *fb) {
     rogue_particle_draw(&s_cam, fb);
 
     if (s_title) { rogue_hud_title(fb, s_best_depth); return; }
-    if (rogue_inventory_is_open()) { rogue_inventory_draw(fb, &s_player); return; }
+    if (rogue_inventory_is_open()) {
+        rogue_inventory_draw(fb, &s_player);
+        draw_minimap(fb);   /* map lives on the inventory screen only */
+        return;
+    }
     if (rogue_shop_is_open()) { rogue_shop_draw(fb, &s_player); return; }
 
     rogue_hud_draw(fb, &s_player, s_depth, rogue_enemies_alive_count());
-    draw_minimap(fb);
     if (s_toast_t > 0) rogue_hud_prompt(fb, s_toast);
 
     if (!s_player.alive) {
