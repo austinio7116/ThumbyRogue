@@ -267,6 +267,10 @@ int main(int argc, char **argv) {
             extern void rogue_game_debug_dmgnum(void);
             rogue_game_debug_dmgnum();
         }
+        if (getenv("ROGUE_SKIP")) {   /* hold LB+RB ~5.6s to open the skip menu */
+            CraftRawButtons h = {0}; h.lb = true; h.rb = true;
+            for (int i = 0; i < 170; i++) rogue_game_tick(&h, 1.0f / 30.0f);
+        }
         if (getenv("ROGUE_DEAD")) {
             extern void rogue_game_debug_kill(void);
             rogue_game_debug_kill();

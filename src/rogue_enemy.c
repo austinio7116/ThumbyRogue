@@ -251,7 +251,7 @@ void rogue_enemies_spawn(const int16_t *room_cx, const int16_t *room_cz,
     int rn = band->roster_n > 0 ? band->roster_n : 1;
     bool boss_floor = rogue_band_is_boss_floor(depth);
 
-    int want = 4 + depth;                 /* scale population with depth */
+    int want = 5 + depth;                 /* population grows steadily with depth */
     if (want > ROGUE_MAX_ENEMIES) want = ROGUE_MAX_ENEMIES;
 
     int placed = 0;

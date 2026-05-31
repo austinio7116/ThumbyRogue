@@ -13,7 +13,7 @@
 #include "craft_render.h"
 #include "rogue_player.h"
 
-#define ROGUE_MAX_ENEMIES 14
+#define ROGUE_MAX_ENEMIES 20
 
 typedef enum {
     EN_RAT, EN_SLIME, EN_SKELETON, EN_SPIDER,

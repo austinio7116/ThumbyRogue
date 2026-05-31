@@ -82,6 +82,10 @@
     <p style="margin:8px 0 0">Reach the <span style="color:var(--teal)">teal down-stairs beacon</span> to descend. Step on the
     <span style="color:var(--gold)">gold merchant pad</span> to shop. Walk onto chests to open them. The
     <b>fog-of-war minimap</b> lives on the <code>MENU</code> screen (it was too big to leave up during play).</p>
+    <p style="margin:8px 0 0"><b>Floating damage numbers</b> rise from every hit — <span style="color:#5ef05e">green</span>
+    for damage you deal, <span style="color:#ff5046">red</span> for damage you take.</p>
+    <p style="margin:8px 0 0"><span class="pill" style="border-color:var(--gold);color:var(--gold)">Cheat</span>
+    hold <b>LB + RB together for ~5s</b> to open a level-skip menu (jump to any depth).</p>
   </div>
 
   <!-- ============ INVENTORY ============ -->
@@ -237,7 +241,9 @@
     <div class="card"><b><span class="sw" style="background:var(--rare)"></span>Rare</b><br><span class="c">2–3 affixes · maybe a socket</span></div>
     <div class="card"><b><span class="sw" style="background:var(--legendary)"></span>Legendary</b><br><span class="c">2–3 affixes + an Aspect + 1–2 sockets</span></div>
   </div>
-  <p class="c">Rarity odds climb with depth; affix magnitudes scale with both depth and rarity.</p>
+  <p class="c">Rarity is deliberately stingy early so the descent feels like progression — at depth 1 a drop
+  is only ~0.5% legendary / ~2.9% rare (mostly common &amp; magic); by depth 20 that climbs to ~6% / ~18%.
+  Affix magnitudes scale with both depth and rarity too.</p>
 
   <h3>Affixes</h3>
   <div class="grid">
@@ -343,8 +349,9 @@
 
   <h3>Enemies</h3>
   <p>Cuboid creatures with wander → chase → <b>telegraphed wind-up</b> → strike AI (every hit is fair —
-  foes flash white-hot before they swing). Stats scale with depth, and each type drops a different
-  kind of loot — not just gold. Ranged foes fire projectiles and kite; flyers ignore the floor.</p>
+  foes flash white-hot before they swing). Both stats <i>and</i> numbers scale with depth — the floor
+  spawns <b>5 + depth</b> enemies (up to 20) — and each type drops a different kind of loot, not just
+  gold. Ranged foes fire projectiles and kite; flyers ignore the floor.</p>
   <table>
     <tr><th>Foe</th><th>Behaviour</th><th>Drops</th></tr>
     <tr><td>Rat</td><td>Fast, weak swarmer</td><td class="c">gold</td></tr>

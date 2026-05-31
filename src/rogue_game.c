@@ -37,6 +37,11 @@ static int   s_last_band = -1;
 static int   s_kills;
 static int   s_best_depth;
 static bool  s_title = true;
+
+/* Cheat: hold LB+RB together for ~5s to open a level-skip menu. */
+static bool  s_skip;
+static int   s_skip_target;
+static float s_lbrb_t;
 static char  s_toast[48];  /* transient pickup/chest message */
 static float s_toast_t;
 static uint32_t s_loot_rng = 0x13572468u;
@@ -299,14 +304,40 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
         s_prev = *btn;
         return;
     }
+    /* Level-skip cheat menu (opened by the LB+RB hold below). */
+    if (s_skip) {
+        if (edge(btn->up, s_prev.up) || edge(btn->right, s_prev.right)) s_skip_target++;
+        if (edge(btn->down, s_prev.down) || edge(btn->left, s_prev.left)) s_skip_target--;
+        if (s_skip_target < 1) s_skip_target = 1;
+        if (edge(btn->a, s_prev.a)) {
+            s_depth = s_skip_target; s_last_band = -1;
+            load_level(); rogue_game_save(1);
+            s_skip = false;
+        }
+        if (edge(btn->b, s_prev.b) || edge(btn->menu, s_prev.menu)) s_skip = false;
+        rogue_camera_get(&s_cam);
+        s_prev = *btn;
+        return;
+    }
+
     if (edge(btn->menu, s_prev.menu)) {
         rogue_inventory_open();
         s_prev = *btn;
         return;
     }
 
-    if (edge(btn->lb, s_prev.lb)) rogue_camera_rotate(-1);
-    if (edge(btn->rb, s_prev.rb)) rogue_camera_rotate(+1);
+    /* LB/RB rotate the view — unless BOTH are held, which arms the level-skip
+     * cheat (hold ~5s). Holding both suppresses rotation so the camera doesn't
+     * spin while you wait. */
+    bool both_lr = btn->lb && btn->rb;
+    if (!both_lr) {
+        if (edge(btn->lb, s_prev.lb)) rogue_camera_rotate(-1);
+        if (edge(btn->rb, s_prev.rb)) rogue_camera_rotate(+1);
+        s_lbrb_t = 0.0f;
+    } else {
+        s_lbrb_t += dt;
+        if (s_lbrb_t >= 5.0f) { s_skip = true; s_skip_target = s_depth; s_lbrb_t = 0.0f; }
+    }
 
     bool atk_edge   = edge(btn->a, s_prev.a);
     bool jump_edge  = edge(btn->b, s_prev.b);
@@ -526,6 +557,33 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
     rogue_camera_update(dt);
     rogue_camera_get(&s_cam);
     s_prev = *btn;
+}
+
+static void gfill(uint16_t *fb, int x, int y, int w, int h, uint16_t c) {
+    for (int j = y; j < y + h; j++) {
+        if ((unsigned)j >= CRAFT_FB_H) continue;
+        for (int i = x; i < x + w; i++)
+            if ((unsigned)i < CRAFT_FB_W) fb[j * CRAFT_FB_W + i] = c;
+    }
+}
+
+/* Level-skip cheat overlay: a fill bar while LB+RB is held, then the menu. */
+static void draw_skip(uint16_t *fb) {
+    if (s_lbrb_t > 0.0f && !s_skip) {
+        craft_font_draw(fb, "LEVEL SKIP...", 30, 50, RGB(240,210,60));
+        int w = (int)(s_lbrb_t / 5.0f * 80.0f);
+        gfill(fb, 24, 60, 80, 6, RGB(24,22,34));
+        gfill(fb, 24, 60, w, 6, RGB(240,210,60));
+    }
+    if (s_skip) {
+        gfill(fb, 18, 40, 92, 46, RGB(20,18,30));
+        gfill(fb, 18, 40, 92, 2, RGB(240,210,60)); gfill(fb, 18, 84, 92, 2, RGB(240,210,60));
+        gfill(fb, 18, 40, 2, 46, RGB(240,210,60));  gfill(fb, 108, 40, 2, 46, RGB(240,210,60));
+        craft_font_draw(fb, "LEVEL SKIP", 24, 46, RGB(240,210,60));
+        char b[24]; snprintf(b, sizeof b, "Depth  %d", s_skip_target);
+        craft_font_draw(fb, b, 24, 58, RGB(255,255,255));
+        craft_font_draw(fb, "up/dn  A go  B x", 24, 72, RGB(160,160,175));
+    }
 }
 
 /* Fog-of-war minimap. Shown only on the inventory/menu screen (it's too
@@ -755,4 +813,5 @@ void rogue_game_draw_overlay(uint16_t *fb) {
         const RogueBand *b = rogue_band_get(s_depth);
         rogue_hud_banner(fb, b->name, b->tint);
     }
+    draw_skip(fb);   /* cheat: arming bar / level-skip menu on top */
 }
