@@ -489,6 +489,48 @@ INLINE_HOT TraceHit trace_ray(Vec3 origin, Vec3 dir, bool stop_at_water) {
     int sz = (dir.z > 0) ? 1 : (dir.z < 0 ? -1 : 0);
 
     float t_enter = 0.0f;
+
+#ifdef ROGUE_FULLFRAME_RENDER
+    /* ThumbyRogue: the iso camera sits back beyond the world edge, so the
+     * ray ORIGIN is often outside the window. Advance the ray to the
+     * world-AABB entry point and seed the DDA there (the loop counts its
+     * step budget from the seed, and t_max is measured from the true
+     * origin, so depth/fog stay correct). Rays that miss the box are sky.
+     * When the origin is inside (origin== camera in-window) this is a
+     * no-op — identical to upstream. */
+    float t_world_enter = 0.0f;
+    {
+        float lox = (float)craft_world_origin_x, hix = lox + (float)CRAFT_WORLD_X;
+        float loy = 0.0f,                        hiy = (float)CRAFT_WORLD_Y;
+        float loz = (float)craft_world_origin_z, hiz = loz + (float)CRAFT_WORLD_Z;
+        bool outside = origin.x < lox || origin.x > hix ||
+                       origin.y < loy || origin.y > hiy ||
+                       origin.z < loz || origin.z > hiz;
+        if (outside) {
+            float tmin = 0.0f, tmax = CRAFT_MAX_DIST;
+            if (dir.x != 0.0f) {
+                float i = 1.0f / dir.x;
+                float t1 = (lox - origin.x) * i, t2 = (hix - origin.x) * i;
+                if (t1 > t2) { float tt = t1; t1 = t2; t2 = tt; }
+                if (t1 > tmin) tmin = t1; if (t2 < tmax) tmax = t2;
+            } else if (origin.x < lox || origin.x > hix) return h;
+            if (dir.y != 0.0f) {
+                float i = 1.0f / dir.y;
+                float t1 = (loy - origin.y) * i, t2 = (hiy - origin.y) * i;
+                if (t1 > t2) { float tt = t1; t1 = t2; t2 = tt; }
+                if (t1 > tmin) tmin = t1; if (t2 < tmax) tmax = t2;
+            } else if (origin.y < loy || origin.y > hiy) return h;
+            if (dir.z != 0.0f) {
+                float i = 1.0f / dir.z;
+                float t1 = (loz - origin.z) * i, t2 = (hiz - origin.z) * i;
+                if (t1 > t2) { float tt = t1; t1 = t2; t2 = tt; }
+                if (t1 > tmin) tmin = t1; if (t2 < tmax) tmax = t2;
+            } else if (origin.z < loz || origin.z > hiz) return h;
+            if (tmin > tmax || tmax < 0.0f) return h;   /* misses the world */
+            t_world_enter = tmin + 0.001f;
+        }
+    }
+#endif
     if (s_coarse_skip && !stop_at_water) {
         /* Incremental 2D DDA over the coarse grid — one floor + two
          * reciprocals of setup, then pure adds/compares per tile (no
@@ -543,6 +585,12 @@ INLINE_HOT TraceHit trace_ray(Vec3 origin, Vec3 dir, bool stop_at_water) {
      * Y-boundary right at the tile seam (a single-axis back-up was not).
      * 2.0 t-units is ≥1 cell for any ray (|dir| ≤ ~1.55 here). */
     if (t_enter > 2.0f) t_enter -= 2.0f; else t_enter = 0.0f;
+#ifdef ROGUE_FULLFRAME_RENDER
+    /* Never seed before the world entry (the cells before it are outside
+     * the buffer). The entry point is in open air above the dungeon walls,
+     * so the step-first loop skipping the seed cell is harmless. */
+    if (t_world_enter > t_enter) t_enter = t_world_enter;
+#endif
     int vx = (int)floorf(origin.x + dir.x * t_enter);
     int vy = (int)floorf(origin.y + dir.y * t_enter);
     int vz = (int)floorf(origin.z + dir.z * t_enter);

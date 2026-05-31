@@ -58,6 +58,10 @@ void rogue_camera_get(CraftCamera *out) {
     float cp = cosf(CAM_PITCH), sp = sinf(CAM_PITCH);
     float cy = cosf(s_yaw_cur), sy = sinf(s_yaw_cur);
     Vec3 fwd = v3(sy * cp, sp, cy * cp);
+    /* The camera sits at its full iso offset and may be OUTSIDE the world
+     * window — the raycaster advances each ray to the world entry point
+     * (ROGUE_FULLFRAME_RENDER patch in craft_render.c), so the hero stays
+     * perfectly centred even in edge rooms. No clamping. */
     out->pos.x = s_focus.x - fwd.x * CAM_DIST;
     out->pos.y = s_focus.y - fwd.y * CAM_DIST + 0.6f; /* aim a touch above feet */
     out->pos.z = s_focus.z - fwd.z * CAM_DIST;

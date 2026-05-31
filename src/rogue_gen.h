@@ -1,0 +1,22 @@
+#ifndef ROGUE_GEN_H
+#define ROGUE_GEN_H
+/*
+ * ThumbyRogue dungeon generator. Carves a BSP rooms+corridors dungeon into
+ * the static 64^3 craft_world buffer (origin 0,0). BSP recursion connects
+ * every sibling region, so the room graph is fully connected — the down-
+ * stairs are always reachable from spawn (verified by a flood-fill).
+ */
+#include <stdint.h>
+#include "craft_types.h"
+
+typedef struct {
+    Vec3 spawn;            /* hero feet, on the up-stairs */
+    int  up_x, up_z;       /* up-stairs cell (XZ) */
+    int  down_x, down_z;   /* down-stairs cell (XZ) */
+    int  floor_y;          /* walkable surface Y */
+    int  n_rooms;
+} RogueLevelInfo;
+
+void rogue_gen_dungeon(uint32_t seed, int depth, RogueLevelInfo *out);
+
+#endif /* ROGUE_GEN_H */

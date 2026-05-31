@@ -14,5 +14,6 @@ void rogue_game_init(uint32_t seed);
 void rogue_game_tick(const CraftRawButtons *btn, float dt);
 void rogue_game_get_camera(CraftCamera *out);    /* render the world with this */
 void rogue_game_draw_overlay(uint16_t *fb);      /* entities + HUD, after strip */
+int  rogue_game_depth(void);                     /* current dungeon depth (1+) */
 
 #endif /* ROGUE_GAME_H */

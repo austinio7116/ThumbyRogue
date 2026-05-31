@@ -69,8 +69,8 @@ add_executable(thumbyrogue
     ${ROGUE_SRC}/rogue_game.c
     ${ROGUE_SRC}/rogue_camera.c
     ${ROGUE_SRC}/rogue_player.c
-    ${ROGUE_SRC}/rogue_level.c
     ${ROGUE_SRC}/rogue_render.c
+    ${ROGUE_SRC}/rogue_gen.c
 
     # Lean vendored engine set — render path only. NO redstone, furnace,
     # mobs, chests, audio etc. yet (added per phase that uses them) so
