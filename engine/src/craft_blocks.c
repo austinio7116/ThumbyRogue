@@ -249,6 +249,73 @@ static void flagstone_pattern(uint16_t *dst, uint32_t seed, int gsize, int tone)
     }
 }
 
+/* --- ThumbyRogue band blocks ------------------------------------- */
+
+/* Caverns wall: warm tan rugged rock with dark pits + the odd ochre
+ * mineral fleck — gives the caverns an earthy, NON-grey feel. */
+static void cave_rock_pattern(uint16_t *dst, uint32_t seed) {
+    uint32_t s = seed;
+    for (int y = 0; y < CRAFT_TEX_SIZE; y++)
+        for (int x = 0; x < CRAFT_TEX_SIZE; x++) {
+            uint32_t h = (uint32_t)((x+1)*73856093) ^ (uint32_t)((y+1)*19349663) ^ seed;
+            h ^= h >> 13; h *= 0x9E3779B1u; h ^= h >> 16;
+            int j = ((int)(xs32(&s) & 0x1f) - 16);
+            int r = 150 + j, g = 124 + j, b = 92 + j;               /* tan base */
+            if ((h & 7u) == 0u)        { r -= 54; g -= 48; b -= 40; }   /* dark pit */
+            else if ((h % 29u) == 0u)  { r = 188; g = 140; b = 52; }    /* ochre fleck */
+            dst[y * CRAFT_TEX_SIZE + x] = rgb565(r, g, b);
+        }
+}
+
+/* Fungal floor: dark blue-purple mycelium speckled with bright bio-
+ * luminescent teal spores + a little green moss. */
+static void mycelium_pattern(uint16_t *dst, uint32_t seed) {
+    uint32_t s = seed;
+    for (int y = 0; y < CRAFT_TEX_SIZE; y++)
+        for (int x = 0; x < CRAFT_TEX_SIZE; x++) {
+            uint32_t h = (uint32_t)((x+3)*40503) ^ (uint32_t)((y+7)*12289) ^ seed;
+            h ^= h >> 13; h *= 0x9E3779B1u; h ^= h >> 16;
+            int j = ((int)(xs32(&s) & 0xf) - 8);
+            int r = 52 + j, g = 40 + j, b = 72 + j;                 /* dark purple */
+            if ((h & 0xf) == 0)        { r = 90; g = 240; b = 200; }    /* glowing spore */
+            else if ((h % 17u) == 0)   { r = 60; g = 130; b = 80;  }    /* moss fleck */
+            else if ((h % 13u) == 0)   { r += 26; g += 12; b += 32; }   /* lighter mottle */
+            dst[y * CRAFT_TEX_SIZE + x] = rgb565(r, g, b);
+        }
+}
+
+/* Fungal wall: dark organic growth — purple-brown with green moss
+ * patches and small magenta glowing fungus. */
+static void fungal_wall_pattern(uint16_t *dst, uint32_t seed) {
+    uint32_t s = seed;
+    for (int y = 0; y < CRAFT_TEX_SIZE; y++)
+        for (int x = 0; x < CRAFT_TEX_SIZE; x++) {
+            uint32_t h = (uint32_t)((x+5)*83492791) ^ (uint32_t)((y+2)*19349663) ^ seed;
+            h ^= h >> 13; h *= 0x9E3779B1u; h ^= h >> 16;
+            int j = ((int)(xs32(&s) & 0x1f) - 16);
+            int r = 64 + j, g = 48 + j, b = 66 + j;                 /* purple-brown */
+            int blob = (int)((h >> 3) & 0x3f);
+            if (blob < 16)        { r = 56;  g = 132; b = 74; }         /* moss patch */
+            else if (blob == 16)  { r = 200; g = 90;  b = 210; }        /* glowing fungus */
+            dst[y * CRAFT_TEX_SIZE + x] = rgb565(r, g, b);
+        }
+}
+
+/* Fungal pillar: pale cream giant-mushroom stalk with vertical fibres
+ * + a few reddish flecks. */
+static void mushroom_pattern(uint16_t *dst, uint32_t seed) {
+    uint32_t s = seed;
+    for (int y = 0; y < CRAFT_TEX_SIZE; y++)
+        for (int x = 0; x < CRAFT_TEX_SIZE; x++) {
+            int fibre = ((x & 3) == 0) ? -18 : 0;                   /* vertical fibres */
+            int j = ((int)(xs32(&s) & 0xf) - 8);
+            int r = 226 + j + fibre, g = 214 + j + fibre, b = 180 + j + fibre;
+            uint32_t h = (uint32_t)((x+1)*40503) ^ (uint32_t)((y+1)*12289) ^ seed;
+            if ((h % 37u) == 0u) { r = 200; g = 110; b = 90; }      /* reddish fleck */
+            dst[y * CRAFT_TEX_SIZE + x] = rgb565(r, g, b);
+        }
+}
+
 /* Brick-like mortar pattern at the grid lines — used by cobble. */
 static void cobble_pattern(uint16_t *dst, uint32_t seed) {
     uint32_t s = seed;
@@ -821,6 +888,14 @@ void craft_blocks_build_textures(void) {
         for (int slot = 0; slot < 3; slot++)
             flagstone_pattern(&craft_textures[(rfloor[v].blk * 3 + slot) * CRAFT_TEX_PIXELS],
                               rfloor[v].seed, rfloor[v].gsize, rfloor[v].tone);
+
+    /* ThumbyRogue band blocks: warm Caverns rock + the unique Fungal Deep set. */
+    for (int slot = 0; slot < 3; slot++) {
+        cave_rock_pattern  (&craft_textures[(BLK_CAVE_ROCK   * 3 + slot) * CRAFT_TEX_PIXELS], 0xCA7E0u);
+        mycelium_pattern   (&craft_textures[(BLK_MYCELIUM    * 3 + slot) * CRAFT_TEX_PIXELS], 0x5907Eu);
+        fungal_wall_pattern(&craft_textures[(BLK_FUNGAL_WALL * 3 + slot) * CRAFT_TEX_PIXELS], 0xF09611u);
+        mushroom_pattern   (&craft_textures[(BLK_MUSHROOM    * 3 + slot) * CRAFT_TEX_PIXELS], 0x3057Eu);
+    }
 
     /* PLANK — horizontal bands. */
     plank_pattern(&craft_textures[(BLK_PLANK * 3 + 0) * CRAFT_TEX_PIXELS], 0xFADE);

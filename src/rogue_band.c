@@ -11,10 +11,10 @@
 static const RogueBand BANDS[] = {
     { "THE CRYPT",   BLK_PLANK,    BLK_COBBLE,    BLK_STONE,          /* vermin & risen dead — warm wood floor vs grey cobble */
       { EN_RAT, EN_BAT, EN_SKELETON, EN_ARCHER }, 4, RGB(180,180,190) },
-    { "THE CAVERNS", BLK_GRAVEL,   BLK_STONE,     BLK_OBSIDIAN,       /* cave beasts & raiders */
-      { EN_SPIDER, EN_KOBOLD, EN_GOBLIN, EN_BAT, EN_SLIME }, 5, RGB(150,140,120) },
-    { "FUNGAL DEEP", BLK_DIRT,     BLK_COBBLE,    BLK_SLIME_BLOCK,    /* toxic spore horrors */
-      { EN_SLIME, EN_ZOMBIE, EN_FIRESPRITE, EN_SPIDER, EN_KOBOLD }, 5, RGB(110,200,110) },
+    { "THE CAVERNS", BLK_DIRT,     BLK_CAVE_ROCK, BLK_STONE,          /* earthy cave — warm tan rock, dirt ground */
+      { EN_SPIDER, EN_KOBOLD, EN_GOBLIN, EN_BAT, EN_SLIME }, 5, RGB(168,138,96) },
+    { "FUNGAL DEEP", BLK_MYCELIUM, BLK_FUNGAL_WALL, BLK_MUSHROOM,     /* bioluminescent spore caverns */
+      { EN_SLIME, EN_ZOMBIE, EN_FIRESPRITE, EN_SPIDER, EN_KOBOLD }, 5, RGB(150,90,210) },
     { "FROSTVAULT",  BLK_RFLOOR,   BLK_ICE,       BLK_SNOWY_ROCK,     /* frozen undead — flagstone vault floor under icy walls */
       { EN_SKELETON, EN_ARCHER, EN_ZOMBIE, EN_BAT }, 4, RGB(170,210,240) },
     { "THE INFERNO", BLK_OBSIDIAN, BLK_COBBLE,    BLK_REDSTONE_BLOCK, /* hell's legions */

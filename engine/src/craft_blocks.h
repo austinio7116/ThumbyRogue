@@ -174,6 +174,10 @@ typedef enum {
     BLK_RFLOOR2         = 106,
     BLK_RFLOOR3         = 107,
     BLK_RFLOOR4         = 108,
+    BLK_CAVE_ROCK       = 109,  /* ThumbyRogue Caverns wall — warm tan rugged rock */
+    BLK_MYCELIUM        = 110,  /* Fungal Deep floor — bioluminescent purple substrate */
+    BLK_FUNGAL_WALL     = 111,  /* Fungal Deep wall — mossy organic growth */
+    BLK_MUSHROOM        = 112,  /* Fungal Deep pillar — giant mushroom stalk */
     BLK_COUNT
 } BlockId;
 
@@ -299,7 +303,7 @@ static inline bool craft_block_opaque(BlockId blk) {
  * blocks (furnace, future chest) live above BLK_STICK in the enum so
  * they need an explicit allow-list. */
 static inline bool craft_block_solid(BlockId blk) {
-    if (blk >= BLK_RFLOOR && blk <= BLK_RFLOOR4) return true;  /* ThumbyRogue floors -- solid cubes */
+    if (blk >= BLK_RFLOOR && blk <= BLK_MUSHROOM) return true;  /* ThumbyRogue floors/walls -- solid cubes */
     if (blk == BLK_AIR || craft_is_water_id((uint8_t)blk) || blk == BLK_TORCH) return false;
     if (craft_is_lava_id((uint8_t)blk)) return false;   /* fluid — you sink into it */
     if (blk == BLK_PORTAL) return false; /* walk-through shimmer */
