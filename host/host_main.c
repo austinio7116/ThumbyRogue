@@ -173,6 +173,21 @@ int main(int argc, char **argv) {
         /* Settle (past the band banner ~2.2s), then dump. */
         CraftRawButtons none = {0};
         if (!getenv("ROGUE_TITLE")) press_start();
+        if (getenv("ROGUE_INV")) {
+            extern void rogue_game_debug_fill_bag(void);
+            extern int rogue_inventory_count(void), rogue_game_player_maxhp(void), rogue_game_player_gold(void);
+            rogue_game_debug_fill_bag();
+            printf("[inv] open bag=%d maxhp=%d\n", rogue_inventory_count(), rogue_game_player_maxhp());
+            CraftRawButtons b={0}, z={0};
+            /* move cursor onto first backpack item, then equip it */
+            for (int k=0;k<6;k++){ b=z; b.right=true; rogue_game_tick(&b,1/30.f); rogue_game_tick(&z,1/30.f); }
+            b=z; b.a=true; rogue_game_tick(&b,1/30.f); rogue_game_tick(&z,1/30.f);
+            printf("[inv] after equip bag=%d maxhp=%d\n", rogue_inventory_count(), rogue_game_player_maxhp());
+            /* salvage next item */
+            b=z; b.right=true; rogue_game_tick(&b,1/30.f); rogue_game_tick(&z,1/30.f);
+            b=z; b.b=true; rogue_game_tick(&b,1/30.f); rogue_game_tick(&z,1/30.f);
+            printf("[inv] after salvage bag=%d gold=%d\n", rogue_inventory_count(), rogue_game_player_gold());
+        }
         if (getenv("ROGUE_CENSUS")) {
             long lava = 0, lamp = 0;
             for (int y = 0; y < CRAFT_WORLD_Y; y++)

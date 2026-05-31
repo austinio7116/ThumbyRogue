@@ -11,6 +11,7 @@
 #include "rogue_band.h"
 #include "rogue_sfx.h"
 #include "rogue_platform.h"
+#include "rogue_inventory.h"
 #include "craft_world.h"
 #include "craft_blocks.h"
 #include "craft_render.h"
@@ -121,6 +122,7 @@ void rogue_game_init(uint32_t seed) {
     s_kills = 0;
     s_best_depth = 0;
     s_title = true;
+    rogue_inventory_clear();
     rogue_sfx_init();
     load_level();
     s_prev = (CraftRawButtons){0};
@@ -151,10 +153,25 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
             s_depth = 1;
             s_have_keep = false;
             s_kills = 0;
+            rogue_inventory_clear();
             load_level();
         }
         rogue_camera_update(dt);
         rogue_camera_get(&s_cam);
+        s_prev = *btn;
+        return;
+    }
+
+    /* Inventory screen — freezes gameplay; MENU toggles it. */
+    if (rogue_inventory_is_open()) {
+        rogue_inventory_input(&s_player, btn, &s_prev);
+        if (edge(btn->menu, s_prev.menu)) rogue_inventory_close();
+        rogue_camera_get(&s_cam);
+        s_prev = *btn;
+        return;
+    }
+    if (edge(btn->menu, s_prev.menu)) {
+        rogue_inventory_open();
         s_prev = *btn;
         return;
     }
@@ -270,22 +287,12 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
         else if (r < 34) { rogue_item_make_torch(&it, 25); rogue_loot_drop(&it, dpos); }
     }
 
-    /* MENU: interact — equip a ground item into its slot (swap), or open a
-     * chest. (The full paperdoll inventory screen lands in Inv 2.) */
-    if (edge(btn->menu, s_prev.menu)) {
-        RogueItem w; int idx;
-        if (rogue_loot_weapon_near(s_player.pos.x, s_player.pos.z, &w, &idx)) {
-            RogueItem taken;
-            if (rogue_loot_take(idx, &taken)) {
-                RogueItem old = s_player.equip[taken.slot];
-                rogue_player_equip(&s_player, &taken);
-                if (rogue_item_is_equip(&old)) rogue_loot_drop(&old, s_player.pos);
-            }
-        } else {
-            int ci;
-            if (rogue_loot_chest_near(s_player.pos.x, s_player.pos.y, s_player.pos.z, &ci))
-                rogue_loot_open_chest(ci, s_depth, loot_rng());
-        }
+    /* Chests open automatically when you reach them (loot spills, then
+     * vacuums into the backpack). */
+    {
+        int ci;
+        if (rogue_loot_chest_near(s_player.pos.x, s_player.pos.y, s_player.pos.z, &ci))
+            rogue_loot_open_chest(ci, s_depth, loot_rng());
     }
 
     /* Event SFX from state deltas this frame. */
@@ -327,6 +334,20 @@ void rogue_game_debug_kill(void) { s_player.hp = 0; s_player.alive = false; s_ki
 int rogue_game_player_maxhp(void) { return s_player.max_hp; }
 int rogue_game_player_armor(void) { return s_player.stats.armor; }
 int rogue_game_player_wdmg(void)  { return s_player.wpn_dmg; }
+
+void rogue_game_debug_gear_up(void);   /* fwd */
+
+/* Fill the backpack with rolled drops + open the inventory (UI screenshot). */
+void rogue_game_debug_fill_bag(void) {
+    rogue_game_debug_gear_up();   /* equip a set so paperdoll shows gear */
+    for (int i = 0; i < 9; i++) {
+        RogueItem it;
+        rogue_item_roll_drop(&it, 9, loot_rng());
+        rogue_inventory_add(&it);
+    }
+    RogueItem pot; rogue_item_make_potion(&pot, 40); rogue_inventory_add(&pot);
+    rogue_inventory_open();
+}
 
 /* Roll + equip one item into every slot (verify stat aggregation). */
 void rogue_game_debug_gear_up(void) {
@@ -378,7 +399,6 @@ void rogue_game_demo_step(float dt, int frame) {
         }
         if (dist < 1.9f) b.a = (frame % 6) < 2;   /* in range → swing */
     }
-    if (frame % 45 == 20) b.menu = true;   /* periodically grab weapons/chests */
     if (frame % 40 == 10) b.b = true;      /* periodic jump (verify physics) */
     rogue_game_tick(&b, dt);
 }
@@ -409,20 +429,10 @@ void rogue_game_draw_overlay(uint16_t *fb) {
     rogue_player_draw(&s_player, &s_cam, fb, 256);
 
     if (s_title) { rogue_hud_title(fb, s_best_depth); return; }
+    if (rogue_inventory_is_open()) { rogue_inventory_draw(fb, &s_player); return; }
 
     rogue_hud_draw(fb, &s_player, s_depth, rogue_enemies_alive_count());
 
-    /* Interact prompt. */
-    if (s_player.alive) {
-        RogueItem w; int idx, ci;
-        char buf[40];
-        if (rogue_loot_weapon_near(s_player.pos.x, s_player.pos.z, &w, &idx)) {
-            snprintf(buf, sizeof buf, "MENU equip %s [%s]", w.name, rogue_slot_name((EquipSlot)w.slot));
-            rogue_hud_prompt(fb, buf);
-        } else if (rogue_loot_chest_near(s_player.pos.x, s_player.pos.y, s_player.pos.z, &ci)) {
-            rogue_hud_prompt(fb, "MENU: open chest");
-        }
-    }
     if (!s_player.alive) {
         int best = s_depth > s_best_depth ? s_depth : s_best_depth;
         rogue_hud_summary(fb, s_depth, s_player.gold, s_kills, best);
