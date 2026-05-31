@@ -43,6 +43,9 @@ void rogue_game_toast(const char *msg) {
     s_toast_t = 2.6f;
 }
 
+/* Fog-of-war minimap: cells the hero has been near. */
+static uint8_t s_visited[CRAFT_WORLD_X * CRAFT_WORLD_Z];
+
 /* Spike traps — always visible (fair), damage on contact with a cooldown. */
 #define MAX_TRAPS 8
 static Vec3  s_trap[MAX_TRAPS];
@@ -73,6 +76,7 @@ static int s_keep_gold;
 static bool s_have_keep;
 
 static void load_level(void) {
+    memset(s_visited, 0, sizeof s_visited);
     rogue_gen_dungeon(s_seed, s_depth, &s_level);
     rogue_player_init(&s_player, s_level.spawn);
     if (s_have_keep) {
@@ -253,6 +257,18 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
                         rogue_camera_snapped_yaw(), s_level.floor_y);
     if (s_player.jumped) rogue_sfx_dodge();   /* jump sound */
 
+    /* Reveal the minimap around the hero (fog of war). */
+    {
+        int pcx = (int)floorf(s_player.pos.x), pcz = (int)floorf(s_player.pos.z);
+        for (int dz = -4; dz <= 4; dz++)
+            for (int dx = -4; dx <= 4; dx++) {
+                if (dx*dx + dz*dz > 20) continue;
+                int x = pcx + dx, z = pcz + dz;
+                if ((unsigned)x < CRAFT_WORLD_X && (unsigned)z < CRAFT_WORLD_Z)
+                    s_visited[z * CRAFT_WORLD_X + x] = 1;
+            }
+    }
+
     /* Melee auto-face: snap the swing toward the nearest enemy in lunge
      * range so daggers/swords land where you mean them to. */
     if (starting_attack && s_player.wpn_class == WCLASS_MELEE) {
@@ -398,6 +414,35 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
     s_prev = *btn;
 }
 
+/* Fog-of-war minimap in the top-right corner. */
+static void draw_minimap(uint16_t *fb) {
+    const int MS = 42, MX = CRAFT_FB_W - MS - 2, MY = 19;
+    for (int j = -1; j <= MS; j++)
+        for (int i = -1; i <= MS; i++) {
+            int sx = MX + i, sy = MY + j;
+            if ((unsigned)sx >= CRAFT_FB_W || (unsigned)sy >= CRAFT_FB_H) continue;
+            if (i < 0 || j < 0 || i >= MS || j >= MS) { fb[sy*CRAFT_FB_W+sx] = RGB(40,38,48); continue; } /* border */
+            int wx = i * CRAFT_WORLD_X / MS, wz = j * CRAFT_WORLD_Z / MS;
+            uint16_t c = RGB(10, 9, 14);                 /* unexplored */
+            if (s_visited[wz * CRAFT_WORLD_X + wx]) {
+                int b = craft_world_get(wx, s_level.floor_y, wz);
+                if (b == BLK_AIR)                       c = RGB(120,116,130); /* floor */
+                else if (craft_is_lava_id((uint8_t)b))  c = RGB(230,110,30);  /* lava */
+                else                                    c = RGB(48,46,58);    /* wall */
+            }
+            fb[sy*CRAFT_FB_W+sx] = c;
+        }
+    /* markers: down-stairs (teal), up (amber), player (white) */
+    #define MM_PT(wx,wz,col) do { \
+        int _x = MX + (int)(wx) * MS / CRAFT_WORLD_X, _y = MY + (int)(wz) * MS / CRAFT_WORLD_Z; \
+        for (int a=0;a<2;a++) for (int b=0;b<2;b++){ int xx=_x+a, yy=_y+b; \
+            if ((unsigned)xx<CRAFT_FB_W && (unsigned)yy<CRAFT_FB_H) fb[yy*CRAFT_FB_W+xx]=(col); } } while(0)
+    MM_PT(s_level.down_x, s_level.down_z, RGB(40,230,210));
+    MM_PT(s_level.up_x,   s_level.up_z,   RGB(245,180,60));
+    MM_PT((int)s_player.pos.x, (int)s_player.pos.z, RGB(255,255,255));
+    #undef MM_PT
+}
+
 void rogue_game_get_camera(CraftCamera *out) { *out = s_cam; }
 int rogue_game_depth(void) { return s_depth; }
 int rogue_game_player_hp(void) { return s_player.hp; }
@@ -529,6 +574,7 @@ void rogue_game_draw_overlay(uint16_t *fb) {
     if (rogue_shop_is_open()) { rogue_shop_draw(fb, &s_player); return; }
 
     rogue_hud_draw(fb, &s_player, s_depth, rogue_enemies_alive_count());
+    draw_minimap(fb);
     if (s_toast_t > 0) rogue_hud_prompt(fb, s_toast);
 
     if (!s_player.alive) {
