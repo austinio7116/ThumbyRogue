@@ -238,19 +238,27 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
     }
 
     /* Effective per-hit damage with a crit roll (from aggregated stats). */
+    uint32_t asp = s_player.stats.aspects;
     int outdmg = s_player.wpn_dmg;
     if ((int)(loot_rng() % 100) < s_player.stats.crit)
         outdmg = outdmg * s_player.stats.crit_dmg / 100;
+    /* Nightstalker aspect: extra damage while the torch is out. */
+    if ((asp & (1u << ASP_DARK)) && s_player.torch_fuel <= 0) outdmg = outdmg * 7 / 5;
 
     /* Melee strike frame → damage every enemy in the swing arc. */
     if (s_player.atk_hit_pending) {
         s_player.atk_hit_pending = false;
         int hits = rogue_enemies_hit_arc(s_player.pos, s_player.yaw,
                               s_player.wpn_range, s_player.wpn_arc_cos, outdmg);
+        /* Chaining aspect: a cleave around the hero on top of the arc. */
+        if ((asp & (1u << ASP_CHAIN)) && hits > 0)
+            rogue_enemies_hit_radius(s_player.pos.x, s_player.pos.z, 2.2f, outdmg / 2);
         if (hits > 0) {
             rogue_sfx_hit();
-            if (s_player.stats.life_on_hit) {
-                s_player.hp += s_player.stats.life_on_hit * hits;
+            int heal = s_player.stats.life_on_hit * hits;
+            if (asp & (1u << ASP_LIFESTEAL)) heal += outdmg / 8;  /* Vampiric */
+            if (heal) {
+                s_player.hp += heal;
                 if (s_player.hp > s_player.max_hp) s_player.hp = s_player.max_hp;
             }
         }
@@ -266,7 +274,7 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
         }
         rogue_proj_fire(s_player.pos, aim, s_player.wpn_proj_speed,
                         outdmg, s_player.wpn_class == WCLASS_CASTER,
-                        s_player.wpn_range);
+                        s_player.wpn_range, (asp & (1u << ASP_PIERCE)) ? 1 : 0);
     }
 
     rogue_enemies_update(&s_player, dt, s_level.floor_y);

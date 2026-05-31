@@ -152,6 +152,11 @@ void rogue_inventory_draw(uint16_t *fb, const RoguePlayer *p) {
     if (sel && sel->kind != ITEM_NONE) {
         uint16_t nc = rogue_item_is_equip(sel) ? rogue_rarity_color(sel->rarity) : sel->color;
         craft_font_draw(fb, sel->name, 3, dy, nc);
+        /* legendary aspect tag on the name row */
+        if (rogue_item_is_equip(sel) && sel->aspect) {
+            const char *ad = rogue_aspect_desc((AspectId)sel->aspect);
+            craft_font_draw(fb, ad, CRAFT_FB_W - craft_font_width(ad) - 3, dy, RGB(220,130,40));
+        }
         if (rogue_item_is_equip(sel)) {
             /* compare vs currently equipped in that slot (for backpack items) */
             const RogueItem *eq = &p->equip[ssl];

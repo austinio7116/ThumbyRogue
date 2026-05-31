@@ -15,6 +15,8 @@ typedef struct {
     float travelled, max_range;
     int   dmg;
     int   caster;     /* 0 = arrow, 1 = bolt (visual) */
+    int   pierce;     /* aspect: pass through enemies */
+    float hit_cd;     /* re-hit interval while piercing */
 } Proj;
 
 static Proj s_proj[MAX_PROJ];
@@ -24,7 +26,7 @@ void rogue_proj_clear(void) {
 }
 
 void rogue_proj_fire(Vec3 pos, float yaw, float speed, int dmg,
-                     int caster, float max_range) {
+                     int caster, float max_range, int pierce) {
     for (int i = 0; i < MAX_PROJ; i++) {
         if (s_proj[i].alive) continue;
         Proj *p = &s_proj[i];
@@ -36,6 +38,8 @@ void rogue_proj_fire(Vec3 pos, float yaw, float speed, int dmg,
         p->max_range = max_range;
         p->dmg = dmg;
         p->caster = caster;
+        p->pierce = pierce;
+        p->hit_cd = 0;
         return;
     }
 }
@@ -55,8 +59,11 @@ void rogue_proj_update(float dt, int floor_y) {
         if (cell_solid((int)floorf(p->pos.x), floor_y, (int)floorf(p->pos.z))) {
             p->alive = false; continue;
         }
-        if (rogue_enemies_hit_point(p->pos.x, p->pos.z, 0.35f, p->dmg))
-            p->alive = false;
+        if (p->hit_cd > 0) p->hit_cd -= dt;
+        if (p->hit_cd <= 0 && rogue_enemies_hit_point(p->pos.x, p->pos.z, 0.35f, p->dmg)) {
+            if (p->pierce) p->hit_cd = 0.12f;   /* keep flying, re-hit periodically */
+            else           p->alive = false;
+        }
     }
 }
 

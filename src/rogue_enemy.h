@@ -37,6 +37,8 @@ int rogue_enemies_hit_arc(Vec3 origin, float yaw, float range,
 /* Point/projectile hit: damage the first live enemy within `radius` of
  * (x,z). Returns 1 if it hit something. */
 int rogue_enemies_hit_point(float x, float z, float radius, int dmg);
+/* AoE: damage ALL live enemies within `radius` (cleave / chain). */
+int rogue_enemies_hit_radius(float x, float z, float radius, int dmg);
 
 /* Drain one enemy death event (position + EnemyType). False when empty.
  * The game uses this to drop loot. */

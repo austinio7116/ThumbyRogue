@@ -236,7 +236,11 @@ void rogue_enemies_update(RoguePlayer *p, float dt, int floor_y) {
                 if (p->alive && dist <= d->atk_range + (e->champion ? 0.8f : 0.4f)) {
                     int dmg = (int)(d->base_dmg * d->dmg_mul) * (e->champion ? 2 : 1);
                     if (s_dark) dmg = dmg * 3 / 2;     /* the dark bites harder */
-                    rogue_player_damage(p, dmg, e->pos);
+                    if (rogue_player_damage(p, dmg, e->pos) &&
+                        (p->stats.aspects & (1u << ASP_THORNS))) {
+                        /* Thorns: reflect a chunk back at the attacker. */
+                        en_apply_damage(e, 6 + dmg / 2, p->pos.x, p->pos.z);
+                    }
                 }
             }
             if (e->state_t >= 0.18f) {
@@ -263,6 +267,20 @@ int rogue_enemies_hit_arc(Vec3 origin, float yaw, float range,
             if (dot < arc_cos) continue;     /* outside the swing arc */
         }
         en_apply_damage(e, dmg, origin.x, origin.z);
+        hits++;
+    }
+    return hits;
+}
+
+int rogue_enemies_hit_radius(float x, float z, float radius, int dmg) {
+    int hits = 0;
+    for (int i = 0; i < ROGUE_MAX_ENEMIES; i++) {
+        Enemy *e = &s_en[i];
+        if (!e->alive) continue;
+        float dx = e->pos.x - x, dz = e->pos.z - z;
+        float rr = radius + DEFS[e->type].radius;
+        if (dx*dx + dz*dz > rr*rr) continue;
+        en_apply_damage(e, dmg, x, z);
         hits++;
     }
     return hits;
