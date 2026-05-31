@@ -240,12 +240,12 @@ void rogue_gen_dungeon(uint32_t seed, int depth, RogueLevelInfo *out) {
 
     apply_to_world(seed, depth);
 
-    /* Lava pits: in ~1/3 of rooms, sink the floor of the four quadrants to
-     * lava (a 1-deep trench you can jump out of), leaving a solid cross
-     * BRIDGE through the centre as the safe route. Lava is a light source,
-     * so the rebuild below makes the pits glow. Non-solid lava never breaks
-     * connectivity — you can always cross (with a burn) if you miss the
-     * bridge. */
+    /* Lava pits: in ~1/3 of rooms, drop the four quadrants into a chasm with
+     * lava a couple of levels DOWN — an open-air gap at floor level then a
+     * glowing lava floor below it, so the cross BRIDGE (and any moving
+     * platform) reads as clearly suspended above the lava. The bridge through
+     * the centre is the safe route; lava is non-solid so connectivity always
+     * holds (you can drop in and get bounced back out, taking a burn). */
     for (int i = 0; i < s_n_rooms; i++) {
         if (i == up || i == down) continue;
         if ((hash2(s_rooms[i].cx, s_rooms[i].cz, seed ^ 0x1A7Au) % 3u) != 0u) continue;
@@ -255,7 +255,42 @@ void rogue_gen_dungeon(uint32_t seed, int depth, RogueLevelInfo *out) {
                 if ((dx >= -1 && dx <= 1) || (dz >= -1 && dz <= 1)) continue; /* bridge */
                 int x = cx + dx, z = cz + dz;
                 if (!is_walk(x, z)) continue;
-                craft_world_set_byte(x, ROGUE_FLOOR_Y - 1, z, BLK_LAVA);
+                craft_world_set_byte(x, ROGUE_FLOOR_Y - 1, z, BLK_AIR);   /* open gap */
+                craft_world_set_byte(x, ROGUE_FLOOR_Y - 2, z, BLK_LAVA);  /* lava below */
+                craft_world_set_byte(x, ROGUE_FLOOR_Y - 3, z, BLK_LAVA);
+            }
+        }
+    }
+
+    /* Verticality: raised plateaus + stepping-stone pillars in ~40% of rooms.
+     * All 1 block high, so they're always jumpable from the ground and never
+     * wall off the validated path — they just add high ground + hop routes. */
+    {
+        const RogueBand *vb = rogue_band_get(depth);
+        for (int i = 0; i < s_n_rooms; i++) {
+            if (i == up || i == down) continue;
+            uint32_t h = hash2(s_rooms[i].cx, s_rooms[i].cz, seed ^ 0x7E12u);
+            if (h % 5u >= 2u) continue;                              /* ~40% */
+            if ((hash2(s_rooms[i].cx, s_rooms[i].cz, seed ^ 0x1A7Au) % 3u) == 0u)
+                continue;                                           /* skip lava rooms */
+            int cx = s_rooms[i].cx, cz = s_rooms[i].cz;
+            if ((h >> 8) & 1) {
+                /* raised plateau offset to one side (centre stays clear) */
+                int ox = (h & 1) ? 2 : -6;
+                for (int dz = -3; dz <= 3; dz++)
+                    for (int dx = 0; dx <= 4; dx++) {
+                        int x = cx + ox + dx, z = cz + dz;
+                        if (is_walk(x, z))
+                            craft_world_set_byte(x, ROGUE_FLOOR_Y, z, vb->floor);
+                    }
+            } else {
+                /* scattered stepping-stone pillars to hop between */
+                for (int s = 0; s < 5; s++) {
+                    int sx = cx + ((int)((h >> (s * 3 + 2)) % 7u) - 3);
+                    int sz = cz + ((int)((h >> (s * 3 + 14)) % 7u) - 3);
+                    if (is_walk(sx, sz))
+                        craft_world_set_byte(sx, ROGUE_FLOOR_Y, sz, vb->floor);
+                }
             }
         }
     }

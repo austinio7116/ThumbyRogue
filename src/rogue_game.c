@@ -254,10 +254,14 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
         int lz = (int)floorf(s_player.pos.z);
         if (craft_is_lava_id((uint8_t)craft_world_get(lx, ly, lz)) ||
             craft_is_lava_id((uint8_t)craft_world_get(lx, ly - 1, lz))) {
+            /* Lava erupts you back out (no soft-lock in the deeper pits) while
+             * it burns — punishing, not a death trap. */
+            if (s_player.vy < 9.0f) s_player.vy = 11.0f;
+            s_player.on_ground = false;
             s_lava_t -= dt;
             if (s_lava_t <= 0) {
                 rogue_player_damage(&s_player, 10 + s_depth, s_player.pos);
-                s_lava_t = 0.45f;
+                s_lava_t = 0.30f;
             }
         } else {
             s_lava_t = 0.0f;
