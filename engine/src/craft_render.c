@@ -1134,7 +1134,13 @@ void craft_render_strip(const CraftCamera *cam, uint16_t *fb,
          * the framebuffer. When it's rendered to an upscaled overlay the plate
          * lands at a scaled position, so render the full frame (folds to the
          * original on the device, where CRAFT_HUD_SCALE==1). */
+#ifdef ROGUE_FULLFRAME_RENDER
+        /* ThumbyRogue patch: no ThumbyCraft hotbar plate, so render the
+         * world edge-to-edge — removes the bottom toolbar gap. */
+        bool row_in_hud = false;
+#else
         bool row_in_hud = (CRAFT_HUD_SCALE == 1) && (py >= CRAFT_HUD_PLATE_Y0);
+#endif
         for (int px = 0; px < CRAFT_FB_W; px += xstep) {
             /* Skip rays behind the opaque hotbar plate — those pixels
              * get overwritten unconditionally by craft_hud_draw_hotbar.

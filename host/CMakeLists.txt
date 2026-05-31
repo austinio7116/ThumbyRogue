@@ -51,6 +51,12 @@ set(CHUNK_STORE_STUB ${CRAFT_ROOT}/host/craft_chunk_store_stub.c)
 add_executable(thumbyrogue_host
     ${CMAKE_CURRENT_LIST_DIR}/host_main.c
     ${CHUNK_STORE_STUB}
+    # ThumbyRogue gameplay.
+    ${ROGUE_SRC}/rogue_game.c
+    ${ROGUE_SRC}/rogue_camera.c
+    ${ROGUE_SRC}/rogue_player.c
+    ${ROGUE_SRC}/rogue_level.c
+    ${ROGUE_SRC}/rogue_render.c
     # Lean module set: only what's needed to generate + render a world.
     # ThumbyRogue has NO redstone and NO furnace/smelting, so those
     # SRAM-heavy subsystems are dropped (the three craft_redstone_* hooks
@@ -71,6 +77,7 @@ add_dependencies(thumbyrogue_host generate_craft_textures)
 target_compile_definitions(thumbyrogue_host PRIVATE
     CRAFT_TEXTURES_BAKED=1
     CRAFT_HOST=1
+    ROGUE_FULLFRAME_RENDER=1   # no craft hotbar plate -> render edge-to-edge
     # ThumbyRogue keeps the engine default 64x64x64 cubic world — one
     # bounded dungeon floor per level.
 )

@@ -65,6 +65,13 @@ add_executable(thumbyrogue
     ${DEVICE}/craft_buttons.c
     ${DEVICE}/craft_chunk_store_stub.c
 
+    # ThumbyRogue gameplay.
+    ${ROGUE_SRC}/rogue_game.c
+    ${ROGUE_SRC}/rogue_camera.c
+    ${ROGUE_SRC}/rogue_player.c
+    ${ROGUE_SRC}/rogue_level.c
+    ${ROGUE_SRC}/rogue_render.c
+
     # Lean vendored engine set — render path only. NO redstone, furnace,
     # mobs, chests, audio etc. yet (added per phase that uses them) so
     # device SRAM only pays for what's live.
@@ -99,6 +106,7 @@ target_compile_definitions(thumbyrogue PRIVATE
     PICO_STACK_SIZE=0x1000
     PICO_CORE1_STACK_SIZE=0x1000
     CRAFT_TEXTURES_BAKED=1
+    ROGUE_FULLFRAME_RENDER=1   # no craft hotbar plate -> render edge-to-edge
     # Engine-default 64x64x64 cubic world = one bounded dungeon floor.
     # This is ThumbyCraft's native device config, so it's known to fit.
 )

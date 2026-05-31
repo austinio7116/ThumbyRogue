@@ -19,7 +19,7 @@ make no sense upstream, so we vendor rather than fork in place.
 
 | File | Change | Phase |
 |------|--------|-------|
-| _(none yet — Phase 0 boots the engine unmodified)_ | | |
+| `src/craft_render.c` | `ROGUE_FULLFRAME_RENDER` guard: when defined, the raycaster no longer skips the bottom hotbar-plate rows, so the world renders edge-to-edge (removes the toolbar gap). Defined in both CMakeLists. | 1 |
 
 Planned patch points (filled in as phases land):
 - `craft_render.{c,h}` — fixed-pitch iso camera helper, 90° snap-yaw.
