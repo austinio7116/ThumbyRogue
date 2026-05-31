@@ -1491,6 +1491,23 @@ void craft_render_strip(const CraftCamera *cam, uint16_t *fb,
                     if (d2 < R2) {
                         float t = 1.0f - d2 / R2;          /* 1 at hero → 0 at edge */
                         pfloor = (int)(250.0f * t * s_light_intensity);
+                        /* Line-of-sight occlusion: walls/terrain between the
+                         * hero and this cell throw it into shadow, so the
+                         * torch carves real depth instead of glowing through
+                         * walls. A few samples along the segment is enough for
+                         * chunky voxel shadows. */
+                        if (pfloor > 0) {
+                            for (int ls = 1; ls <= 4; ls++) {
+                                float lt = ls * 0.2f;       /* 0.2..0.8 */
+                                int qx = (int)floorf(lpx + ((h.fx + 0.5f) - lpx) * lt);
+                                int qy = (int)floorf(lpy + ((h.fy + 0.5f) - lpy) * lt);
+                                int qz = (int)floorf(lpz + ((h.fz + 0.5f) - lpz) * lt);
+                                if (craft_block_opaque((BlockId)craft_world_get(qx, qy, qz))) {
+                                    pfloor >>= 2;           /* in shadow → mostly ambient */
+                                    break;
+                                }
+                            }
+                        }
                     }
 #else
                     if      (d2 <  6.25f) pfloor = 220;  /* ≤ 2.5 blocks */

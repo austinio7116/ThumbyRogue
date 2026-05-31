@@ -162,5 +162,33 @@ void rogue_shop_draw(uint16_t *fb, const RoguePlayer *p) {
         shop_row(fb, y, sel, dim, opt[i].t, RGB(200,200,210), opt[i].cost);
         y += 10;
     }
+
+    /* Detail panel for the selected item — stats + affixes as you scroll. */
+    int dy = CRAFT_FB_H - 28;
+    fr(fb, 0, dy - 1, CRAFT_FB_W, 19, RGB(8, 7, 5));
+    if (s_cur < N_STOCK && !s_sold[s_cur]) {
+        const RogueItem *it = &s_stock[s_cur];
+        if (it->kind == ITEM_WEAPON)
+            snprintf(buf, sizeof buf, "DMG %d  %s", it->base_dmg, rogue_slot_name((EquipSlot)it->slot));
+        else
+            snprintf(buf, sizeof buf, "ARM %d  %s", it->armor, rogue_slot_name((EquipSlot)it->slot));
+        craft_font_draw(fb, buf, 4, dy, rogue_rarity_color(it->rarity));
+        char line[44]; line[0] = 0; int col = 4;
+        for (int a = 0; a < it->n_affix; a++) {
+            char ab[24]; rogue_affix_label(ab, sizeof ab, &it->affix[a]);
+            craft_font_draw(fb, ab, col, dy + 8, RGB(150,200,150));
+            col += craft_font_width(ab) + 6;
+        }
+        if (it->aspect) {
+            const char *ad = rogue_aspect_desc((AspectId)it->aspect);
+            craft_font_draw(fb, ad, CRAFT_FB_W - craft_font_width(ad) - 4, dy, RGB(220,130,40));
+        }
+    } else if (s_cur == OPT_GAMBLE) {
+        craft_font_draw(fb, "buy a random item", 4, dy, RGB(180,180,190));
+    } else if (s_cur == OPT_REROLL) {
+        craft_font_draw(fb, "re-roll equipped weapon affixes", 4, dy, RGB(180,180,190));
+    } else if (s_cur == OPT_UPGRADE) {
+        craft_font_draw(fb, "raise equipped weapon damage", 4, dy, RGB(180,180,190));
+    }
     craft_font_draw(fb,"A buy/use    MENU leave",4,CRAFT_FB_H-9,RGB(150,150,160));
 }
