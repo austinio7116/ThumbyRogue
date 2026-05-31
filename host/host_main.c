@@ -47,6 +47,22 @@ void craft_redstone_note_change(BlockId p, BlockId n) { (void)p; (void)n; }
 void craft_redstone_rescan(void)     {}
 void craft_redstone_mark_dirty(void) {}
 
+/* Save storage — a file next to the binary. */
+int rogue_plat_save(const uint8_t *data, int len) {
+    FILE *f = fopen("thumbyrogue.sav", "wb");
+    if (!f) return 0;
+    fwrite(data, 1, (size_t)len, f);
+    fclose(f);
+    return 1;
+}
+int rogue_plat_load(uint8_t *data, int max) {
+    FILE *f = fopen("thumbyrogue.sav", "rb");
+    if (!f) return 0;
+    int n = (int)fread(data, 1, (size_t)max, f);
+    fclose(f);
+    return n;
+}
+
 static SDL_AudioDeviceID g_audio;
 static void audio_cb(void *ud, Uint8 *stream, int len) {
     (void)ud;
@@ -128,6 +144,24 @@ int main(int argc, char **argv) {
     if (getenv("ROGUE_DEPTH")) {
         extern void rogue_game_debug_set_depth(int);
         rogue_game_debug_set_depth(atoi(getenv("ROGUE_DEPTH")));
+    }
+    if (getenv("ROGUE_MKSAVE")) {   /* make a save then exit */
+        extern void rogue_game_debug_set_depth(int), rogue_game_debug_gear_up(void);
+        extern const char *rogue_game_weapon_name(void);
+        extern int rogue_game_player_gold(void);
+        rogue_game_debug_set_depth(atoi(getenv("ROGUE_MKSAVE")));
+        rogue_game_debug_gear_up();
+        rogue_game_save(1);
+        printf("[save] made save depth=%d gold=%d wpn=%s\n",
+               rogue_game_depth(), rogue_game_player_gold(), rogue_game_weapon_name());
+        return 0;
+    }
+    if (getenv("ROGUE_SAVECHK")) {  /* report what init resumed, then exit */
+        extern int rogue_game_player_gold(void);
+        extern const char *rogue_game_weapon_name(void);
+        printf("[save] resumed depth=%d gold=%d wpn=%s\n",
+               rogue_game_depth(), rogue_game_player_gold(), rogue_game_weapon_name());
+        return 0;
     }
 
     /* Headless autopilot: hold forward + mash attack for ~12s, logging

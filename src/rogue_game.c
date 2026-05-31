@@ -76,6 +76,63 @@ static RogueItem s_keep_equip[SLOT_COUNT];
 static int s_keep_gold;
 static bool s_have_keep;
 
+/* ---- save / load ---- */
+int rogue_plat_save(const uint8_t *data, int len);   /* platform-provided */
+int rogue_plat_load(uint8_t *data, int max);
+
+#define ROGUE_SAVE_MAGIC 0x52475631u   /* 'RGV1' */
+typedef struct {
+    uint32_t magic, version;
+    uint32_t seed;
+    int32_t  depth;        /* >0 = a live run to resume; <=0 = none */
+    int32_t  kills, best, gold, hp;
+    float    torch;
+    RogueItem equip[SLOT_COUNT];
+    int32_t  bag_n;
+    RogueItem bag[ROGUE_BAG_N];
+} RogueSave;
+
+void rogue_game_save(int run_active) {
+    RogueSave s;
+    memset(&s, 0, sizeof s);
+    s.magic = ROGUE_SAVE_MAGIC; s.version = 1;
+    s.seed = s_seed;
+    s.depth = run_active ? s_depth : -1;
+    s.kills = s_kills;
+    s.best = (s_depth > s_best_depth) ? s_depth : s_best_depth;
+    s.gold = s_player.gold;
+    s.hp = s_player.hp;
+    s.torch = s_player.torch_fuel;
+    for (int i = 0; i < SLOT_COUNT; i++) s.equip[i] = s_player.equip[i];
+    s.bag_n = rogue_inventory_export(s.bag, ROGUE_BAG_N);
+    rogue_plat_save((const uint8_t *)&s, (int)sizeof s);
+}
+
+static void load_level(void);
+/* Try to resume a saved run. Returns true if a live run was restored. */
+static bool try_resume(void) {
+    RogueSave s;
+    int n = rogue_plat_load((uint8_t *)&s, (int)sizeof s);
+    if (n < (int)sizeof s || s.magic != ROGUE_SAVE_MAGIC) return false;
+    if (s.best > s_best_depth) s_best_depth = s.best;
+    if (s.depth <= 0) return false;        /* save exists but run is over */
+    s_seed = s.seed;
+    s_depth = s.depth;
+    s_kills = s.kills;
+    load_level();                          /* regenerate the saved floor */
+    for (int i = 0; i < SLOT_COUNT; i++) s_player.equip[i] = s.equip[i];
+    rogue_player_recompute(&s_player);
+    s_player.hp = s.hp > 0 ? s.hp : 1;
+    if (s_player.hp > s_player.max_hp) s_player.hp = s_player.max_hp;
+    s_player.gold = s.gold;
+    s_player.torch_fuel = s.torch;
+    rogue_inventory_import(s.bag, s.bag_n);
+    s_have_keep = true;
+    for (int i = 0; i < SLOT_COUNT; i++) s_keep_equip[i] = s.equip[i];
+    s_keep_gold = s.gold;
+    return true;
+}
+
 static void load_level(void) {
     memset(s_visited, 0, sizeof s_visited);
     rogue_particle_clear();
@@ -148,10 +205,15 @@ void rogue_game_init(uint32_t seed) {
 
     s_kills = 0;
     s_best_depth = 0;
-    s_title = true;
     rogue_inventory_clear();
     rogue_sfx_init();
-    load_level();
+    /* Resume a saved run if there is one; otherwise start fresh at the title. */
+    if (try_resume()) {
+        s_title = false;
+    } else {
+        s_title = true;
+        load_level();
+    }
     s_prev = (CraftRawButtons){0};
 }
 
@@ -172,6 +234,7 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
      * gold lost, back to the starter dagger). */
     if (!s_player.alive) {
         if (s_depth > s_best_depth) s_best_depth = s_depth;
+        if (s_dead_t == 0.0f) rogue_game_save(0);   /* permadeath: wipe run, keep best */
         s_dead_t += dt;
         /* require a brief beat before accepting input, then wait for A */
         if (s_dead_t > 0.6f && edge(btn->a, s_prev.a)) {
@@ -182,6 +245,7 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
             s_kills = 0;
             rogue_inventory_clear();
             load_level();
+            rogue_game_save(1);
         }
         rogue_camera_update(dt);
         rogue_camera_get(&s_cam);
@@ -416,6 +480,7 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
         s_have_keep = true;
         s_depth++;
         load_level();
+        rogue_game_save(1);   /* checkpoint each new floor */
     }
 
     if (s_band_banner_t > 0) s_band_banner_t -= dt;

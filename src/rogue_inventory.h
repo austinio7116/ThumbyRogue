@@ -17,6 +17,10 @@ bool rogue_inventory_add(const RogueItem *it);   /* false if backpack full */
 bool rogue_inventory_full(void);
 int  rogue_inventory_count(void);
 
+/* Save/load: copy the backpack out / in. */
+int  rogue_inventory_export(RogueItem *out, int max);
+void rogue_inventory_import(const RogueItem *in, int n);
+
 bool rogue_inventory_is_open(void);
 void rogue_inventory_open(void);
 void rogue_inventory_close(void);

@@ -11,6 +11,13 @@
 #include "craft_render.h"
 
 void rogue_game_init(uint32_t seed);
+
+/* Persistence. The platform provides storage (file on host, flash on device):
+ *   int rogue_plat_save(const uint8_t *data, int len);   // 1 on success
+ *   int rogue_plat_load(uint8_t *data, int max);         // bytes read, 0 = none
+ * rogue_game_save persists the current run; load happens automatically in
+ * rogue_game_init (resumes a saved run, else starts fresh keeping best depth). */
+void rogue_game_save(int run_active);
 void rogue_game_tick(const CraftRawButtons *btn, float dt);
 void rogue_game_get_camera(CraftCamera *out);    /* render the world with this */
 void rogue_game_draw_overlay(uint16_t *fb);      /* entities + HUD, after strip */

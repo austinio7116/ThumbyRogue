@@ -58,6 +58,7 @@ static void run_tiles(void) {
     }
 }
 static void core1_entry(void) {
+    multicore_lockout_victim_init();   /* allow core0 to park us during flash saves */
     while (true) {
         while (!s_core1_go) tight_loop_contents();
         s_core1_go = false;

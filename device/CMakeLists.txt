@@ -64,6 +64,7 @@ add_executable(thumbyrogue
     ${DEVICE}/craft_lcd_gc9107.c
     ${DEVICE}/craft_buttons.c
     ${DEVICE}/craft_chunk_store_stub.c
+    ${DEVICE}/rogue_save_flash.c
     ${DEVICE}/craft_audio_pwm.c
 
     # ThumbyRogue gameplay.

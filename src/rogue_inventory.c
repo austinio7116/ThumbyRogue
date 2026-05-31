@@ -24,6 +24,17 @@ bool rogue_inventory_is_open(void){ return s_open; }
 void rogue_inventory_open(void)  { s_open = true; s_cur = 0; }
 void rogue_inventory_close(void) { s_open = false; }
 
+int rogue_inventory_export(RogueItem *out, int max) {
+    int n = s_bag_n < max ? s_bag_n : max;
+    for (int i = 0; i < n; i++) out[i] = s_bag[i];
+    return n;
+}
+void rogue_inventory_import(const RogueItem *in, int n) {
+    if (n > ROGUE_BAG_N) n = ROGUE_BAG_N;
+    for (int i = 0; i < n; i++) s_bag[i] = in[i];
+    s_bag_n = n;
+}
+
 bool rogue_inventory_add(const RogueItem *it) {
     if (s_bag_n >= ROGUE_BAG_N) return false;
     s_bag[s_bag_n++] = *it;
