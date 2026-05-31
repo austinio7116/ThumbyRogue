@@ -7,7 +7,7 @@
 
 #define RGB(r,g,b) ((uint16_t)((((r)>>3)<<11)|(((g)>>2)<<5)|((b)>>3)))
 #define MAX_GROUND 18
-#define MAX_CHEST  6
+#define MAX_CHEST  8
 #define PICKUP_R   1.4f    /* gold/potion vacuum radius */
 #define INTERACT_R 1.3f
 
@@ -42,7 +42,7 @@ void rogue_loot_place_chests(const int16_t *room_cx, const int16_t *room_cz,
     for (int i = 0; i < MAX_CHEST; i++) s_c[i].used = false;
     s_rng = seed ^ (0x51ED2700u * (uint32_t)(depth + 1));
     if (!s_rng) s_rng = 1;
-    int want = 1 + depth / 3;
+    int want = 3 + depth / 2;
     if (want > MAX_CHEST) want = MAX_CHEST;
     int placed = 0;
     for (int a = 0; a < want * 5 && placed < want; a++) {

@@ -218,27 +218,31 @@ static void speckle(uint16_t *dst, uint32_t seed, int r, int g, int b, int jit) 
     }
 }
 
-/* ThumbyRogue dungeon floor: four large mortared flagstones with a soft
- * top-left bevel and very low grain — reads cleanly at iso distance instead
- * of the noisy speckle of natural stone. */
-static void flagstone_pattern(uint16_t *dst, uint32_t seed) {
+/* ThumbyRogue dungeon flagstone: mortared slabs with a soft top-left bevel,
+ * per-slab tone variation and the odd crack — clean at iso distance. `gsize`
+ * sets slab size and `tone` shifts brightness, so several variants can be
+ * scattered across the floor for tessellating variety. */
+static void flagstone_pattern(uint16_t *dst, uint32_t seed, int gsize, int tone) {
     uint32_t s = seed;
-    static const int base[4] = { 120, 108, 114, 100 };
+    int half = gsize / 2;
     for (int y = 0; y < CRAFT_TEX_SIZE; y++) {
         for (int x = 0; x < CRAFT_TEX_SIZE; x++) {
-            int sx = x >> 3, sy = y >> 3;          /* which 8x8 flagstone */
-            int lx = x & 7,  ly = y & 7;
+            int lx = x % gsize, ly = y % gsize;
+            int sxx = x / gsize, syy = y / gsize;
+            uint32_t sh = (uint32_t)(sxx * 73856093) ^ (uint32_t)(syy * 19349663) ^ seed;
+            int slabtone = (int)(sh % 22u) - 11;           /* per-slab shade */
             int c;
-            if (lx == 0 || ly == 0) {              /* recessed mortar joint */
-                c = 56 + (int)(xs32(&s) & 7);
+            if (lx == 0 || ly == 0) {                      /* recessed mortar */
+                c = 54 + (int)(xs32(&s) & 7);
             } else {
-                c = base[sy * 2 + sx];
-                c += (4 - lx) + (4 - ly);          /* gentle top-left bevel */
-                if (lx == 7 || ly == 7) c -= 14;   /* shaded far edge */
-                c += ((int)(xs32(&s) & 7) - 3);    /* faint grain */
+                c = 118 + tone + slabtone;
+                c += (half - lx) + (half - ly);            /* top-left bevel */
+                if (lx == gsize - 1 || ly == gsize - 1) c -= 12;
+                c += ((int)(xs32(&s) & 7) - 3);            /* faint grain */
+                if (((sh >> (lx & 7)) & 0x3Fu) == 0u) c -= 34;  /* occasional crack */
             }
             if (c < 0) c = 0;
-            if (c > 200) c = 200;
+            if (c > 205) c = 205;
             int b = c - 4; if (b < 0) b = 0;
             dst[y * CRAFT_TEX_SIZE + x] = rgb565(c + 6, c + 2, b);  /* faintly warm */
         }
@@ -802,10 +806,18 @@ void craft_blocks_build_textures(void) {
     cobble_pattern(&craft_textures[(BLK_COBBLE * 3 + 1) * CRAFT_TEX_PIXELS], 0xC0B);
     cobble_pattern(&craft_textures[(BLK_COBBLE * 3 + 2) * CRAFT_TEX_PIXELS], 0xC0B);
 
-    /* ROGUE FLAGSTONE FLOOR — clean mortared flagstones. */
-    flagstone_pattern(&craft_textures[(BLK_RFLOOR * 3 + 0) * CRAFT_TEX_PIXELS], 0xF1A65);
-    flagstone_pattern(&craft_textures[(BLK_RFLOOR * 3 + 1) * CRAFT_TEX_PIXELS], 0xF1A65);
-    flagstone_pattern(&craft_textures[(BLK_RFLOOR * 3 + 2) * CRAFT_TEX_PIXELS], 0xF1A65);
+    /* ROGUE FLAGSTONE FLOORS — four variants (slab size + tone) scattered
+     * across the floor for tessellating variety. */
+    struct { int blk; uint32_t seed; int gsize; int tone; } rfloor[4] = {
+        { BLK_RFLOOR,  0xF1A65u, 8,   0 },   /* medium slabs */
+        { BLK_RFLOOR2, 0x5AB12u, 8, -12 },   /* darker medium slabs */
+        { BLK_RFLOOR3, 0x9C3E7u, 4,  +6 },   /* small tiles */
+        { BLK_RFLOOR4, 0x2D71Fu, 16, -4 },   /* one big cracked slab */
+    };
+    for (int v = 0; v < 4; v++)
+        for (int slot = 0; slot < 3; slot++)
+            flagstone_pattern(&craft_textures[(rfloor[v].blk * 3 + slot) * CRAFT_TEX_PIXELS],
+                              rfloor[v].seed, rfloor[v].gsize, rfloor[v].tone);
 
     /* PLANK — horizontal bands. */
     plank_pattern(&craft_textures[(BLK_PLANK * 3 + 0) * CRAFT_TEX_PIXELS], 0xFADE);

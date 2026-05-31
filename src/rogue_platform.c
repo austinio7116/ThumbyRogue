@@ -26,12 +26,33 @@ static uint32_t hh(uint32_t x){ x^=x<<13; x^=x>>17; x^=x<<5; return x; }
 
 void rogue_platform_place(const int16_t *room_cx, const int16_t *room_cz,
                           int n_rooms, int up_x, int up_z,
-                          int floor_y, int depth, uint32_t seed) {
+                          int floor_y, int depth, uint32_t seed,
+                          const int16_t *chasm_x, const int16_t *chasm_z,
+                          int n_chasm) {
     rogue_platform_clear();
     uint32_t r = seed ^ 0x9143u ^ (uint32_t)(depth * 2654435761u);
-    int want = 1 + depth / 3;
-    if (want > MAX_PLAT) want = MAX_PLAT;
+    float y = (float)floor_y;          /* top surface at normal walk height */
     int placed = 0;
+
+    /* A platform ferrying across each lava lake (parallel to the bridge, but
+     * over the lava) — guarantees a visible moving platform over a chasm. */
+    for (int c = 0; c < n_chasm && placed < MAX_PLAT; c++) {
+        int cx = chasm_x[c], cz = chasm_z[c];
+        Plat *p = &s_p[placed++];
+        p->used = true;
+        p->a = v3(cx - 5.0f, y, cz + 4.0f);
+        p->b = v3(cx + 5.0f, y, cz + 4.0f);
+        r = hh(r);
+        p->t = (float)(r & 0xFF) / 255.0f;
+        p->dir = 1.0f;
+        p->speed = 0.40f + 0.04f * depth;
+        if (p->speed > 0.7f) p->speed = 0.7f;
+        p->pos = p->prev = p->a;
+    }
+
+    /* A few more scattered through other rooms. */
+    int want = placed + 1 + depth / 4;
+    if (want > MAX_PLAT) want = MAX_PLAT;
     for (int a = 0; a < want * 5 && placed < want; a++) {
         r = hh(r);
         int idx = (int)(r % (uint32_t)(n_rooms > 0 ? n_rooms : 1));
@@ -39,14 +60,8 @@ void rogue_platform_place(const int16_t *room_cx, const int16_t *room_cz,
         if (cx == up_x && cz == up_z) continue;
         Plat *p = &s_p[placed];
         p->used = true;
-        float y = (float)floor_y;       /* top surface at normal walk height */
-        if (hh(r) & 1) {                /* oscillate along X (offset off-bridge) */
-            p->a = v3(cx - 4.0f, y, cz + 3.0f);
-            p->b = v3(cx + 4.0f, y, cz + 3.0f);
-        } else {                        /* along Z */
-            p->a = v3(cx + 3.0f, y, cz - 4.0f);
-            p->b = v3(cx + 3.0f, y, cz + 4.0f);
-        }
+        if (hh(r) & 1) { p->a = v3(cx - 4.0f, y, cz + 3.0f); p->b = v3(cx + 4.0f, y, cz + 3.0f); }
+        else           { p->a = v3(cx + 3.0f, y, cz - 4.0f); p->b = v3(cx + 3.0f, y, cz + 4.0f); }
         p->t = (float)(hh(r) & 0xFF) / 255.0f;
         p->dir = 1.0f;
         p->speed = 0.35f + 0.05f * depth;

@@ -157,8 +157,11 @@ static int bg_height(int x, int z, uint32_t seed) {
     float n = vnoise(x / 9.0f, z / 9.0f, seed)
             + 0.4f * vnoise(x / 4.0f, z / 4.0f, seed ^ 0x55u);
     n /= 1.4f;
-    int h = (int)(ROGUE_FLOOR_Y - 3 + n * 6.0f);
-    if (h < 1) h = 1;
+    /* The dungeon is carved into rock: the surrounding terrain rises ABOVE the
+     * floor (cliffs/massif), so it reads as scenery beyond the walls but is
+     * never walkable — you can't wander out through a ruined gap onto it. */
+    int h = (int)(ROGUE_FLOOR_Y + 1 + n * 5.0f);   /* FLOOR_Y+1 .. FLOOR_Y+6 */
+    if (h < ROGUE_FLOOR_Y + 1) h = ROGUE_FLOOR_Y + 1;
     if (h >= CRAFT_WORLD_Y) h = CRAFT_WORLD_Y - 1;
     return h;
 }
@@ -182,6 +185,14 @@ static void apply_to_world(uint32_t seed, int depth) {
                 /* Room/corridor: flat clearing — solid floor, open above. */
                 for (int y = 0; y < ROGUE_FLOOR_Y; y++)
                     craft_world_set_byte(x, y, z, FLOOR);
+                /* Flagstone bands scatter 4 slab variants across the surface
+                 * so the floor tessellates with variety instead of a repeated
+                 * tile. */
+                if (FLOOR == BLK_RFLOOR) {
+                    uint32_t hv = hash2(x, z, seed ^ 0xF100u);
+                    craft_world_set_byte(x, ROGUE_FLOOR_Y - 1, z,
+                                         (uint8_t)(BLK_RFLOOR + (hv % 4u)));
+                }
                 continue;
             }
             /* Border cell = touches a walkable neighbour → thin low wall. */
@@ -202,14 +213,13 @@ static void apply_to_world(uint32_t seed, int depth) {
                     craft_world_set_byte(x, y, z, WALL);
                 continue;
             }
-            /* Open background: rolling natural terrain for life. */
+            /* Surrounding rock: a dark cavern massif rising above the floor on
+             * all sides — encloses the dungeon (you can't walk out a ruined
+             * gap onto it) and gives the scene depth. Uses the band's wall
+             * block so it matches the dungeon's stone. */
             int th = bg_height(x, z, seed);
-            for (int y = 0; y <= th; y++) {
-                uint8_t blk = BLK_STONE;
-                if (y == th)        blk = BLK_GRASS;
-                else if (y > th - 3) blk = BLK_DIRT;
-                craft_world_set_byte(x, y, z, blk);
-            }
+            for (int y = 0; y <= th; y++)
+                craft_world_set_byte(x, y, z, WALL);
         }
     }
 }
@@ -240,26 +250,36 @@ void rogue_gen_dungeon(uint32_t seed, int depth, RogueLevelInfo *out) {
 
     apply_to_world(seed, depth);
 
-    /* Lava pits: in ~1/3 of rooms, drop the four quadrants into a chasm with
-     * lava a couple of levels DOWN — an open-air gap at floor level then a
-     * glowing lava floor below it, so the cross BRIDGE (and any moving
-     * platform) reads as clearly suspended above the lava. The bridge through
-     * the centre is the safe route; lava is non-solid so connectivity always
-     * holds (you can drop in and get bounced back out, taking a burn). */
-    for (int i = 0; i < s_n_rooms; i++) {
+    /* Lava chasms: turn a couple of rooms into an ORGANIC lava lake sunk a
+     * couple of levels below the floor, spanned by a narrow 2-wide BRIDGE you
+     * cross on foot (and, via rogue_platform, a moving platform). The blobby
+     * lake edge comes from value noise, not square quadrants. Lava is
+     * non-solid + erupts you out, so the bridge is the safe route but a miss
+     * never soft-locks. Chasm centres are recorded for platform placement. */
+    out->n_chasm = 0;
+    for (int i = 0; i < s_n_rooms && out->n_chasm < 3; i++) {
         if (i == up || i == down) continue;
-        if ((hash2(s_rooms[i].cx, s_rooms[i].cz, seed ^ 0x1A7Au) % 3u) != 0u) continue;
+        bool force = (out->n_chasm == 0 && i == s_n_rooms - 1);  /* guarantee >=1 */
+        if (!force && (hash2(s_rooms[i].cx, s_rooms[i].cz, seed ^ 0x1A7Au) % 3u) != 0u)
+            continue;
         int cx = s_rooms[i].cx, cz = s_rooms[i].cz;
-        for (int dz = -4; dz <= 4; dz++) {
-            for (int dx = -4; dx <= 4; dx++) {
-                if ((dx >= -1 && dx <= 1) || (dz >= -1 && dz <= 1)) continue; /* bridge */
+        for (int dz = -7; dz <= 7; dz++) {
+            for (int dx = -7; dx <= 7; dx++) {
+                if (dz == 0 || dz == 1) continue;            /* 2-wide bridge along x */
+                float d = (float)(dx*dx + dz*dz);
+                float rn = 4.6f + 2.4f * (vnoise((cx+dx) * 0.45f, (cz+dz) * 0.45f,
+                                                 seed ^ 0x9F1u) - 0.5f) * 2.0f;
+                if (d > rn * rn) continue;                   /* blobby lake edge */
                 int x = cx + dx, z = cz + dz;
                 if (!is_walk(x, z)) continue;
-                craft_world_set_byte(x, ROGUE_FLOOR_Y - 1, z, BLK_AIR);   /* open gap */
-                craft_world_set_byte(x, ROGUE_FLOOR_Y - 2, z, BLK_LAVA);  /* lava below */
+                craft_world_set_byte(x, ROGUE_FLOOR_Y - 1, z, BLK_AIR);
+                craft_world_set_byte(x, ROGUE_FLOOR_Y - 2, z, BLK_LAVA);
                 craft_world_set_byte(x, ROGUE_FLOOR_Y - 3, z, BLK_LAVA);
             }
         }
+        out->chasm_x[out->n_chasm] = (int16_t)cx;
+        out->chasm_z[out->n_chasm] = (int16_t)cz;
+        out->n_chasm++;
     }
 
     /* Verticality: raised plateaus + stepping-stone pillars in ~40% of rooms.

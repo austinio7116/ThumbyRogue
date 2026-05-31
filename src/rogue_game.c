@@ -80,7 +80,8 @@ static void load_level(void) {
                             s_depth, s_seed);
     rogue_platform_place(s_level.room_cx, s_level.room_cz, s_level.n_rooms,
                          s_level.up_x, s_level.up_z, s_level.floor_y,
-                         s_depth, s_seed);
+                         s_depth, s_seed,
+                         s_level.chasm_x, s_level.chasm_z, s_level.n_chasm);
     rogue_shop_place(s_level.room_cx, s_level.room_cz, s_level.n_rooms,
                      s_level.up_x, s_level.up_z, s_level.down_x, s_level.down_z,
                      s_level.floor_y, s_depth, s_seed);

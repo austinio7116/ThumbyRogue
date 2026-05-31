@@ -15,7 +15,9 @@
 void rogue_platform_clear(void);
 void rogue_platform_place(const int16_t *room_cx, const int16_t *room_cz,
                           int n_rooms, int up_x, int up_z,
-                          int floor_y, int depth, uint32_t seed);
+                          int floor_y, int depth, uint32_t seed,
+                          const int16_t *chasm_x, const int16_t *chasm_z,
+                          int n_chasm);
 void rogue_platform_update(float dt);
 
 /* If a platform top is within landing reach under the footprint at (x,z,feet),
