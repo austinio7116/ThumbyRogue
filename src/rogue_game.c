@@ -12,6 +12,7 @@
 #include "rogue_sfx.h"
 #include "rogue_platform.h"
 #include "rogue_inventory.h"
+#include "rogue_shop.h"
 #include "craft_world.h"
 #include "craft_blocks.h"
 #include "craft_render.h"
@@ -80,6 +81,9 @@ static void load_level(void) {
     rogue_platform_place(s_level.room_cx, s_level.room_cz, s_level.n_rooms,
                          s_level.up_x, s_level.up_z, s_level.floor_y,
                          s_depth, s_seed);
+    rogue_shop_place(s_level.room_cx, s_level.room_cz, s_level.n_rooms,
+                     s_level.up_x, s_level.up_z, s_level.down_x, s_level.down_z,
+                     s_level.floor_y, s_depth, s_seed);
     /* Spike traps in some rooms (not the up-stairs). */
     s_n_trap = 0;
     int twant = 1 + s_depth / 2;
@@ -166,6 +170,14 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
     if (rogue_inventory_is_open()) {
         rogue_inventory_input(&s_player, btn, &s_prev);
         if (edge(btn->menu, s_prev.menu)) rogue_inventory_close();
+        rogue_camera_get(&s_cam);
+        s_prev = *btn;
+        return;
+    }
+    /* Shop screen — opened by the merchant pad; MENU leaves. */
+    if (rogue_shop_is_open()) {
+        rogue_shop_input(&s_player, btn, &s_prev);
+        if (edge(btn->menu, s_prev.menu)) rogue_shop_close();
         rogue_camera_get(&s_cam);
         s_prev = *btn;
         return;
@@ -292,7 +304,8 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
         int r = loot_rng() % 100;
         if (r < 16)      { rogue_item_roll_drop(&it, s_depth, loot_rng()); rogue_loot_drop(&it, dpos); }
         else if (r < 22) { rogue_item_make_potion(&it, 30); rogue_loot_drop(&it, dpos); }
-        else if (r < 34) { rogue_item_make_torch(&it, 25); rogue_loot_drop(&it, dpos); }
+        else if (r < 30) { rogue_item_make_torch(&it, 25); rogue_loot_drop(&it, dpos); }
+        else if (r < 36) { rogue_item_make_gem(&it, (GemType)(1 + loot_rng()%4)); rogue_loot_drop(&it, dpos); }
     }
 
     /* Chests open automatically when you reach them (loot spills, then
@@ -301,6 +314,13 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
         int ci;
         if (rogue_loot_chest_near(s_player.pos.x, s_player.pos.y, s_player.pos.z, &ci))
             rogue_loot_open_chest(ci, s_depth, loot_rng());
+    }
+    /* Step onto the merchant pad → open the shop (rising edge). */
+    {
+        static bool was_on_pad;
+        bool on = rogue_shop_pad_near(s_player.pos.x, s_player.pos.y, s_player.pos.z);
+        if (on && !was_on_pad) rogue_shop_open();
+        was_on_pad = on;
     }
 
     /* Event SFX from state deltas this frame. */
@@ -344,6 +364,7 @@ int rogue_game_player_armor(void) { return s_player.stats.armor; }
 int rogue_game_player_wdmg(void)  { return s_player.wpn_dmg; }
 
 void rogue_game_debug_gear_up(void);   /* fwd */
+void rogue_game_debug_open_shop(void){ s_player.gold=999; rogue_shop_open(); }
 
 /* Fill the backpack with rolled drops + open the inventory (UI screenshot). */
 void rogue_game_debug_fill_bag(void) {
@@ -438,6 +459,7 @@ void rogue_game_draw_overlay(uint16_t *fb) {
 
     if (s_title) { rogue_hud_title(fb, s_best_depth); return; }
     if (rogue_inventory_is_open()) { rogue_inventory_draw(fb, &s_player); return; }
+    if (rogue_shop_is_open()) { rogue_shop_draw(fb, &s_player); return; }
 
     rogue_hud_draw(fb, &s_player, s_depth, rogue_enemies_alive_count());
 

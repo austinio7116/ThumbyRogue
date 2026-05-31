@@ -81,8 +81,8 @@ void rogue_loot_update(RoguePlayer *p, float dt) {
             p->torch_fuel += g->item.amount;
             if (p->torch_fuel > 90.0f) p->torch_fuel = 90.0f;
             g->alive = false;
-        } else if (rogue_item_is_equip(&g->item)) {
-            /* gear auto-collects into the backpack (managed via MENU) */
+        } else if (rogue_item_is_equip(&g->item) || g->item.kind == ITEM_GEM) {
+            /* gear + gems auto-collect into the backpack (managed via MENU) */
             if (rogue_inventory_add(&g->item)) g->alive = false;
         }
     }

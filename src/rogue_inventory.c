@@ -70,6 +70,18 @@ void rogue_inventory_input(RoguePlayer *p, const CraftRawButtons *btn,
                 p->hp += s_bag[k].amount;
                 if (p->hp > p->max_hp) p->hp = p->max_hp;
                 bag_remove(k);
+            } else if (k < s_bag_n && s_bag[k].kind == ITEM_GEM) {
+                /* Socket the gem into the first equipped item with a free hole. */
+                GemType g = (GemType)s_bag[k].amount;
+                for (int sl = 0; sl < SLOT_COUNT; sl++) {
+                    RogueItem *e = &p->equip[sl];
+                    if (!rogue_item_is_equip(e)) continue;
+                    bool done = false;
+                    for (int gi = 0; gi < e->sockets && gi < 2; gi++) {
+                        if (e->gem[gi] == GEM_NONE) { e->gem[gi] = (uint8_t)g; done = true; break; }
+                    }
+                    if (done) { bag_remove(k); rogue_player_recompute(p); break; }
+                }
             }
         }
     }
@@ -174,6 +186,8 @@ void rogue_inventory_draw(uint16_t *fb, const RoguePlayer *p) {
             craft_font_draw(fb, buf, 3, dy + 8, RGB(200,200,210));
         } else if (sel->kind == ITEM_POTION) {
             craft_font_draw(fb, "A:drink", 3, dy + 8, RGB(200,200,210));
+        } else if (sel->kind == ITEM_GEM) {
+            craft_font_draw(fb, "A:socket into gear  B:salvage", 3, dy + 8, RGB(200,200,210));
         }
     } else {
         craft_font_draw(fb, "MENU:close  dpad:move", 3, dy + 4, RGB(150,150,160));

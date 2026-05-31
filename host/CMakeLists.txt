@@ -62,6 +62,7 @@ add_executable(thumbyrogue_host
     ${ROGUE_SRC}/rogue_items.c
     ${ROGUE_SRC}/rogue_stats.c
     ${ROGUE_SRC}/rogue_inventory.c
+    ${ROGUE_SRC}/rogue_shop.c
     ${ROGUE_SRC}/rogue_loot.c
     ${ROGUE_SRC}/rogue_proj.c
     ${ROGUE_SRC}/rogue_band.c

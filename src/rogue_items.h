@@ -16,7 +16,7 @@ typedef enum {
 } EquipSlot;
 
 typedef enum { WCLASS_MELEE, WCLASS_RANGED, WCLASS_CASTER } WeaponClass;
-typedef enum { ITEM_NONE, ITEM_WEAPON, ITEM_GEAR, ITEM_GOLD, ITEM_POTION, ITEM_TORCH } ItemKind;
+typedef enum { ITEM_NONE, ITEM_WEAPON, ITEM_GEAR, ITEM_GOLD, ITEM_POTION, ITEM_TORCH, ITEM_GEM } ItemKind;
 typedef enum { RAR_COMMON, RAR_MAGIC, RAR_RARE, RAR_LEGENDARY, RAR_COUNT } Rarity;
 
 /* Affixes — type + rolled magnitude. */
@@ -69,6 +69,8 @@ static inline bool rogue_item_is_equip(const RogueItem *it) {
 void rogue_item_make_gold(RogueItem *it, int amount);
 void rogue_item_make_potion(RogueItem *it, int heal);
 void rogue_item_make_torch(RogueItem *it, int seconds);
+void rogue_item_make_gem(RogueItem *it, GemType g);
+uint16_t rogue_gem_color(GemType g);
 void rogue_item_starter(RogueItem *it);                       /* common dagger */
 void rogue_item_roll_weapon(RogueItem *it, int depth, uint32_t seed);
 void rogue_item_roll_gear(RogueItem *it, EquipSlot slot, int depth, uint32_t seed);

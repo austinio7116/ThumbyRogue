@@ -116,6 +116,19 @@ void rogue_item_make_torch(RogueItem *it, int seconds) {
     memset(it,0,sizeof *it); it->kind=ITEM_TORCH; it->amount=seconds;
     it->color=RGB(255,170,40); snprintf(it->name,sizeof it->name,"Torch");
 }
+uint16_t rogue_gem_color(GemType g) {
+    switch (g) {
+        case GEM_RUBY:     return RGB(220,40,60);
+        case GEM_SAPPHIRE: return RGB(60,110,230);
+        case GEM_EMERALD:  return RGB(40,210,110);
+        case GEM_TOPAZ:    return RGB(240,210,60);
+        default:           return RGB(200,200,200);
+    }
+}
+void rogue_item_make_gem(RogueItem *it, GemType g) {
+    memset(it,0,sizeof *it); it->kind=ITEM_GEM; it->amount=(int16_t)g;
+    it->color=rogue_gem_color(g); snprintf(it->name,sizeof it->name,"%s",rogue_gem_name(g));
+}
 
 /* Roll one affix appropriate to the slot. */
 static Affix roll_affix(uint32_t *s, EquipSlot slot, int depth, Rarity rar) {
