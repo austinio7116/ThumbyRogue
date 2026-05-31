@@ -1,5 +1,6 @@
 #include "rogue_player.h"
 #include "rogue_render.h"
+#include "rogue_platform.h"
 #include "craft_world.h"
 #include "craft_blocks.h"
 #include <math.h>
@@ -12,11 +13,13 @@
 
 #define PLAYER_SPEED   5.2f
 #define PLAYER_RADIUS  0.30f
+#define PLAYER_H       1.15f   /* body height for collision */
+#define GRAVITY        26.0f
+#define JUMP_VEL       9.6f    /* ~2-block jump apex */
+#define MAX_FALL       32.0f
+#define FALL_SAFE      4.5f    /* fall height before damage */
 #define ATK_HITFRAME   0.11f   /* time into the swing the blow lands */
 #define ATK_RECOVER    0.16f
-#define DODGE_DUR      0.26f
-#define DODGE_SPEED    12.0f
-#define DODGE_CD       0.50f
 
 /* Hero palette */
 #define C_TUNIC   RGB(40, 90, 200)
@@ -58,6 +61,10 @@ void rogue_player_init(RoguePlayer *p, Vec3 spawn) {
     p->atk_hit_pending = false;
     p->dodge_t = p->dodge_cd = 0.0f;
     p->dodge_dx = p->dodge_dz = 0.0f;
+    p->vy = 0.0f;
+    p->on_ground = true;
+    p->peak_y = spawn.y;
+    p->jumped = false;
     p->invuln_t = 0.0f;
     p->hurt_flash = 0.0f;
     p->fire_pending = false;
@@ -82,44 +89,51 @@ void rogue_player_equip(RoguePlayer *p, const RogueItem *it) {
     p->max_hp = new_max;
 }
 
-static bool cell_solid(int wx, int wy, int wz) {
-    return craft_block_solid(craft_world_get(wx, wy, wz));
+static bool solid_cell(int x, int y, int z) {
+    if (y < 0 || y >= CRAFT_WORLD_Y) return false;
+    return craft_block_solid(craft_world_get(x, y, z));
 }
-static bool can_stand(float x, float z, int floor_y) {
+/* Any solid cell in the footprint at integer height y? */
+static bool foot_solid_y(float x, float z, int y) {
     float r = PLAYER_RADIUS;
     int x0 = (int)floorf(x - r), x1 = (int)floorf(x + r);
     int z0 = (int)floorf(z - r), z1 = (int)floorf(z + r);
     for (int cz = z0; cz <= z1; cz++)
         for (int cx = x0; cx <= x1; cx++)
-            if (cell_solid(cx, floor_y, cz)) return false;
-    return true;
+            if (solid_cell(cx, y, cz)) return true;
+    return false;
 }
-static void move_xz(RoguePlayer *p, float mx, float mz, float step, int floor_y) {
+/* Solid anywhere in the body's vertical span standing at (x,z,feet)? */
+static bool body_blocked(float x, float z, float feet) {
+    int ylo = (int)floorf(feet + 0.15f);
+    int yhi = (int)floorf(feet + PLAYER_H - 0.05f);
+    for (int y = ylo; y <= yhi; y++)
+        if (foot_solid_y(x, z, y)) return true;
+    return false;
+}
+/* Top surface of the highest solid at/below `feet` under the footprint. */
+static float ground_top(float x, float z, float feet) {
+    for (int y = (int)floorf(feet + 0.01f); y >= 0; y--)
+        if (foot_solid_y(x, z, y)) return (float)(y + 1);
+    return 0.0f;
+}
+static void move_h(RoguePlayer *p, float mx, float mz, float step) {
     float nx = p->pos.x + mx * step;
-    if (can_stand(nx, p->pos.z, floor_y)) p->pos.x = nx;
+    if (!body_blocked(nx, p->pos.z, p->pos.y)) p->pos.x = nx;
     float nz = p->pos.z + mz * step;
-    if (can_stand(p->pos.x, nz, floor_y)) p->pos.z = nz;
+    if (!body_blocked(p->pos.x, nz, p->pos.y)) p->pos.z = nz;
 }
 
 void rogue_player_update(RoguePlayer *p, const CraftRawButtons *btn,
-                         bool atk_edge, bool dodge_edge,
+                         bool atk_edge, bool jump_edge,
                          float dt, float cam_yaw, int floor_y) {
     if (!p->alive) return;
 
+    (void)floor_y;
+    p->jumped = false;
     if (p->atk_cd   > 0) p->atk_cd   -= dt;
-    if (p->dodge_cd > 0) p->dodge_cd -= dt;
     if (p->invuln_t > 0) p->invuln_t -= dt;
     if (p->hurt_flash > 0) p->hurt_flash -= dt;
-
-    /* Knockback impulse (decays fast), collision-checked. */
-    if (p->knock.x != 0 || p->knock.z != 0) {
-        move_xz(p, p->knock.x, p->knock.z, dt, floor_y);
-        float decay = 1.0f - 9.0f * dt;
-        if (decay < 0) decay = 0;
-        p->knock.x *= decay; p->knock.z *= decay;
-        if (fabsf(p->knock.x) < 0.05f && fabsf(p->knock.z) < 0.05f)
-            p->knock = v3(0,0,0);
-    }
 
     float fx = sinf(cam_yaw), fz = cosf(cam_yaw);
     float rx = cosf(cam_yaw), rz = -sinf(cam_yaw);
@@ -131,32 +145,67 @@ void rogue_player_update(RoguePlayer *p, const CraftRawButtons *btn,
     float len = sqrtf(mx*mx + mz*mz);
     if (len > 0.0001f) { mx /= len; mz /= len; }
 
-    if (p->dodge_t > 0) {
-        /* Rolling: locked direction, fast, invulnerable. */
-        p->dodge_t -= dt;
-        if (p->invuln_t < p->dodge_t) p->invuln_t = p->dodge_t;
-        move_xz(p, p->dodge_dx, p->dodge_dz, DODGE_SPEED * dt, floor_y);
-    } else {
-        /* Start a dodge? */
-        if (dodge_edge && p->dodge_cd <= 0 && len > 0.0001f) {
-            p->dodge_t = DODGE_DUR;
-            p->dodge_cd = DODGE_CD;
-            p->dodge_dx = mx; p->dodge_dz = mz;
-            p->yaw = atan2f(mx, mz);
+    /* Horizontal: walk (slowed mid-swing) + decaying knockback. */
+    float sp = PLAYER_SPEED * (p->atk_t > 0 ? 0.4f : 1.0f);
+    if (len > 0.0001f) {
+        if (p->atk_t <= 0) p->yaw = atan2f(mx, mz);
+        if (p->on_ground) p->move_phase += dt * 8.0f;
+        move_h(p, mx, mz, sp * dt);
+    }
+    if (p->knock.x != 0 || p->knock.z != 0) {
+        move_h(p, p->knock.x, p->knock.z, dt);
+        float decay = 1.0f - 9.0f * dt; if (decay < 0) decay = 0;
+        p->knock.x *= decay; p->knock.z *= decay;
+        if (fabsf(p->knock.x) < 0.05f && fabsf(p->knock.z) < 0.05f) p->knock = v3(0,0,0);
+    }
+
+    /* Jump. */
+    if (jump_edge && p->on_ground) {
+        p->vy = JUMP_VEL;
+        p->on_ground = false;
+        p->jumped = true;
+    }
+
+    /* Gravity + vertical resolve. */
+    p->vy -= GRAVITY * dt;
+    if (p->vy < -MAX_FALL) p->vy = -MAX_FALL;
+    float ny = p->pos.y + p->vy * dt;
+    if (p->vy <= 0.0f) {
+        float g = ground_top(p->pos.x, p->pos.z, p->pos.y);
+        /* A moving platform can be the higher support. */
+        float ptop, pdx, pdy, pdz; bool on_plat = false;
+        if (rogue_platform_support(p->pos.x, p->pos.z, p->pos.y, &ptop, &pdx, &pdy, &pdz)
+            && ptop > g) { g = ptop; on_plat = true; }
+        if (ny <= g) {
+            if (!p->on_ground) {
+                float fall = p->peak_y - g;
+                if (fall > FALL_SAFE)
+                    rogue_player_damage(p, (int)((fall - FALL_SAFE) * 6.0f), p->pos);
+            }
+            p->pos.y = g; p->vy = 0.0f; p->on_ground = true;
+            if (on_plat) {            /* ride: carry the platform's motion */
+                move_h(p, pdx, pdz, 1.0f);
+                p->pos.y += pdy;
+            }
         } else {
-            /* Walk (slowed while mid-swing for weight). */
-            float sp = PLAYER_SPEED * (p->atk_t > 0 ? 0.35f : 1.0f);
-            if (len > 0.0001f) {
-                if (p->atk_t <= 0) p->yaw = atan2f(mx, mz);
-                p->move_phase += dt * 8.0f;
-                move_xz(p, mx, mz, sp * dt, floor_y);
-            }
-            /* Start an attack? */
-            if (atk_edge && p->atk_cd <= 0 && p->atk_t <= 0) {
-                p->atk_t = p->wpn_dur;
-                p->atk_hit_done = false;
-            }
+            p->pos.y = ny; p->on_ground = false;
         }
+    } else {
+        /* Rising: stop at a ceiling. */
+        if (foot_solid_y(p->pos.x, p->pos.z, (int)floorf(ny + PLAYER_H))) {
+            p->vy = 0.0f;
+        } else {
+            p->pos.y = ny;
+        }
+        p->on_ground = false;
+    }
+    if (p->on_ground) p->peak_y = p->pos.y;
+    else if (p->pos.y > p->peak_y) p->peak_y = p->pos.y;
+
+    /* Start an attack? */
+    if (atk_edge && p->atk_cd <= 0 && p->atk_t <= 0) {
+        p->atk_t = p->wpn_dur;
+        p->atk_hit_done = false;
     }
 
     /* Advance swing; raise the hit flag at the strike frame. */

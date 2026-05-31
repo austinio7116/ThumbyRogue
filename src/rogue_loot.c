@@ -1,5 +1,7 @@
 #include "rogue_loot.h"
 #include "rogue_render.h"
+#include "craft_world.h"
+#include "craft_blocks.h"
 #include <math.h>
 
 #define RGB(r,g,b) ((uint16_t)((((r)>>3)<<11)|(((g)>>2)<<5)|((b)>>3)))
@@ -48,7 +50,14 @@ void rogue_loot_place_chests(const int16_t *room_cx, const int16_t *room_cz,
         if (room_cx[r] == up_x && room_cz[r] == up_z) continue;
         s_c[placed].used = true;
         s_c[placed].opened = false;
-        s_c[placed].pos = v3(room_cx[r] + 0.5f, (float)floor_y, room_cz[r] + 0.5f);
+        int cx = room_cx[r], cz = room_cz[r];
+        float cy = (float)floor_y;
+        /* ~45% of chests sit on a pedestal you must JUMP onto to reach. */
+        if ((xs() % 100u) < 45u) {
+            craft_world_set_byte(cx, floor_y, cz, BLK_COBBLE);  /* 1-high pedestal */
+            cy = (float)(floor_y + 1);
+        }
+        s_c[placed].pos = v3(cx + 0.5f, cy, cz + 0.5f);
         placed++;
     }
 }
@@ -96,10 +105,11 @@ bool rogue_loot_take(int index, RogueItem *out) {
     return true;
 }
 
-bool rogue_loot_chest_near(float x, float z, int *out_index) {
+bool rogue_loot_chest_near(float x, float y, float z, int *out_index) {
     for (int i = 0; i < MAX_CHEST; i++) {
         if (!s_c[i].used || s_c[i].opened) continue;
         float dx = s_c[i].pos.x - x, dz = s_c[i].pos.z - z;
+        if (fabsf(s_c[i].pos.y - y) > 0.8f) continue;  /* must stand at its level */
         if (dx*dx + dz*dz <= INTERACT_R*INTERACT_R) { *out_index = i; return true; }
     }
     return false;

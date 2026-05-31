@@ -240,6 +240,26 @@ void rogue_gen_dungeon(uint32_t seed, int depth, RogueLevelInfo *out) {
 
     apply_to_world(seed, depth);
 
+    /* Lava pits: in ~1/3 of rooms, sink the floor of the four quadrants to
+     * lava (a 1-deep trench you can jump out of), leaving a solid cross
+     * BRIDGE through the centre as the safe route. Lava is a light source,
+     * so the rebuild below makes the pits glow. Non-solid lava never breaks
+     * connectivity — you can always cross (with a burn) if you miss the
+     * bridge. */
+    for (int i = 0; i < s_n_rooms; i++) {
+        if (i == up || i == down) continue;
+        if ((hash2(s_rooms[i].cx, s_rooms[i].cz, seed ^ 0x1A7Au) % 3u) != 0u) continue;
+        int cx = s_rooms[i].cx, cz = s_rooms[i].cz;
+        for (int dz = -4; dz <= 4; dz++) {
+            for (int dx = -4; dx <= 4; dx++) {
+                if ((dx >= -1 && dx <= 1) || (dz >= -1 && dz <= 1)) continue; /* bridge */
+                int x = cx + dx, z = cz + dz;
+                if (!is_walk(x, z)) continue;
+                craft_world_set_byte(x, ROGUE_FLOOR_Y - 1, z, BLK_LAVA);
+            }
+        }
+    }
+
     /* Scatter glowing braziers (lit-lamp blocks) through ~2/3 of the rooms
      * so the dungeon has fixed light sources beyond the hero's torch. The
      * lightmap rebuild below propagates their glow. */

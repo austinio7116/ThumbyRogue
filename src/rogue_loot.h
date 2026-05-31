@@ -28,8 +28,9 @@ bool rogue_loot_weapon_near(float x, float z, RogueItem *out, int *out_index);
 /* Remove + return the ground weapon at index (after equipping it). */
 bool rogue_loot_take(int index, RogueItem *out);
 
-/* Nearest unopened chest within interact range. */
-bool rogue_loot_chest_near(float x, float z, int *out_index);
+/* Nearest unopened chest within interact range (XZ + matching height, so
+ * pedestal chests require a jump up to open). */
+bool rogue_loot_chest_near(float x, float y, float z, int *out_index);
 void rogue_loot_open_chest(int index, int depth, uint32_t seed);
 
 void rogue_loot_draw(const CraftCamera *cam, uint16_t *fb);

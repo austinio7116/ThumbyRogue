@@ -151,6 +151,8 @@ int main(int argc, char **argv) {
                        rogue_enemies_alive_count(), rogue_game_player_gold(),
                        rogue_game_weapon_name());
             }
+            { extern float rogue_game_player_y(void);
+              if (f >= 8 && f <= 24) printf("[y] f=%d y=%.2f\n", f, rogue_game_player_y()); }
             if (shot_path && f == 90) { render_frame(); dump_ppm(shot_path); }
         }
         SDL_Quit();
@@ -161,6 +163,16 @@ int main(int argc, char **argv) {
         /* Settle (past the band banner ~2.2s), then dump. */
         CraftRawButtons none = {0};
         if (!getenv("ROGUE_TITLE")) press_start();
+        if (getenv("ROGUE_CENSUS")) {
+            long lava = 0, lamp = 0;
+            for (int y = 0; y < CRAFT_WORLD_Y; y++)
+              for (int z = 0; z < CRAFT_WORLD_Z; z++)
+                for (int x = 0; x < CRAFT_WORLD_X; x++) {
+                    int b = craft_world_get(x,y,z);
+                    if (b == 91) lava++; else if (b == 73) lamp++;
+                }
+            printf("[census] lava=%ld lamp(brazier)=%ld\n", lava, lamp);
+        }
         for (int i = 0; i < 80; i++) rogue_game_tick(&none, 1.0f / 30.0f);
         if (getenv("ROGUE_DEAD")) {
             extern void rogue_game_debug_kill(void);

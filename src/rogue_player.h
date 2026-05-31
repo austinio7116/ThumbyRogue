@@ -20,6 +20,12 @@ typedef struct {
     int   hp, max_hp;
     bool  alive;
 
+    /* platforming physics */
+    float vy;             /* vertical velocity */
+    bool  on_ground;
+    float peak_y;         /* highest y this airtime, for fall damage */
+    bool  jumped;         /* set the frame a jump launches (for SFX) */
+
     /* combat timers */
     float atk_t;          /* >0 while swinging */
     float atk_cd;         /* recovery before next swing */
@@ -44,9 +50,11 @@ typedef struct {
 void rogue_player_init(RoguePlayer *p, Vec3 spawn);
 void rogue_player_equip(RoguePlayer *p, const RogueItem *it);
 
-/* atk_edge / dodge_edge are just-pressed edges computed by the caller. */
+/* atk_edge / jump_edge are just-pressed edges computed by the caller.
+ * `floor_y` is unused now that the hero has full gravity/Y-collision, but
+ * kept for call-site compatibility. */
 void rogue_player_update(RoguePlayer *p, const CraftRawButtons *btn,
-                         bool atk_edge, bool dodge_edge,
+                         bool atk_edge, bool jump_edge,
                          float dt, float cam_yaw, int floor_y);
 
 /* Apply damage from a world point (knockback away from it). Respects
