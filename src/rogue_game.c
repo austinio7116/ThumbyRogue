@@ -711,6 +711,18 @@ void rogue_game_debug_weapon_sheet(void) {
     rogue_inventory_open();
 }
 
+/* Stand the hero a few tiles in front of the first lava cell (screenshot). */
+int rogue_game_debug_goto_lava(void) {
+    for (int z = 0; z < CRAFT_WORLD_Z; z++)
+        for (int x = 0; x < CRAFT_WORLD_X; x++)
+            for (int y = s_level.floor_y - 3; y <= s_level.floor_y; y++)
+                if (craft_is_lava_id((uint8_t)craft_world_get(x, y, z))) {
+                    s_player.pos = v3(x + 0.5f, (float)s_level.floor_y, z - 4.5f);
+                    return 1;
+                }
+    return 0;
+}
+
 /* Move the hero onto the first water pool found (water-render verification). */
 int rogue_game_debug_goto_water(void) {
     for (int z = 0; z < CRAFT_WORLD_Z; z++)

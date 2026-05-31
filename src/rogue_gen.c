@@ -193,15 +193,16 @@ static void apply_to_world(uint32_t seed, int depth) {
                     craft_world_set_byte(x, y, z, WALL);
                 continue;
             }
-            /* Surrounding terrain: a LOW grass-topped earth lip on all sides —
-             * green for contrast against the grey stone dungeon, but only ~2
-             * tall so it encloses (you can't walk/jump out) without walling
-             * off the iso camera. */
+            /* Surrounding terrain: a LOW lip on all sides, themed per band
+             * (grass for the Crypt, snow for the Frostvault, spore mycelium
+             * for the Fungal Deep, …) for contrast against the dungeon, but
+             * only ~2 tall so it encloses without walling off the iso camera. */
             int th = bg_height(x, z, seed);
             for (int y = 0; y <= th; y++) {
-                uint8_t blk = BLK_STONE;
-                if (y == th)          blk = BLK_GRASS;
-                else if (y == th - 1) blk = BLK_DIRT;
+                uint8_t blk = band->bg_sub;
+                if (y == th)          blk = band->bg_top;
+                else if (y == th - 1) blk = band->bg_sub;
+                else                  blk = BLK_STONE;
                 craft_world_set_byte(x, y, z, blk);
             }
         }

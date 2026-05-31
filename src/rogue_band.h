@@ -15,6 +15,7 @@
 typedef struct {
     const char *name;
     uint8_t floor, wall, pillar;        /* block ids for the reskin */
+    uint8_t bg_top, bg_sub;             /* surrounding terrain surface + subsurface */
     uint8_t roster[ROGUE_BAND_ROSTER];  /* EnemyType ids this band spawns */
     uint8_t roster_n;
     uint16_t tint;                      /* banner colour */

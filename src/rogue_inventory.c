@@ -105,6 +105,45 @@ static void clamp_cur(void) {
     if (s_cur < 0) s_cur = 0;
 }
 
+#define BP_COLS 7
+/* Directional grid navigation. The paperdoll is a 2x3 block (cur 0..5); the
+ * backpack is a 7-wide grid (cur 6..). Moving down off the paperdoll drops
+ * into the backpack top row and vice-versa; moves never land on empty bag
+ * cells. dx/dy are -1/0/+1. */
+static void grid_nav(int dx, int dy) {
+    if (s_cur < 6) {                                  /* --- paperdoll --- */
+        int col = s_cur & 1, row = s_cur >> 1;
+        if (dx) { col += dx; if (col < 0 || col > 1) return; s_cur = row * 2 + col; return; }
+        if (dy < 0) { if (row > 0) s_cur = (row - 1) * 2 + col; return; }
+        if (dy > 0) {
+            if (row < 2) { s_cur = (row + 1) * 2 + col; return; }
+            int bp = (col == 0) ? 1 : 4;              /* drop into backpack top row */
+            if (bp < s_bag_n) s_cur = 6 + bp;
+            else if (s_bag_n > 0) s_cur = 6 + s_bag_n - 1;
+            return;
+        }
+        return;
+    }
+    int k = s_cur - 6, col = k % BP_COLS, row = k / BP_COLS;  /* --- backpack --- */
+    if (dx) {
+        int nc = col + dx;
+        if (nc < 0 || nc >= BP_COLS) return;
+        int t = row * BP_COLS + nc;
+        if (t < s_bag_n) s_cur = 6 + t;
+        return;
+    }
+    if (dy < 0) {
+        if (row > 0) { s_cur = 6 + (row - 1) * BP_COLS + col; return; }
+        s_cur = (col < 4) ? 4 : 5;                    /* up into paperdoll bottom row */
+        return;
+    }
+    if (dy > 0) {
+        int t = (row + 1) * BP_COLS + col;
+        if (t < s_bag_n) s_cur = 6 + t;
+        return;
+    }
+}
+
 void rogue_inventory_input(RoguePlayer *p, const CraftRawButtons *btn,
                            const CraftRawButtons *prev) {
     bool up = edge(btn->up,prev->up), dn = edge(btn->down,prev->down);
@@ -192,12 +231,12 @@ void rogue_inventory_input(RoguePlayer *p, const CraftRawButtons *btn,
         return;
     }
 
-    /* --- grid navigation (default) --- */
-    int total = 6 + s_bag_n; if (total < 6) total = 6;
-    if (lf || up) s_cur--;
-    if (rt || dn) s_cur++;
-    if (s_cur < 0) s_cur = total - 1;
-    if (s_cur >= total) s_cur = 0;
+    /* --- grid navigation (default): directional, not linear --- */
+    if (up) grid_nav(0, -1);
+    if (dn) grid_nav(0,  1);
+    if (lf) grid_nav(-1, 0);
+    if (rt) grid_nav( 1, 0);
+    clamp_cur();
 
     /* A = quick equip / unequip / use (fast path). */
     if (a) {

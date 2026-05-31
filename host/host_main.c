@@ -258,6 +258,10 @@ int main(int argc, char **argv) {
             extern int rogue_game_debug_goto_water(void);
             printf("[water] found pool: %d\n", rogue_game_debug_goto_water());
         }
+        if (getenv("ROGUE_LAVA")) {
+            extern int rogue_game_debug_goto_lava(void);
+            printf("[lava] found: %d\n", rogue_game_debug_goto_lava());
+        }
         { int settle = getenv("ROGUE_SETTLE") ? atoi(getenv("ROGUE_SETTLE")) : 80;
           for (int i = 0; i < settle; i++) rogue_game_tick(&none, 1.0f / 30.0f); }
         if (getenv("ROGUE_FXWPN")) {   /* equip a weapon, swing/fire, catch the FX mid-action */

@@ -10,14 +10,19 @@
  * depth, and across the five bands every one of the 11 enemy types appears. */
 static const RogueBand BANDS[] = {
     { "THE CRYPT",   BLK_PLANK,    BLK_COBBLE,    BLK_STONE,          /* vermin & risen dead — warm wood floor vs grey cobble */
+      BLK_GRASS,    BLK_DIRT,        /* graveyard grass surround */
       { EN_RAT, EN_BAT, EN_SKELETON, EN_ARCHER }, 4, RGB(180,180,190) },
     { "THE CAVERNS", BLK_DIRT,     BLK_CAVE_ROCK, BLK_STONE,          /* earthy cave — warm tan rock, dirt ground */
+      BLK_DIRT,     BLK_CAVE_ROCK,   /* earthen mounds */
       { EN_SPIDER, EN_KOBOLD, EN_GOBLIN, EN_BAT, EN_SLIME }, 5, RGB(168,138,96) },
     { "FUNGAL DEEP", BLK_MYCELIUM, BLK_FUNGAL_WALL, BLK_MUSHROOM,     /* bioluminescent spore caverns */
+      BLK_MYCELIUM, BLK_FUNGAL_WALL, /* spore overgrowth surround */
       { EN_SLIME, EN_ZOMBIE, EN_FIRESPRITE, EN_SPIDER, EN_KOBOLD }, 5, RGB(150,90,210) },
     { "FROSTVAULT",  BLK_RFLOOR,   BLK_ICE,       BLK_SNOWY_ROCK,     /* frozen undead — flagstone vault floor under icy walls */
+      BLK_SNOW,     BLK_SNOWY_ROCK,  /* snowfield surround */
       { EN_SKELETON, EN_ARCHER, EN_ZOMBIE, EN_BAT }, 4, RGB(170,210,240) },
     { "THE INFERNO", BLK_OBSIDIAN, BLK_COBBLE,    BLK_REDSTONE_BLOCK, /* hell's legions */
+      BLK_OBSIDIAN, BLK_STONE,       /* charred obsidian surround */
       { EN_DEMON, EN_FIRESPRITE, EN_GOBLIN, EN_ARCHER, EN_KOBOLD }, 5, RGB(240,120,60) },
 };
 #define N_BANDS ((int)(sizeof(BANDS)/sizeof(BANDS[0])))
