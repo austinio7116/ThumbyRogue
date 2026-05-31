@@ -19,9 +19,15 @@ See **[PLAN.md](PLAN.md)** for the full design and phased roadmap, and
 
 ## Status
 
-**Phase 0 — Scaffold: done.** The vendored engine builds and renders a
-textured voxel world at the isometric tilt on both host (SDL2) and device
-(RP2350). No game loop yet — that's Phase 1+.
+**Playable on host + device.** Full run loop: title → descend → permadeath
+summary. Implemented: iso camera (90° rotate), BSP dungeons with guaranteed
+paths, real-time combat (melee/ranged/caster + dodge→jump), jump/platforming
+(lava pits & bridges, pedestals, moving platforms), 5 depth bands + champions,
+the **Diablo-4-lite loot system** (6 equip slots, rarity + affixes, legendary
+aspects, sockets/gems, salvage, merchant shop) with a paperdoll inventory
+screen, light/torch tension, traps, and procedural audio. See
+**[docs/guide.html](docs/guide.html)** for the illustrated loot & level-gen
+guide.
 
 ## Layout
 
