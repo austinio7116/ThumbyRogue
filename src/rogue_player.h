@@ -18,6 +18,7 @@ typedef struct {
     Vec3  knock;          /* knockback velocity (decays) */
     float yaw;            /* facing, radians (0 = +Z) */
     float move_phase;     /* walk-cycle accumulator */
+    float walk_blend;     /* 0..1 eased in/out as you start/stop moving */
     int   hp, max_hp;
     bool  alive;
 

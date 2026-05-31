@@ -768,6 +768,8 @@ void rogue_game_debug_force_weapon(int wt) {
 }
 /* Force the hero's facing (radians) for FX direction checks. */
 void rogue_game_debug_set_yaw(float yaw) { s_player.yaw = yaw; }
+/* Freeze a mid-stride walk pose (animation check). */
+void rogue_game_debug_walkpose(float ph) { s_player.walk_blend = 1.0f; s_player.move_phase = ph; }
 /* Reveal the whole fog-of-war map (minimap verification). */
 void rogue_game_debug_reveal_map(void) {
     for (int i = 0; i < CRAFT_WORLD_X * CRAFT_WORLD_Z; i++) s_visited[i] = 1;

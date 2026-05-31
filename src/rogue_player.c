@@ -54,6 +54,7 @@ void rogue_player_init(RoguePlayer *p, Vec3 spawn) {
     p->knock = v3(0, 0, 0);
     p->yaw = 0.0f;
     p->move_phase = 0.0f;
+    p->walk_blend = 0.0f;
     p->max_hp = 100;
     p->hp = 100;
     p->alive = true;
@@ -169,11 +170,16 @@ void rogue_player_update(RoguePlayer *p, const CraftRawButtons *btn,
     if (craft_is_water_id((uint8_t)craft_world_get((int)floorf(p->pos.x),
                           (int)floorf(p->pos.y), (int)floorf(p->pos.z))))
         sp *= 0.55f;
+    bool walking = (len > 0.0001f) && p->on_ground;
     if (len > 0.0001f) {
         if (p->atk_t <= 0) p->yaw = atan2f(mx, mz);
-        if (p->on_ground) p->move_phase += dt * 8.0f;
+        if (p->on_ground) p->move_phase += dt * 9.0f;
         move_h(p, mx, mz, sp * dt);
     }
+    /* Ease the walk animation in/out so starting/stopping isn't a snap. */
+    float wb_target = walking ? 1.0f : 0.0f;
+    float wb_rate = 12.0f * dt; if (wb_rate > 1.0f) wb_rate = 1.0f;
+    p->walk_blend += (wb_target - p->walk_blend) * wb_rate;
     if (p->knock.x != 0 || p->knock.z != 0) {
         move_h(p, p->knock.x, p->knock.z, dt);
         float decay = 1.0f - 9.0f * dt; if (decay < 0) decay = 0;
@@ -264,6 +270,25 @@ void rogue_player_draw(const RoguePlayer *p, const CraftCamera *cam,
                        uint16_t *fb, int tint_q8) {
     RogueCuboid parts[HERO_NPARTS];
     for (int i = 0; i < HERO_NPARTS; i++) parts[i] = hero_parts[i];
+
+    /* Walk cycle: stride the legs (opposite phase), counter-swing the arms +
+     * hands, and bob the upper body — scaled by walk_blend so it eases in and
+     * out. Boots are parts 0/1, arms 5/6, hands 7/8; the upper body bobs while
+     * the feet stay planted. */
+    float wb = p->walk_blend;
+    if (wb > 0.01f) {
+        float sw  = sinf(p->move_phase);             /* left phase  */
+        float swo = sinf(p->move_phase + (float)M_PI);/* right phase */
+        float stride = 0.12f * wb;
+        parts[0].cz += stride * sw;   parts[1].cz += stride * swo;   /* legs */
+        if (sw  > 0) parts[0].cy += 0.03f * wb * sw;                 /* lift forward foot */
+        if (swo > 0) parts[1].cy += 0.03f * wb * swo;
+        parts[5].cz += stride * swo;  parts[7].cz += stride * swo;   /* left arm + hand */
+        parts[6].cz += stride * sw;   parts[8].cz += stride * sw;    /* right arm + hand */
+        /* upper-body bob (twice walk freq); keep boots planted */
+        float bob = 0.035f * wb * (0.5f - 0.5f * cosf(p->move_phase * 2.0f));
+        for (int i = 2; i < HERO_NPARTS; i++) parts[i].cy += bob;
+    }
 
     /* Pose the sword: swing forward+down through the strike. */
     if (p->atk_t > 0) {

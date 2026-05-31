@@ -264,6 +264,10 @@ int main(int argc, char **argv) {
         }
         { int settle = getenv("ROGUE_SETTLE") ? atoi(getenv("ROGUE_SETTLE")) : 80;
           for (int i = 0; i < settle; i++) rogue_game_tick(&none, 1.0f / 30.0f); }
+        if (getenv("ROGUE_WALK")) {   /* freeze a mid-stride pose (after settle) */
+            extern void rogue_game_debug_walkpose(float);
+            rogue_game_debug_walkpose((float)atof(getenv("ROGUE_WALK")));
+        }
         if (getenv("ROGUE_FXWPN")) {   /* equip a weapon, swing/fire, catch the FX mid-action */
             extern void rogue_game_debug_force_weapon(int);
             extern void rogue_game_debug_set_yaw(float);
