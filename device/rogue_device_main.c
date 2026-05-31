@@ -95,6 +95,11 @@ int main(void) {
 
         rogue_game_get_camera(&s_render_cam);
         craft_render_begin(&s_render_cam);
+        /* The framebuffer is single-buffered and craft_lcd_present streams it
+         * to the panel via async DMA. Wait for the PREVIOUS frame's DMA to
+         * finish before we start writing g_fb again, otherwise the render
+         * races the transfer and tears a flickering line across the screen. */
+        craft_lcd_wait_idle();
         __atomic_store_n(&s_next_tile, 0, __ATOMIC_RELAXED);
         s_core1_done = false;
         s_core1_go   = true;

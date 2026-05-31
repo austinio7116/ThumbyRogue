@@ -262,15 +262,23 @@ int main(int argc, char **argv) {
           for (int i = 0; i < settle; i++) rogue_game_tick(&none, 1.0f / 30.0f); }
         if (getenv("ROGUE_FXWPN")) {   /* equip a weapon, swing/fire, catch the FX mid-action */
             extern void rogue_game_debug_force_weapon(int);
+            extern void rogue_game_debug_set_yaw(float);
             rogue_game_debug_force_weapon(atoi(getenv("ROGUE_FXWPN")));
             int settle = getenv("ROGUE_FXT") ? atoi(getenv("ROGUE_FXT")) : 3;
             CraftRawButtons a = {0}; a.a = true;
-            rogue_game_tick(&a, 1.0f / 30.0f);
+            rogue_game_tick(&a, 1.0f / 30.0f);   /* start the swing (auto-face runs here) */
+            if (getenv("ROGUE_FXYAW"))           /* override facing after auto-face; deg: 0=+z away, 90=+x right */
+                rogue_game_debug_set_yaw((float)atof(getenv("ROGUE_FXYAW")) * 3.14159265f / 180.0f);
             for (int i = 0; i < settle; i++) rogue_game_tick(&none, 1.0f / 30.0f);
         }
         if (getenv("ROGUE_DMGNUM")) {
             extern void rogue_game_debug_dmgnum(void);
             rogue_game_debug_dmgnum();
+        }
+        if (getenv("ROGUE_MAP")) {   /* reveal map + open inventory grid to view it */
+            extern void rogue_game_debug_fill_bag(void), rogue_game_debug_reveal_map(void);
+            rogue_game_debug_fill_bag();
+            rogue_game_debug_reveal_map();
         }
         if (getenv("ROGUE_SKIP")) {   /* hold LB+RB ~5.6s to open the skip menu */
             CraftRawButtons h = {0}; h.lb = true; h.rb = true;

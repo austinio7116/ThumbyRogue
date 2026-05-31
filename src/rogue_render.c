@@ -107,8 +107,12 @@ void rogue_render_model(const CraftCamera *cam, uint16_t *fb,
     if (sy_max >= CRAFT_FB_H) sy_max = CRAFT_FB_H - 1;
     if (sx_min > sx_max || sy_min > sy_max) return;
 
-    /* Camera position in model-local frame (inverse yaw about Y). */
-    float my_c = cosf(-yaw), my_s = sinf(-yaw);
+    /* Camera position in model-local frame. The game's forward convention is
+     * (sin yaw, cos yaw) — the same one movement, the melee hit-arc and
+     * projectiles use — so local +z must map to that world direction. (This
+     * only spins each model about its own centre; screen position comes from
+     * the world-space AABB above, so nothing moves left/right.) */
+    float my_c = cosf(yaw), my_s = sinf(yaw);
     float rel_x = cam->pos.x - pos.x;
     float rel_y = cam->pos.y - pos.y;
     float rel_z = cam->pos.z - pos.z;

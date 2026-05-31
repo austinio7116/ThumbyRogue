@@ -598,6 +598,33 @@ static void draw_skip(uint16_t *fb) {
 /* Fog-of-war minimap. Shown only on the inventory/menu screen (it's too
  * large to leave on during play), tucked into the free area to the right
  * of the paperdoll's stat column. */
+/* Map a minimap cell (i,j) to world (wx,wz), oriented to the current camera
+ * so the map matches what you see: up = away-from-camera, right = screen-right.
+ * The 90deg snap index picks one of four axis permutations/flips. */
+static void mm_cell_to_world(int i, int j, int MS, int *wx, int *wz) {
+    int u, v;   /* normalised 0..MS-1 along world +x (u) and +z (v) */
+    switch (rogue_camera_yaw_index() & 3) {
+        default:
+        case 0: u = i;          v = MS - 1 - j; break;
+        case 1: u = MS - 1 - j; v = MS - 1 - i; break;
+        case 2: u = MS - 1 - i; v = j;          break;
+        case 3: u = j;          v = i;          break;
+    }
+    *wx = u * CRAFT_WORLD_X / MS;
+    *wz = v * CRAFT_WORLD_Z / MS;
+}
+/* Inverse: world (wx,wz) -> minimap cell (i,j). */
+static void mm_world_to_cell(int wx, int wz, int MS, int *i, int *j) {
+    int u = wx * MS / CRAFT_WORLD_X, v = wz * MS / CRAFT_WORLD_Z;
+    switch (rogue_camera_yaw_index() & 3) {
+        default:
+        case 0: *i = u;          *j = MS - 1 - v; break;
+        case 1: *i = MS - 1 - v; *j = MS - 1 - u; break;
+        case 2: *i = MS - 1 - u; *j = v;          break;
+        case 3: *i = v;          *j = u;          break;
+    }
+}
+
 static void draw_minimap(uint16_t *fb) {
     const int MS = 36, MX = CRAFT_FB_W - MS - 1, MY = 12;
     craft_font_draw(fb, "MAP", MX, MY - 9, RGB(150,150,160));
@@ -606,7 +633,7 @@ static void draw_minimap(uint16_t *fb) {
             int sx = MX + i, sy = MY + j;
             if ((unsigned)sx >= CRAFT_FB_W || (unsigned)sy >= CRAFT_FB_H) continue;
             if (i < 0 || j < 0 || i >= MS || j >= MS) { fb[sy*CRAFT_FB_W+sx] = RGB(40,38,48); continue; } /* border */
-            int wx = i * CRAFT_WORLD_X / MS, wz = j * CRAFT_WORLD_Z / MS;
+            int wx, wz; mm_cell_to_world(i, j, MS, &wx, &wz);
             uint16_t c = RGB(10, 9, 14);                 /* unexplored */
             if (s_visited[wz * CRAFT_WORLD_X + wx]) {
                 int b = craft_world_get(wx, s_level.floor_y, wz);
@@ -618,7 +645,8 @@ static void draw_minimap(uint16_t *fb) {
         }
     /* markers: down-stairs (teal), up (amber), player (white) */
     #define MM_PT(wx,wz,col) do { \
-        int _x = MX + (int)(wx) * MS / CRAFT_WORLD_X, _y = MY + (int)(wz) * MS / CRAFT_WORLD_Z; \
+        int _i, _j; mm_world_to_cell((int)(wx), (int)(wz), MS, &_i, &_j); \
+        int _x = MX + _i, _y = MY + _j; \
         for (int a=0;a<2;a++) for (int b=0;b<2;b++){ int xx=_x+a, yy=_y+b; \
             if ((unsigned)xx<CRAFT_FB_W && (unsigned)yy<CRAFT_FB_H) fb[yy*CRAFT_FB_W+xx]=(col); } } while(0)
     MM_PT(s_level.down_x, s_level.down_z, RGB(40,230,210));
@@ -725,6 +753,12 @@ void rogue_game_debug_force_weapon(int wt) {
         RogueItem it; rogue_item_roll_weapon(&it, 6, loot_rng());
         if (it.wtype == wt) { rogue_player_equip(&s_player, &it); return; }
     }
+}
+/* Force the hero's facing (radians) for FX direction checks. */
+void rogue_game_debug_set_yaw(float yaw) { s_player.yaw = yaw; }
+/* Reveal the whole fog-of-war map (minimap verification). */
+void rogue_game_debug_reveal_map(void) {
+    for (int i = 0; i < CRAFT_WORLD_X * CRAFT_WORLD_Z; i++) s_visited[i] = 1;
 }
 
 /* Roll + equip one item into every slot (verify stat aggregation). */
