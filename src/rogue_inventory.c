@@ -122,9 +122,11 @@ void rogue_inventory_draw(uint16_t *fb, const RoguePlayer *p) {
         int col = i % 2, row = i / 2;
         int x = px0 + col * (bw + gap), y = py0 + row * (bh + gap);
         const RogueItem *it = &p->equip[PD[i]];
-        uint16_t bdr = (s_cur == i) ? RGB(255,255,255)
+        bool sel = (s_cur == i);
+        uint16_t bdr = sel ? RGB(255,255,255)
                      : rogue_item_is_equip(it) ? rogue_rarity_color(it->rarity) : RGB(70,70,80);
-        box(fb, x, y, bw, bh, bdr, RGB(24,22,30));
+        if (sel) box(fb, x-1, y-1, bw+2, bh+2, RGB(240,210,60), RGB(60,52,18));  /* gold cursor frame */
+        box(fb, x, y, bw, bh, bdr, sel ? RGB(48,42,24) : RGB(24,22,30));
         craft_font_draw(fb, slot_abbrev(PD[i]), x + 2, y + 1, RGB(150,150,160));
         if (rogue_item_is_equip(it))
             craft_font_draw(fb, "*", x + bw - 6, y + bh - 7, rogue_rarity_color(it->rarity));
@@ -144,10 +146,12 @@ void rogue_inventory_draw(uint16_t *fb, const RoguePlayer *p) {
         int col = k % cols, row = k / cols;
         int x = gx0 + col * (cw + gp), y = gy0 + row * (ch + gp);
         bool has = k < s_bag_n;
-        uint16_t bdr = (s_cur == 6 + k) ? RGB(255,255,255)
+        bool sel = (s_cur == 6 + k);
+        uint16_t bdr = sel ? RGB(255,255,255)
                      : has ? (rogue_item_is_equip(&s_bag[k]) ? rogue_rarity_color(s_bag[k].rarity) : s_bag[k].color)
                            : RGB(50,48,58);
-        box(fb, x, y, cw, ch, bdr, RGB(20,18,26));
+        if (sel) box(fb, x-1, y-1, cw+2, ch+2, RGB(240,210,60), RGB(60,52,18));  /* gold cursor frame */
+        box(fb, x, y, cw, ch, bdr, sel ? RGB(48,42,24) : RGB(20,18,26));
         if (has) {
             uint16_t ic = rogue_item_is_equip(&s_bag[k]) ? rogue_rarity_color(s_bag[k].rarity) : s_bag[k].color;
             fr(fb, x + 4, y + 3, cw - 8, ch - 6, ic);

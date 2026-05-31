@@ -69,7 +69,7 @@ void rogue_player_init(RoguePlayer *p, Vec3 spawn) {
     p->hurt_flash = 0.0f;
     p->fire_pending = false;
     p->gold = 0;
-    p->torch_fuel = 55.0f;
+    p->torch_fuel = 75.0f;
     for (int i = 0; i < SLOT_COUNT; i++) p->equip[i].kind = ITEM_NONE;
     RogueItem starter;
     rogue_item_starter(&starter);

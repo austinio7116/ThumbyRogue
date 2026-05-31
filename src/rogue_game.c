@@ -196,9 +196,26 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
     int  hp0 = s_player.hp, gold0 = s_player.gold;
     if (atk_edge && s_player.atk_cd <= 0 && s_player.atk_t <= 0) rogue_sfx_swing();
 
-    /* Torch burns down; out of fuel → darkness + bolder, deadlier foes. */
-    if (s_player.torch_fuel > 0) s_player.torch_fuel -= dt;
+    /* Torch burns down slowly; relight it FAST by standing near a lit brazier
+     * or lava (a clear, discoverable recharge). Torch pickups also refill it. */
+    if (s_player.torch_fuel > 0) s_player.torch_fuel -= dt * 0.7f;
+    {
+        int pcx = (int)floorf(s_player.pos.x);
+        int pcz = (int)floorf(s_player.pos.z);
+        int pcy = s_level.floor_y;
+        bool near_fire = false;
+        for (int dz = -2; dz <= 2 && !near_fire; dz++)
+            for (int dx = -2; dx <= 2; dx++) {
+                int b  = craft_world_get(pcx + dx, pcy, pcz + dz);
+                int b2 = craft_world_get(pcx + dx, pcy - 1, pcz + dz);
+                if (b == BLK_LAMP_ON || craft_is_lava_id((uint8_t)b) ||
+                    craft_is_lava_id((uint8_t)b2)) { near_fire = true; break; }
+            }
+        if (near_fire && s_player.torch_fuel < 90.0f)
+            s_player.torch_fuel += dt * 18.0f;   /* relight */
+    }
     if (s_player.torch_fuel < 0) s_player.torch_fuel = 0;
+    if (s_player.torch_fuel > 90.0f) s_player.torch_fuel = 90.0f;
     craft_render_set_player_light(s_player.torch_fuel > 0);
     /* Torch dims + shrinks as fuel runs low — brightness is a resource you
      * watch drain. Full above 14s, fading to a dim ember by 0. */
@@ -312,8 +329,8 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
         int r = loot_rng() % 100;
         if (r < 16)      { rogue_item_roll_drop(&it, s_depth, loot_rng()); rogue_loot_drop(&it, dpos); }
         else if (r < 22) { rogue_item_make_potion(&it, 30); rogue_loot_drop(&it, dpos); }
-        else if (r < 30) { rogue_item_make_torch(&it, 25); rogue_loot_drop(&it, dpos); }
-        else if (r < 36) { rogue_item_make_gem(&it, (GemType)(1 + loot_rng()%4)); rogue_loot_drop(&it, dpos); }
+        else if (r < 38) { rogue_item_make_torch(&it, 35); rogue_loot_drop(&it, dpos); }
+        else if (r < 44) { rogue_item_make_gem(&it, (GemType)(1 + loot_rng()%4)); rogue_loot_drop(&it, dpos); }
     }
 
     /* Chests open automatically when you reach them (loot spills, then

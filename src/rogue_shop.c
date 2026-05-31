@@ -112,32 +112,55 @@ static void fr(uint16_t *fb,int x,int y,int w,int h,uint16_t c){
         for(int i=x;i<x+w;i++) if((unsigned)i<CRAFT_FB_W) fb[j*CRAFT_FB_W+i]=c; }
 }
 
+/* Draw one selectable row with a clear highlight bar + cursor. */
+static void shop_row(uint16_t *fb, int y, bool sel, bool dim,
+                     const char *label, uint16_t lc, int price) {
+    if (sel) {
+        fr(fb, 0, y - 1, CRAFT_FB_W, 9, RGB(60, 52, 18));   /* highlight bar */
+        fr(fb, 0, y - 1, 2, 9, RGB(240, 210, 60));          /* gold edge */
+        craft_font_draw(fb, ">", 4, y, RGB(255, 255, 255));
+    }
+    uint16_t c = dim ? RGB(95, 90, 80) : (sel ? RGB(255, 255, 255) : lc);
+    craft_font_draw(fb, label, 11, y, c);
+    if (price >= 0) {
+        char pb[12]; snprintf(pb, sizeof pb, "%d", price);
+        uint16_t pc = dim ? RGB(120,70,60) : RGB(240, 210, 60);
+        craft_font_draw(fb, pb, CRAFT_FB_W - craft_font_width(pb) - 4, y, pc);
+    }
+}
+
 void rogue_shop_draw(uint16_t *fb, const RoguePlayer *p) {
     fr(fb,0,0,CRAFT_FB_W,CRAFT_FB_H,RGB(14,12,8));
     char buf[40];
-    craft_font_draw(fb,"MERCHANT",3,2,RGB(240,220,120));
+    craft_font_draw(fb,"MERCHANT",4,2,RGB(240,220,120));
     snprintf(buf,sizeof buf,"G %d",p->gold);
-    craft_font_draw(fb,buf,CRAFT_FB_W-craft_font_width(buf)-3,2,RGB(240,210,60));
+    craft_font_draw(fb,buf,CRAFT_FB_W-craft_font_width(buf)-4,2,RGB(240,210,60));
+    fr(fb,0,11,CRAFT_FB_W,1,RGB(60,52,30));
 
-    int y = 14;
+    int y = 16;
     for (int i = 0; i < N_STOCK; i++) {
-        uint16_t c = (s_cur==i)?RGB(255,255,255):rogue_rarity_color(s_stock[i].rarity);
-        if (s_sold[i]) { snprintf(buf,sizeof buf,"-- sold --"); c=RGB(90,90,90); }
-        else snprintf(buf,sizeof buf,"%-16s %d", s_stock[i].name, s_price[i]);
-        craft_font_draw(fb,buf,4,y,c);
-        y += 9;
+        bool sel = (s_cur == i);
+        if (s_sold[i]) {
+            shop_row(fb, y, sel, true, "- sold -", RGB(90,90,90), -1);
+        } else {
+            bool dim = p->gold < s_price[i];
+            shop_row(fb, y, sel, dim, s_stock[i].name,
+                     rogue_rarity_color(s_stock[i].rarity), s_price[i]);
+        }
+        y += 10;
     }
-    y += 3;
+    y += 4;
+    fr(fb,0,y-3,CRAFT_FB_W,1,RGB(60,52,30));
     struct { int id; const char *t; int cost; } opt[3] = {
-        { OPT_GAMBLE,  "Gamble (random)", 30 + s_depth*8 },
-        { OPT_REROLL,  "Reroll weapon",   25 + s_depth*5 },
-        { OPT_UPGRADE, "Upgrade weapon",  40 + s_depth*8 },
+        { OPT_GAMBLE,  "Gamble random", 30 + s_depth*8 },
+        { OPT_REROLL,  "Reroll weapon", 25 + s_depth*5 },
+        { OPT_UPGRADE, "Upgrade weapon",40 + s_depth*8 },
     };
     for (int i = 0; i < 3; i++) {
-        uint16_t c = (s_cur==opt[i].id)?RGB(255,255,255):RGB(200,200,210);
-        snprintf(buf,sizeof buf,"%-16s %d", opt[i].t, opt[i].cost);
-        craft_font_draw(fb,buf,4,y,c);
-        y += 9;
+        bool sel = (s_cur == opt[i].id);
+        bool dim = p->gold < opt[i].cost;
+        shop_row(fb, y, sel, dim, opt[i].t, RGB(200,200,210), opt[i].cost);
+        y += 10;
     }
-    craft_font_draw(fb,"A buy/use   MENU leave",4,CRAFT_FB_H-9,RGB(150,150,160));
+    craft_font_draw(fb,"A buy/use    MENU leave",4,CRAFT_FB_H-9,RGB(150,150,160));
 }
