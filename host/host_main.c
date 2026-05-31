@@ -268,6 +268,10 @@ int main(int argc, char **argv) {
             extern void rogue_game_debug_walkpose(float);
             rogue_game_debug_walkpose((float)atof(getenv("ROGUE_WALK")));
         }
+        if (getenv("ROGUE_XRAY")) {   /* walk south into the camera-side wall */
+            CraftRawButtons d = {0}; d.down = true;
+            for (int i = 0; i < 50; i++) rogue_game_tick(&d, 1.0f / 30.0f);
+        }
         if (getenv("ROGUE_FXWPN")) {   /* equip a weapon, swing/fire, catch the FX mid-action */
             extern void rogue_game_debug_force_weapon(int);
             extern void rogue_game_debug_set_yaw(float);

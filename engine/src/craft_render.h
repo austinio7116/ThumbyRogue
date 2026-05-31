@@ -108,6 +108,9 @@ void craft_render_set_light_pos(float x, float y, float z);
  * blocks. The bubble falls off smoothly to the radius. */
 void craft_render_set_light_intensity(float i);
 void craft_render_set_light_radius(float r);
+/* X-ray sphere: camera-side wall cells within `radius` of (x, feet_y, z) turn
+ * translucent so the hero is never hidden behind a near wall. radius<=0 off. */
+void craft_render_set_xray(float x, float feet_y, float z, float radius);
 #endif
 
 /* Drive the day/night cycle. `world_time` is seconds since world

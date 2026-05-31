@@ -183,6 +183,21 @@ void craft_render_set_light_radius(float r) {
     if (r < 1.0f) r = 1.0f;
     s_light_radius2 = r * r;
 }
+
+/* X-ray sphere: camera-side wall cells within `radius` of the hero turn
+ * translucent so the hero is never lost behind a near wall. Floor cells
+ * (below feet_y) and walls behind the hero are left solid. Disabled when
+ * radius <= 0. */
+static bool  s_xray_on = false;
+static float s_xray_x = 0, s_xray_z = 0;
+static int   s_xray_fy = 0;          /* hero feet cell-y; cells with by >= fy are walls */
+static float s_xray_r2 = 0;
+void craft_render_set_xray(float x, float feet_y, float z, float radius) {
+    s_xray_on = (radius > 0.0f);
+    s_xray_x = x; s_xray_z = z;
+    s_xray_fy = (int)feet_y;
+    s_xray_r2 = radius * radius;
+}
 #endif
 float craft_render_sun_y(void) { return s_sun_y; }
 int   craft_render_brightness_q8(void) { return s_brightness_q8; }
@@ -359,6 +374,7 @@ typedef struct {
     BlockId blk;
     bool   passed_water;
     bool   passed_glass;
+    bool   passed_xray;    /* ray went through a near camera-side wall (x-ray sphere) */
     /* Surface u/v captured at the FIRST water-from-not-water entry so
      * render_strip can sample the animated water texture there. Only
      * meaningful when passed_water is true; if the ray started inside
@@ -922,6 +938,25 @@ INLINE_HOT TraceHit trace_ray(Vec3 origin, Vec3 dir, bool stop_at_water) {
             if (lt[tv * CRAFT_TEX_SIZE + tu] == CRAFT_CUTOUT_KEY) continue;
         }
 
+#ifdef ROGUE_FULLFRAME_RENDER
+        /* X-ray near walls: turn camera-side wall cells inside the hero sphere
+         * translucent (pass the ray through to the floor/hero behind). Floor
+         * cells (by < feet) and walls beyond the hero are left solid. */
+        if (s_xray_on && !stop_at_water && vy >= s_xray_fy) {
+            float hdx = (float)vx + 0.5f - s_xray_x;
+            float hdz = (float)vz + 0.5f - s_xray_z;
+            if (hdx * hdx + hdz * hdz <= s_xray_r2) {
+                float cox = (float)vx + 0.5f - origin.x, coy = (float)vy + 0.5f - origin.y,
+                      coz = (float)vz + 0.5f - origin.z;
+                float hox = s_xray_x - origin.x, hoy = (float)s_xray_fy + 0.5f - origin.y,
+                      hoz = s_xray_z - origin.z;
+                if (cox*cox + coy*coy + coz*coz < hox*hox + hoy*hoy + hoz*hoz) {
+                    h.passed_xray = true;     /* see through this near wall cell */
+                    continue;
+                }
+            }
+        }
+#endif
         PROF_INC(craft_prof_hits);
         h.hit = true;
         h.bx = vx; h.by = vy; h.bz = vz;
@@ -1560,6 +1595,16 @@ void craft_render_strip(const CraftCamera *cam, uint16_t *fb,
                     b1 = (b1 * 13 + bg * 3) >> 4;
                     c = (uint16_t)((r1 << 11) | (g1 << 5) | b1);
                 }
+#ifdef ROGUE_FULLFRAME_RENDER
+                if (h.passed_xray) {
+                    /* Hazy grey veil over whatever lay behind the near wall —
+                     * reads as a translucent cutaway. The hero (drawn after,
+                     * z-tested against the floor distance here) shows through. */
+                    int r1 = (c >> 11) & 0x1F, g1 = (c >> 5) & 0x3F, b1 = c & 0x1F;
+                    r1 = (r1 + 14) >> 1; g1 = (g1 + 28) >> 1; b1 = (b1 + 17) >> 1;
+                    c = (uint16_t)((r1 << 11) | (g1 << 5) | b1);
+                }
+#endif
 
                 /* Compute world distance once: needed for zbuf and
                  * (conditionally) fog. One sqrt per pixel costs us

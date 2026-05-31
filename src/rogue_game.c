@@ -384,6 +384,8 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
     }
     /* Light the bubble around the HERO (head height), not the camera. */
     craft_render_set_light_pos(s_player.pos.x, s_player.pos.y + 0.9f, s_player.pos.z);
+    /* X-ray near walls so the hero is never lost behind them (camera-side only). */
+    craft_render_set_xray(s_player.pos.x, s_player.pos.y, s_player.pos.z, 3.5f);
     rogue_enemies_set_dark(s_player.torch_fuel <= 0);
 
     rogue_platform_update(dt);   /* before player: sets platform delta to ride */
