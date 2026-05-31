@@ -15,15 +15,19 @@
 #
 cmake_minimum_required(VERSION 3.16)
 
-set(PICO_BOARD tinycircuits_thumby_color_rp2350)
-set(PICO_PLATFORM rp2350)
-include(${PICO_SDK_PATH}/pico_sdk_init.cmake)
+# Standalone defines its own SDK/project; as a ThumbyOne slot the parent
+# CMakeLists has already initialised the SDK and just add_subdirectory()s us.
+if (NOT THUMBYONE_SLOT_MODE)
+    set(PICO_BOARD tinycircuits_thumby_color_rp2350)
+    set(PICO_PLATFORM rp2350)
+    include(${PICO_SDK_PATH}/pico_sdk_init.cmake)
 
-project(thumbyrogue_device C CXX ASM)
-set(CMAKE_C_STANDARD 11)
-set(CMAKE_CXX_STANDARD 14)
+    project(thumbyrogue_device C CXX ASM)
+    set(CMAKE_C_STANDARD 11)
+    set(CMAKE_CXX_STANDARD 14)
 
-pico_sdk_init()
+    pico_sdk_init()
+endif()
 
 set(ROGUE_ROOT ${CMAKE_CURRENT_LIST_DIR}/..)
 set(CRAFT_ROOT ${ROGUE_ROOT}/engine)
@@ -33,10 +37,13 @@ set(DEVICE     ${CMAKE_CURRENT_LIST_DIR})
 
 # Bake the procedural texture atlas to const flash data — saves ~32 KB
 # SRAM. Native host tool via sub-CMake so the cross toolchain skips it.
+# All paths/targets use CMAKE_CURRENT_BINARY_DIR + a rogue-specific target
+# name so that, as a ThumbyOne slot, we don't collide with the ThumbyCraft
+# slot's identically-structured baker (which uses the top build dir).
 include(ExternalProject)
 ExternalProject_Add(thumbyrogue_baker
     SOURCE_DIR ${CRAFT_ROOT}/tools
-    BINARY_DIR ${CMAKE_BINARY_DIR}/baker
+    BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/baker
     CMAKE_ARGS
         -DCMAKE_BUILD_TYPE=Release
         -DCMAKE_C_COMPILER=cc
@@ -46,17 +53,25 @@ ExternalProject_Add(thumbyrogue_baker
         -DCMAKE_EXE_LINKER_FLAGS=
     INSTALL_COMMAND ""
     BUILD_ALWAYS 1
-    BUILD_BYPRODUCTS ${CMAKE_BINARY_DIR}/baker/bake_textures
+    BUILD_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/baker/bake_textures
 )
-set(CRAFT_BAKED_C ${CMAKE_BINARY_DIR}/generated/craft_textures_baked.c)
+set(CRAFT_BAKED_C ${CMAKE_CURRENT_BINARY_DIR}/generated/craft_textures_baked.c)
 add_custom_command(
     OUTPUT ${CRAFT_BAKED_C}
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/generated
-    COMMAND ${CMAKE_BINARY_DIR}/baker/bake_textures ${CRAFT_BAKED_C}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/generated
+    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/baker/bake_textures ${CRAFT_BAKED_C}
     DEPENDS thumbyrogue_baker ${SRC}/craft_blocks.c ${SRC}/craft_blocks.h
     COMMENT "Baking craft_textures atlas to flash"
 )
-add_custom_target(generate_craft_textures DEPENDS ${CRAFT_BAKED_C})
+add_custom_target(generate_rogue_textures DEPENDS ${CRAFT_BAKED_C})
+
+# Save backend: standalone uses a dedicated flash sector; the ThumbyOne
+# slot writes the run blob to the shared FAT so it survives reflashing.
+if (THUMBYONE_SLOT_MODE)
+    set(ROGUE_SAVE_SRC ${DEVICE}/rogue_save_fatfs.c)
+else()
+    set(ROGUE_SAVE_SRC ${DEVICE}/rogue_save_flash.c)
+endif()
 
 add_executable(thumbyrogue
     # Platform layer.
@@ -64,7 +79,7 @@ add_executable(thumbyrogue
     ${DEVICE}/craft_lcd_gc9107.c
     ${DEVICE}/craft_buttons.c
     ${DEVICE}/craft_chunk_store_stub.c
-    ${DEVICE}/rogue_save_flash.c
+    ${ROGUE_SAVE_SRC}
     ${DEVICE}/craft_audio_pwm.c
 
     # ThumbyRogue gameplay.
@@ -102,7 +117,29 @@ add_executable(thumbyrogue
     ${CRAFT_BAKED_C}
 )
 
+# Slot mode: pull in FatFs + ThumbyOne's shared helpers (FS mount, LED +
+# backlight + settings for the brightness chord, handoff for return-to-lobby).
+if (THUMBYONE_SLOT_MODE)
+    target_sources(thumbyrogue PRIVATE
+        ${THUMBYONE_COMMON_SRC}          # thumbyone_handoff.c
+        ${THUMBYONE_FATFS_SRC}
+        ${THUMBYONE_COMMON_FS_SRC}
+        ${THUMBYONE_COMMON_LED_SRC}
+        ${THUMBYONE_COMMON_BACKLIGHT_SRC}
+        ${THUMBYONE_COMMON_SETTINGS_SRC}
+    )
+endif()
+
 target_include_directories(thumbyrogue PRIVATE ${SRC} ${ROGUE_SRC} ${DEVICE})
+if (THUMBYONE_SLOT_MODE)
+    target_include_directories(thumbyrogue PRIVATE
+        ${THUMBYONE_FATFS_INCLUDE}
+        ${THUMBYONE_COMMON_INCLUDE}
+        ${THUMBYONE_COMMON_LED_INCLUDE}
+        ${THUMBYONE_COMMON_BACKLIGHT_INCLUDE}
+        ${THUMBYONE_COMMON_SETTINGS_INCLUDE}
+    )
+endif()
 
 target_compile_options(thumbyrogue PRIVATE
     -O3 -g -Wall -Wextra
@@ -116,19 +153,43 @@ target_link_libraries(thumbyrogue
     hardware_spi hardware_dma hardware_pwm hardware_irq
     hardware_flash hardware_sync hardware_clocks hardware_gpio
 )
+if (THUMBYONE_SLOT_MODE)
+    target_link_libraries(thumbyrogue hardware_pio hardware_adc)
+endif()
+
+# Slot mode: FatFs caches + shared helpers eat into the SRAM budget, so trim
+# the heap (the engine barely uses it). Standalone keeps the bigger heap.
+if (THUMBYONE_SLOT_MODE)
+    set(ROGUE_HEAP_SIZE 0x2000)
+else()
+    set(ROGUE_HEAP_SIZE 0x4000)
+endif()
 
 target_compile_definitions(thumbyrogue PRIVATE
-    PICO_HEAP_SIZE=0x4000
+    PICO_HEAP_SIZE=${ROGUE_HEAP_SIZE}
     PICO_STACK_SIZE=0x1000
     PICO_CORE1_STACK_SIZE=0x1000
     CRAFT_TEXTURES_BAKED=1
     ROGUE_FULLFRAME_RENDER=1   # no craft hotbar plate -> render edge-to-edge
+    $<$<BOOL:${THUMBYONE_SLOT_MODE}>:THUMBYONE_SLOT_MODE=1>
     # Engine-default 64x64x64 cubic world = one bounded dungeon floor.
     # This is ThumbyCraft's native device config, so it's known to fit.
 )
-add_dependencies(thumbyrogue generate_craft_textures)
+add_dependencies(thumbyrogue generate_rogue_textures)
 
 pico_enable_stdio_usb(thumbyrogue 0)
 pico_enable_stdio_uart(thumbyrogue 0)
 
+# Slot mode: switch the UF2 family to "absolute" so the lobby's chain_image
+# path can load us wherever the rebase places us in flash.
+if (THUMBYONE_SLOT_MODE)
+    pico_set_uf2_family(thumbyrogue "absolute")
+endif()
+
 pico_add_extra_outputs(thumbyrogue)
+
+# Slot mode: the ThumbyOne combiner expects firmware_thumbyrogue.uf2 in
+# rogue_slot/. Standalone keeps thumbyrogue.uf2 (build/deploy scripts).
+if (THUMBYONE_SLOT_MODE)
+    set_target_properties(thumbyrogue PROPERTIES OUTPUT_NAME "firmware_thumbyrogue")
+endif()

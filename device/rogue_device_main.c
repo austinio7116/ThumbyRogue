@@ -22,6 +22,15 @@
 #include "craft_audio_pwm.h"
 #include "rogue_game.h"
 
+#ifdef THUMBYONE_SLOT_MODE
+#include "ff.h"
+#include "thumbyone_fs.h"
+#include "thumbyone_handoff.h"
+#include "thumbyone_led.h"
+static FATFS   g_fs;
+static uint8_t g_fs_work[FF_MAX_SS] __attribute__((aligned(4)));
+#endif
+
 void craft_tool_models_init(void);
 void craft_blocks_build_textures(void);
 
@@ -78,6 +87,13 @@ int main(void) {
     craft_blocks_build_textures();
     craft_tool_models_init();
     craft_audio_pwm_init();
+#ifdef THUMBYONE_SLOT_MODE
+    /* Honour the lobby's brightness setting + LED, then mount the shared FAT
+     * so rogue_plat_load/save (run blob) can read/write /thumbyrogue/run.sav.
+     * Must happen BEFORE rogue_game_init(), which try-resumes from the save. */
+    thumbyone_slot_init_brightness_and_led(true);
+    (void)thumbyone_fs_mount_or_format(&g_fs, g_fs_work, sizeof g_fs_work);
+#endif
     rogue_game_init(get_rand_32());
 
     multicore_launch_core1(core1_entry);
@@ -90,6 +106,21 @@ int main(void) {
         float dt = (now_ms - last_ms) * 0.001f;
         if (dt > 0.1f) dt = 0.1f;
         last_ms = now_ms;
+
+#ifdef THUMBYONE_SLOT_MODE
+        /* Hold MENU ~1.2s to return to the lobby (short taps still open the
+         * inventory). The run auto-saved on the last descent resumes next time. */
+        static uint32_t s_menu_held_ms = 0;
+        if (btn.menu) {
+            s_menu_held_ms += (uint32_t)(dt * 1000.0f);
+            if (s_menu_held_ms >= 1200u) {
+                craft_lcd_wait_idle();
+                thumbyone_handoff_request_lobby();   /* reboots to lobby; no return */
+            }
+        } else {
+            s_menu_held_ms = 0;
+        }
+#endif
 
         rogue_game_tick(&btn, dt);
 
