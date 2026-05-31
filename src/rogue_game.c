@@ -90,15 +90,22 @@ static int   s_n_trap;
 static float s_trap_cd[MAX_TRAPS];
 static uint32_t loot_rng(void){ s_loot_rng^=s_loot_rng<<13; s_loot_rng^=s_loot_rng>>17; s_loot_rng^=s_loot_rng<<5; return s_loot_rng; }
 
+/* Stairs are drawn as four offset steps (descending into a dark pit for the
+ * down-stairs, rising for the up-stairs) plus the tall locator beacon — teal
+ * for down, amber for up (colours unchanged). */
 static const RogueCuboid down_stair[] = {
-    { 0.0f, 0.05f, 0.0f, 0.45f, 0.05f, 0.45f, RGB(20, 20, 28)  },
-    { 0.0f, 0.30f, 0.0f, 0.30f, 0.22f, 0.30f, RGB(10, 10, 14)  },
-    { 0.0f, 1.25f, 0.0f, 0.06f, 1.20f, 0.06f, RGB(40, 230, 210) },
+    { 0.0f, 0.20f, -0.20f, 0.40f, 0.04f, 0.09f, RGB(74, 74, 86)  },  /* rim step (front, high) */
+    { 0.0f, 0.14f, -0.04f, 0.40f, 0.04f, 0.09f, RGB(52, 52, 62)  },
+    { 0.0f, 0.08f,  0.12f, 0.40f, 0.04f, 0.09f, RGB(36, 36, 44)  },
+    { 0.0f, 0.02f,  0.28f, 0.40f, 0.04f, 0.09f, RGB(22, 22, 30)  },  /* deepest (back, low) */
+    { 0.0f, 1.25f,  0.0f,  0.05f, 1.20f, 0.05f, RGB(40, 230, 210) }, /* teal beacon */
 };
 static const RogueCuboid up_stair[] = {
-    { 0.0f, 0.12f, 0.0f, 0.42f, 0.12f, 0.42f, RGB(150,150,160) },
-    { 0.0f, 0.30f, 0.0f, 0.26f, 0.20f, 0.26f, RGB(120,120,128) },
-    { 0.0f, 1.25f, 0.0f, 0.06f, 1.20f, 0.06f, RGB(245,180, 60) },
+    { 0.0f, 0.06f, -0.20f, 0.40f, 0.06f, 0.09f, RGB(140,140,150) }, /* low step (front) */
+    { 0.0f, 0.16f, -0.04f, 0.40f, 0.06f, 0.09f, RGB(152,152,162) },
+    { 0.0f, 0.26f,  0.12f, 0.40f, 0.06f, 0.09f, RGB(164,164,174) },
+    { 0.0f, 0.36f,  0.28f, 0.40f, 0.06f, 0.09f, RGB(176,176,186) }, /* high step (back) */
+    { 0.0f, 1.25f,  0.0f,  0.05f, 1.20f, 0.05f, RGB(245,180, 60) }, /* amber beacon */
 };
 /* Minecraft-style floor torch: a thin wooden stick topped with a flame. */
 static const RogueCuboid torch_model[] = {
@@ -834,8 +841,8 @@ void rogue_game_demo_step(float dt, int frame) {
 void rogue_game_draw_overlay(uint16_t *fb) {
     Vec3 dpos = v3(s_level.down_x + 0.5f, (float)s_level.floor_y, s_level.down_z + 0.5f);
     Vec3 upos = v3(s_level.up_x + 0.5f,   (float)s_level.floor_y, s_level.up_z + 0.5f);
-    rogue_render_model(&s_cam, fb, upos, 0.0f, up_stair, 3, 0.5f, 2.5f, 0.0f, 256);
-    rogue_render_model(&s_cam, fb, dpos, 0.0f, down_stair, 3, 0.5f, 2.5f, 0.0f, 256);
+    rogue_render_model(&s_cam, fb, upos, 0.0f, up_stair, 5, 0.5f, 2.5f, 0.0f, 256);
+    rogue_render_model(&s_cam, fb, dpos, 0.0f, down_stair, 5, 0.5f, 2.5f, 0.0f, 256);
 
     /* Wall/floor torches (the room light sources). */
     for (int i = 0; i < s_level.n_torch; i++) {

@@ -199,13 +199,14 @@ void rogue_loot_draw(const CraftCamera *cam, uint16_t *fb) {
         if (!g->alive) continue;
         bool eq = rogue_item_is_equip(&g->item);
         uint16_t c = eq ? rogue_rarity_color(g->item.rarity) : g->item.color;
-        /* beam: a tall thin glowing column — taller for higher rarity */
-        float bh = eq ? (0.9f + 0.35f * g->item.rarity) : 0.8f;
-        RogueCuboid beam[2] = {
-            { 0.0f, bh, 0.0f, 0.05f, bh,        0.05f, c },   /* bright core */
-            { 0.0f, bh, 0.0f, 0.09f, bh * 0.9f, 0.09f, c },   /* soft halo */
-        };
-        rogue_render_model(cam, fb, g->pos, 0.0f, beam, 2, 0.12f, bh * 2.0f, 0.0f, 256);
+        /* Shaft of light: a tall coloured outer glow with a near-white bright
+         * core rising from the drop — taller for higher rarity. Rendered in
+         * two passes so the core can use a much higher emissive flash. */
+        float bh = eq ? (1.4f + 0.45f * g->item.rarity) : 1.1f;
+        RogueCuboid outer[1] = { { 0.0f, bh, 0.0f, 0.07f, bh, 0.07f, c } };
+        rogue_render_model(cam, fb, g->pos, g->spin * 0.25f, outer, 1, 0.12f, bh * 2.0f, 0.40f, 256);
+        RogueCuboid core[1]  = { { 0.0f, bh, 0.0f, 0.025f, bh, 0.025f, c } };
+        rogue_render_model(cam, fb, g->pos, 0.0f, core, 1, 0.06f, bh * 2.0f, 0.92f, 256);
         float bob = 0.12f + 0.05f * sinf(g->spin * 1.7f);
         Vec3 pos = g->pos; pos.y += bob;
         RogueCuboid m[1] = { { 0.0f, 0.10f, 0.0f, 0.10f, 0.10f, 0.10f, c } };
