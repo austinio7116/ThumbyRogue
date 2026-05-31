@@ -26,6 +26,12 @@ typedef struct {
 
 static Enemy s_en[ROGUE_MAX_ENEMIES];
 
+/* Death-event ring: combat records where/what died so the game can drop
+ * loot without the enemy module knowing about items. */
+static Vec3      s_death_pos[ROGUE_MAX_ENEMIES];
+static EnemyType s_death_type[ROGUE_MAX_ENEMIES];
+static int       s_death_n;
+
 /* --- per-type stats ---------------------------------------------- */
 typedef struct {
     float speed, aggro, atk_range, windup, dmg_mul;
@@ -91,6 +97,34 @@ static float frand(void){ return (float)(rng() & 0xFFFF) / 65536.0f; }
 
 void rogue_enemies_clear(void) {
     for (int i = 0; i < ROGUE_MAX_ENEMIES; i++) s_en[i].alive = false;
+    s_death_n = 0;
+}
+
+/* Apply damage + knockback to one enemy; record a death event if it dies. */
+static void en_apply_damage(Enemy *e, int dmg, float fromx, float fromz) {
+    e->hp -= dmg;
+    e->hurt_flash = 0.22f;
+    float dx = e->pos.x - fromx, dz = e->pos.z - fromz;
+    float l = sqrtf(dx*dx + dz*dz);
+    if (l > 0.001f) { e->pos.x += dx/l * 0.30f; e->pos.z += dz/l * 0.30f; }
+    if (e->hp <= 0) {
+        e->alive = false;
+        if (s_death_n < ROGUE_MAX_ENEMIES) {
+            s_death_pos[s_death_n] = e->pos;
+            s_death_type[s_death_n] = e->type;
+            s_death_n++;
+        }
+    } else if (e->state == AI_WANDER) {
+        e->state = AI_CHASE; e->state_t = 0;
+    }
+}
+
+bool rogue_enemies_pop_death(Vec3 *pos, int *type) {
+    if (s_death_n <= 0) return false;
+    s_death_n--;
+    *pos = s_death_pos[s_death_n];
+    *type = (int)s_death_type[s_death_n];
+    return true;
 }
 
 void rogue_enemies_spawn(const int16_t *room_cx, const int16_t *room_cz,
@@ -213,13 +247,23 @@ int rogue_enemies_hit_arc(Vec3 origin, float yaw, float range,
             float dot = (dx/dist) * fx + (dz/dist) * fz;
             if (dot < arc_cos) continue;     /* outside the swing arc */
         }
-        e->hp -= dmg;
-        e->hurt_flash = 0.22f;
-        /* knockback */
-        if (dist > 0.001f) { e->pos.x += dx/dist * 0.35f; e->pos.z += dz/dist * 0.35f; }
-        if (e->hp <= 0) e->alive = false;
-        else if (e->state == AI_WANDER) { e->state = AI_CHASE; e->state_t = 0; }
+        en_apply_damage(e, dmg, origin.x, origin.z);
         hits++;
+    }
+    return hits;
+}
+
+int rogue_enemies_hit_point(float x, float z, float radius, int dmg) {
+    int hits = 0;
+    for (int i = 0; i < ROGUE_MAX_ENEMIES; i++) {
+        Enemy *e = &s_en[i];
+        if (!e->alive) continue;
+        float dx = e->pos.x - x, dz = e->pos.z - z;
+        float rr = radius + DEFS[e->type].radius;
+        if (dx*dx + dz*dz > rr*rr) continue;
+        en_apply_damage(e, dmg, x, z);
+        hits++;
+        break;   /* a projectile hits one target */
     }
     return hits;
 }

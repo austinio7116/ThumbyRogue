@@ -10,6 +10,7 @@
 #include "craft_types.h"
 #include "craft_render.h"
 #include "craft_buttons.h"
+#include "rogue_items.h"
 
 typedef struct {
     Vec3  pos;            /* feet position */
@@ -29,13 +30,18 @@ typedef struct {
     float dodge_dx, dodge_dz;
     float invuln_t;       /* i-frames remaining */
     float hurt_flash;     /* red wash on taking damage */
+    bool  fire_pending;   /* ranged/caster: launch a projectile this frame */
 
-    /* weapon stats (gear-defined in Phase 4; fixed melee for now) */
-    float wpn_range, wpn_arc_cos, wpn_dur;
+    /* equipped weapon — defines the playstyle */
+    RogueItem   weapon;
+    WeaponClass wpn_class;
+    float wpn_range, wpn_arc_cos, wpn_dur, wpn_proj_speed;
     int   wpn_dmg;
+    int   gold;
 } RoguePlayer;
 
 void rogue_player_init(RoguePlayer *p, Vec3 spawn);
+void rogue_player_equip(RoguePlayer *p, const RogueItem *it);
 
 /* atk_edge / dodge_edge are just-pressed edges computed by the caller. */
 void rogue_player_update(RoguePlayer *p, const CraftRawButtons *btn,

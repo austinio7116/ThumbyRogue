@@ -5,9 +5,14 @@
 #include "rogue_gen.h"
 #include "rogue_render.h"
 #include "rogue_hud.h"
+#include "rogue_items.h"
+#include "rogue_loot.h"
+#include "rogue_proj.h"
 #include "craft_world.h"
 #include "craft_render.h"
 #include <math.h>
+#include <stdio.h>
+#include <string.h>
 
 #define RGB(r,g,b) ((uint16_t)((((r)>>3)<<11)|(((g)>>2)<<5)|((b)>>3)))
 
@@ -18,6 +23,8 @@ static RogueLevelInfo s_level;
 static uint32_t s_seed;
 static int   s_depth;
 static float s_dead_t;     /* >0 while the death banner shows */
+static uint32_t s_loot_rng = 0x13572468u;
+static uint32_t loot_rng(void){ s_loot_rng^=s_loot_rng<<13; s_loot_rng^=s_loot_rng>>17; s_loot_rng^=s_loot_rng<<5; return s_loot_rng; }
 
 static const RogueCuboid down_stair[] = {
     { 0.0f, 0.05f, 0.0f, 0.45f, 0.05f, 0.45f, RGB(20, 20, 28)  },
@@ -30,19 +37,35 @@ static const RogueCuboid up_stair[] = {
     { 0.0f, 1.25f, 0.0f, 0.06f, 1.20f, 0.06f, RGB(245,180, 60) },
 };
 
+/* Carry the equipped weapon + gold across floors; only rebuild on death. */
+static RogueItem s_keep_weapon;
+static int s_keep_gold;
+static bool s_have_keep;
+
 static void load_level(void) {
     rogue_gen_dungeon(s_seed, s_depth, &s_level);
     rogue_player_init(&s_player, s_level.spawn);
+    if (s_have_keep) {
+        rogue_player_equip(&s_player, &s_keep_weapon);
+        s_player.gold = s_keep_gold;
+    }
     rogue_camera_init(s_player.pos);
     rogue_enemies_spawn(s_level.room_cx, s_level.room_cz, s_level.n_rooms,
                         s_level.up_x, s_level.up_z, s_level.floor_y,
                         s_depth, s_seed);
+    rogue_loot_clear();
+    rogue_proj_clear();
+    rogue_loot_place_chests(s_level.room_cx, s_level.room_cz, s_level.n_rooms,
+                            s_level.up_x, s_level.up_z, s_level.floor_y,
+                            s_depth, s_seed);
 }
 
 void rogue_game_init(uint32_t seed) {
     s_seed = seed;
     s_depth = 1;
     s_dead_t = 0.0f;
+    s_have_keep = false;
+    s_loot_rng = seed | 1u;
 
     craft_render_set_fog(false);
     craft_render_set_clouds(false);
@@ -62,13 +85,15 @@ void rogue_game_init(uint32_t seed) {
 static bool edge(bool now, bool prev) { return now && !prev; }
 
 void rogue_game_tick(const CraftRawButtons *btn, float dt) {
-    /* Death → show banner, then restart the run from depth 1. */
+    /* Death → show banner, then restart the run from depth 1 (permadeath:
+     * gear + gold are lost, back to the starter dagger). */
     if (!s_player.alive) {
         s_dead_t += dt;
         if (s_dead_t > 2.2f) {
             s_dead_t = 0.0f;
             s_seed = s_seed * 1664525u + 1013904223u;
             s_depth = 1;
+            s_have_keep = false;
             load_level();
         }
         rogue_camera_update(dt);
@@ -93,13 +118,58 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
                               s_player.wpn_range, s_player.wpn_arc_cos,
                               s_player.wpn_dmg);
     }
+    /* Ranged/caster strike frame → fire a projectile (auto-aim a nearby foe). */
+    if (s_player.fire_pending) {
+        s_player.fire_pending = false;
+        float aim = s_player.yaw, ex, ez;
+        if (rogue_enemies_nearest(s_player.pos.x, s_player.pos.z, &ex, &ez)) {
+            float dx = ex - s_player.pos.x, dz = ez - s_player.pos.z;
+            if (dx*dx + dz*dz < s_player.wpn_range * s_player.wpn_range)
+                aim = atan2f(dx, dz);
+        }
+        rogue_proj_fire(s_player.pos, aim, s_player.wpn_proj_speed,
+                        s_player.wpn_dmg, s_player.wpn_class == WCLASS_CASTER,
+                        s_player.wpn_range);
+    }
 
     rogue_enemies_update(&s_player, dt, s_level.floor_y);
+    rogue_proj_update(dt, s_level.floor_y);
+    rogue_loot_update(&s_player, dt);
 
-    /* Descend when the hero reaches the down-stairs. */
+    /* Drop loot from anything that died this frame. */
+    Vec3 dpos; int dtype;
+    while (rogue_enemies_pop_death(&dpos, &dtype)) {
+        RogueItem it;
+        rogue_item_make_gold(&it, 2 + (int)(loot_rng() % (5 + s_depth * 2)));
+        rogue_loot_drop(&it, dpos);
+        int r = loot_rng() % 100;
+        if (r < 12) { rogue_item_roll_weapon(&it, s_depth, loot_rng()); rogue_loot_drop(&it, dpos); }
+        else if (r < 24) { rogue_item_make_potion(&it, 30); rogue_loot_drop(&it, dpos); }
+    }
+
+    /* MENU: interact — equip a ground weapon (swap), or open a chest. */
+    if (edge(btn->menu, s_prev.menu)) {
+        RogueItem w; int idx;
+        if (rogue_loot_weapon_near(s_player.pos.x, s_player.pos.z, &w, &idx)) {
+            RogueItem old = s_player.weapon, taken;
+            if (rogue_loot_take(idx, &taken)) {
+                rogue_player_equip(&s_player, &taken);
+                rogue_loot_drop(&old, s_player.pos);
+            }
+        } else {
+            int ci;
+            if (rogue_loot_chest_near(s_player.pos.x, s_player.pos.z, &ci))
+                rogue_loot_open_chest(ci, s_depth, loot_rng());
+        }
+    }
+
+    /* Descend when the hero reaches the down-stairs (keep gear + gold). */
     float ddx = s_player.pos.x - (s_level.down_x + 0.5f);
     float ddz = s_player.pos.z - (s_level.down_z + 0.5f);
     if (ddx*ddx + ddz*ddz < 0.7f*0.7f) {
+        s_keep_weapon = s_player.weapon;
+        s_keep_gold = s_player.gold;
+        s_have_keep = true;
         s_depth++;
         load_level();
     }
@@ -113,6 +183,25 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
 void rogue_game_get_camera(CraftCamera *out) { *out = s_cam; }
 int rogue_game_depth(void) { return s_depth; }
 int rogue_game_player_hp(void) { return s_player.hp; }
+int rogue_game_player_gold(void) { return s_player.gold; }
+const char *rogue_game_weapon_name(void) { return s_player.weapon.name; }
+
+/* Test hook: drop a strong weapon at the hero's feet then run the real
+ * equip path (weapon_near -> take -> equip -> drop old). Verifies the
+ * gear-defined playstyle swap end-to-end. */
+void rogue_game_debug_drop_weapon(void) {
+    RogueItem it;
+    rogue_item_roll_weapon(&it, 8, loot_rng());
+    rogue_loot_drop(&it, s_player.pos);
+    RogueItem w; int idx;
+    if (rogue_loot_weapon_near(s_player.pos.x, s_player.pos.z, &w, &idx)) {
+        RogueItem old = s_player.weapon, taken;
+        if (rogue_loot_take(idx, &taken)) {
+            rogue_player_equip(&s_player, &taken);
+            rogue_loot_drop(&old, s_player.pos);
+        }
+    }
+}
 
 /* Headless autopilot step: steer toward the nearest foe (screen-relative,
  * via the snapped camera yaw) and swing when close. For verification only. */
@@ -133,6 +222,7 @@ void rogue_game_demo_step(float dt, int frame) {
         }
         if (dist < 1.9f) b.a = (frame % 6) < 2;   /* in range → swing */
     }
+    if (frame % 45 == 20) b.menu = true;   /* periodically grab weapons/chests */
     rogue_game_tick(&b, dt);
 }
 
@@ -141,9 +231,23 @@ void rogue_game_draw_overlay(uint16_t *fb) {
     Vec3 upos = v3(s_level.up_x + 0.5f,   (float)s_level.floor_y, s_level.up_z + 0.5f);
     rogue_render_model(&s_cam, fb, upos, 0.0f, up_stair, 3, 0.5f, 2.5f, 0.0f, 256);
     rogue_render_model(&s_cam, fb, dpos, 0.0f, down_stair, 3, 0.5f, 2.5f, 0.0f, 256);
+    rogue_loot_draw(&s_cam, fb);
+    rogue_proj_draw(&s_cam, fb);
     rogue_enemies_draw(&s_cam, fb);
     rogue_player_draw(&s_player, &s_cam, fb, 256);
 
     rogue_hud_draw(fb, &s_player, s_depth, rogue_enemies_alive_count());
+
+    /* Interact prompt. */
+    if (s_player.alive) {
+        RogueItem w; int idx, ci;
+        char buf[40];
+        if (rogue_loot_weapon_near(s_player.pos.x, s_player.pos.z, &w, &idx)) {
+            snprintf(buf, sizeof buf, "MENU: %s (%d)", w.name, w.dmg);
+            rogue_hud_prompt(fb, buf);
+        } else if (rogue_loot_chest_near(s_player.pos.x, s_player.pos.z, &ci)) {
+            rogue_hud_prompt(fb, "MENU: open chest");
+        }
+    }
     if (!s_player.alive) rogue_hud_banner(fb, "YOU DIED", RGB(220, 40, 40));
 }

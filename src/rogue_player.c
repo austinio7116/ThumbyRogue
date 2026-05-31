@@ -60,11 +60,25 @@ void rogue_player_init(RoguePlayer *p, Vec3 spawn) {
     p->dodge_dx = p->dodge_dz = 0.0f;
     p->invuln_t = 0.0f;
     p->hurt_flash = 0.0f;
-    /* Default melee weapon (Phase 4 makes this gear-driven). */
-    p->wpn_range = 1.8f;
-    p->wpn_arc_cos = 0.40f;   /* cos(~66°) half-arc */
-    p->wpn_dur = 0.30f;
-    p->wpn_dmg = 26;
+    p->fire_pending = false;
+    p->gold = 0;
+    RogueItem starter;
+    rogue_item_starter(&starter);
+    rogue_player_equip(p, &starter);
+}
+
+void rogue_player_equip(RoguePlayer *p, const RogueItem *it) {
+    p->weapon = *it;
+    p->wpn_class = it->wclass;
+    p->wpn_dmg = it->dmg;
+    p->wpn_range = it->range;
+    p->wpn_arc_cos = it->arc_cos;
+    p->wpn_dur = it->cooldown;
+    p->wpn_proj_speed = it->proj_speed;
+    int new_max = 100 + it->bonus_life;
+    /* keep current HP ratio sane when max changes */
+    if (p->hp > new_max) p->hp = new_max;
+    p->max_hp = new_max;
 }
 
 static bool cell_solid(int wx, int wy, int wz) {
@@ -150,7 +164,8 @@ void rogue_player_update(RoguePlayer *p, const CraftRawButtons *btn,
         float elapsed = p->wpn_dur - p->atk_t;
         if (!p->atk_hit_done && elapsed >= ATK_HITFRAME) {
             p->atk_hit_done = true;
-            p->atk_hit_pending = true;
+            if (p->wpn_class == WCLASS_MELEE) p->atk_hit_pending = true;
+            else                              p->fire_pending = true;
         }
         if (p->atk_t <= 0) p->atk_cd = ATK_RECOVER;
     }

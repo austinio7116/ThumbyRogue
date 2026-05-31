@@ -40,6 +40,23 @@ void rogue_hud_draw(uint16_t *fb, const RoguePlayer *p, int depth, int enemies) 
     snprintf(buf, sizeof buf, "FOES %d", enemies);
     w = craft_font_width(buf);
     craft_font_draw(fb, buf, CRAFT_FB_W - w - 3, 11, RGB(230, 120, 120));
+
+    /* Gold, under the health bar. */
+    snprintf(buf, sizeof buf, "G %d", p->gold);
+    craft_font_draw(fb, buf, bx, by + bh + 2, RGB(240, 210, 60));
+
+    /* Equipped weapon name, bottom (rarity-tinted). */
+    uint16_t wc = rogue_rarity_color(p->weapon.rarity);
+    w = craft_font_width(p->weapon.name);
+    craft_font_draw(fb, p->weapon.name, (CRAFT_FB_W - w) / 2,
+                    CRAFT_FB_H - 8, wc);
+}
+
+void rogue_hud_prompt(uint16_t *fb, const char *msg) {
+    int w = craft_font_width(msg);
+    int x = (CRAFT_FB_W - w) / 2, y = CRAFT_FB_H - 18;
+    fill_rect(fb, x - 2, y - 1, w + 4, 8, RGB(10, 10, 14));
+    craft_font_draw(fb, msg, x, y, RGB(245, 245, 200));
 }
 
 void rogue_hud_banner(uint16_t *fb, const char *msg, uint16_t color) {

@@ -10,5 +10,6 @@
 
 void rogue_hud_draw(uint16_t *fb, const RoguePlayer *p, int depth, int enemies);
 void rogue_hud_banner(uint16_t *fb, const char *msg, uint16_t color);
+void rogue_hud_prompt(uint16_t *fb, const char *msg);
 
 #endif /* ROGUE_HUD_H */

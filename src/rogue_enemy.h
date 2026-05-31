@@ -33,6 +33,14 @@ void rogue_enemies_update(RoguePlayer *p, float dt, int floor_y);
 int rogue_enemies_hit_arc(Vec3 origin, float yaw, float range,
                           float arc_cos, int dmg);
 
+/* Point/projectile hit: damage the first live enemy within `radius` of
+ * (x,z). Returns 1 if it hit something. */
+int rogue_enemies_hit_point(float x, float z, float radius, int dmg);
+
+/* Drain one enemy death event (position + EnemyType). False when empty.
+ * The game uses this to drop loot. */
+bool rogue_enemies_pop_death(Vec3 *pos, int *type);
+
 void rogue_enemies_draw(const CraftCamera *cam, uint16_t *fb);
 
 int rogue_enemies_alive_count(void);

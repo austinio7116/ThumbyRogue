@@ -105,14 +105,20 @@ int main(int argc, char **argv) {
         extern int rogue_game_player_hp(void);
         extern int rogue_enemies_alive_count(void);
         extern void rogue_game_demo_step(float dt, int frame);
+        extern void rogue_game_debug_drop_weapon(void);
         float t = 0;
         for (int f = 0; f < 25 * 30; f++) {
+            if (f == 10) rogue_game_debug_drop_weapon();   /* test equip swap */
             rogue_game_demo_step(1.0f / 30.0f, f);
             t += 1.0f / 30.0f;
-            if (f % 30 == 0)
-                printf("[demo] t=%.0fs depth=%d hp=%d foes=%d\n",
+            if (f % 30 == 0) {
+                extern int rogue_game_player_gold(void);
+                extern const char *rogue_game_weapon_name(void);
+                printf("[demo] t=%.0fs depth=%d hp=%d foes=%d gold=%d wpn=%s\n",
                        t, rogue_game_depth(), rogue_game_player_hp(),
-                       rogue_enemies_alive_count());
+                       rogue_enemies_alive_count(), rogue_game_player_gold(),
+                       rogue_game_weapon_name());
+            }
             if (shot_path && f == 90) { render_frame(); dump_ppm(shot_path); }
         }
         SDL_Quit();
