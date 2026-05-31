@@ -64,6 +64,7 @@ add_executable(thumbyrogue
     ${DEVICE}/craft_lcd_gc9107.c
     ${DEVICE}/craft_buttons.c
     ${DEVICE}/craft_chunk_store_stub.c
+    ${DEVICE}/craft_audio_pwm.c
 
     # ThumbyRogue gameplay.
     ${ROGUE_SRC}/rogue_game.c
@@ -77,6 +78,7 @@ add_executable(thumbyrogue
     ${ROGUE_SRC}/rogue_loot.c
     ${ROGUE_SRC}/rogue_proj.c
     ${ROGUE_SRC}/rogue_band.c
+    ${ROGUE_SRC}/rogue_sfx.c
 
     # Lean vendored engine set — render path only. NO redstone, furnace,
     # mobs, chests, audio etc. yet (added per phase that uses them) so
@@ -87,6 +89,7 @@ add_executable(thumbyrogue
     ${SRC}/craft_torches.c
     ${SRC}/craft_tool_models.c
     ${SRC}/craft_font.c
+    ${SRC}/craft_audio.c
     ${SRC}/craft_gen.c
 
     ${CRAFT_BAKED_C}

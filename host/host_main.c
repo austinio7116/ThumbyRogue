@@ -19,6 +19,7 @@
 #include "craft_blocks.h"
 #include "craft_types.h"
 #include "craft_buttons.h"
+#include "craft_audio.h"
 #include "rogue_game.h"
 
 #include <SDL2/SDL.h>
@@ -45,6 +46,31 @@ const uint16_t *craft_save_slot_thumb(int slot) { (void)slot; return NULL; }
 void craft_redstone_note_change(BlockId p, BlockId n) { (void)p; (void)n; }
 void craft_redstone_rescan(void)     {}
 void craft_redstone_mark_dirty(void) {}
+
+static SDL_AudioDeviceID g_audio;
+static void audio_cb(void *ud, Uint8 *stream, int len) {
+    (void)ud;
+    craft_audio_render((int16_t *)stream, len / (int)sizeof(int16_t));
+}
+static void audio_init(void) {
+    SDL_AudioSpec want, have;
+    SDL_zero(want);
+    want.freq = CRAFT_AUDIO_RATE;
+    want.format = AUDIO_S16SYS;
+    want.channels = 1;
+    want.samples = 512;
+    want.callback = audio_cb;
+    g_audio = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
+    if (g_audio) SDL_PauseAudioDevice(g_audio, 0);
+}
+
+/* Dismiss the title screen (headless/auto paths). */
+static void press_start(void) {
+    CraftRawButtons b = {0}; b.a = true;
+    rogue_game_tick(&b, 1.0f / 30.0f);
+    b.a = false;
+    rogue_game_tick(&b, 1.0f / 30.0f);
+}
 
 static void render_frame(void) {
     CraftCamera cam;
@@ -87,6 +113,7 @@ int main(int argc, char **argv) {
             SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
         tex = SDL_CreateTexture(ren, SDL_PIXELFORMAT_RGB565,
             SDL_TEXTUREACCESS_STREAMING, CRAFT_FB_W, CRAFT_FB_H);
+        audio_init();
     }
 
     srand((unsigned)time(NULL));
@@ -110,6 +137,7 @@ int main(int argc, char **argv) {
         extern int rogue_enemies_alive_count(void);
         extern void rogue_game_demo_step(float dt, int frame);
         extern void rogue_game_debug_drop_weapon(void);
+        press_start();
         float t = 0;
         for (int f = 0; f < 25 * 30; f++) {
             if (f == 10) rogue_game_debug_drop_weapon();   /* test equip swap */
@@ -132,6 +160,7 @@ int main(int argc, char **argv) {
     if (shot_path) {
         /* Settle (past the band banner ~2.2s), then dump. */
         CraftRawButtons none = {0};
+        if (!getenv("ROGUE_TITLE")) press_start();
         for (int i = 0; i < 80; i++) rogue_game_tick(&none, 1.0f / 30.0f);
         if (getenv("ROGUE_DEAD")) {
             extern void rogue_game_debug_kill(void);

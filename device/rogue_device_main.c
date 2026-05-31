@@ -18,6 +18,8 @@
 #include "craft_render.h"
 #include "craft_world.h"
 #include "craft_blocks.h"
+#include "craft_audio.h"
+#include "craft_audio_pwm.h"
 #include "rogue_game.h"
 
 void craft_tool_models_init(void);
@@ -74,6 +76,7 @@ int main(void) {
     craft_world_init();
     craft_blocks_build_textures();
     craft_tool_models_init();
+    craft_audio_pwm_init();
     rogue_game_init(get_rand_32());
 
     multicore_launch_core1(core1_entry);
@@ -98,6 +101,16 @@ int main(void) {
         while (!s_core1_done) tight_loop_contents();
 
         rogue_game_draw_overlay(g_fb);
+
+        /* Pump procedural audio to the PWM sink. */
+        int room = craft_audio_pwm_room();
+        while (room > 0) {
+            int16_t buf[128];
+            int n = room < 128 ? room : 128;
+            craft_audio_render(buf, n);
+            craft_audio_pwm_push(buf, n);
+            room -= n;
+        }
 
         craft_lcd_present(g_fb);
     }

@@ -9,6 +9,7 @@
 #include "rogue_loot.h"
 #include "rogue_proj.h"
 #include "rogue_band.h"
+#include "rogue_sfx.h"
 #include "craft_world.h"
 #include "craft_render.h"
 #include <math.h>
@@ -28,6 +29,7 @@ static float s_band_banner_t;  /* >0 while the band-name banner shows */
 static int   s_last_band = -1;
 static int   s_kills;
 static int   s_best_depth;
+static bool  s_title = true;
 static uint32_t s_loot_rng = 0x13572468u;
 
 /* Spike traps — always visible (fair), damage on contact with a cooldown. */
@@ -110,6 +112,8 @@ void rogue_game_init(uint32_t seed) {
 
     s_kills = 0;
     s_best_depth = 0;
+    s_title = true;
+    rogue_sfx_init();
     load_level();
     s_prev = (CraftRawButtons){0};
 }
@@ -117,6 +121,16 @@ void rogue_game_init(uint32_t seed) {
 static bool edge(bool now, bool prev) { return now && !prev; }
 
 void rogue_game_tick(const CraftRawButtons *btn, float dt) {
+    /* Title screen — slowly orbit the camera until A starts the run. */
+    if (s_title) {
+        if (edge(btn->a, s_prev.a)) s_title = false;
+        rogue_camera_follow(s_player.pos, dt);
+        rogue_camera_update(dt);
+        rogue_camera_get(&s_cam);
+        s_prev = *btn;
+        return;
+    }
+
     /* Death → run-summary screen; A starts a fresh run (permadeath: gear +
      * gold lost, back to the starter dagger). */
     if (!s_player.alive) {
@@ -142,6 +156,9 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
 
     bool atk_edge   = edge(btn->a, s_prev.a);
     bool dodge_edge = edge(btn->b, s_prev.b);
+    int  hp0 = s_player.hp, gold0 = s_player.gold;
+    if (atk_edge && s_player.atk_cd <= 0 && s_player.atk_t <= 0) rogue_sfx_swing();
+    if (dodge_edge && s_player.dodge_cd <= 0) rogue_sfx_dodge();
 
     /* Torch burns down; out of fuel → darkness + bolder, deadlier foes. */
     if (s_player.torch_fuel > 0) s_player.torch_fuel -= dt;
@@ -165,9 +182,10 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
     /* Melee strike frame → damage every enemy in the swing arc. */
     if (s_player.atk_hit_pending) {
         s_player.atk_hit_pending = false;
-        rogue_enemies_hit_arc(s_player.pos, s_player.yaw,
+        int hits = rogue_enemies_hit_arc(s_player.pos, s_player.yaw,
                               s_player.wpn_range, s_player.wpn_arc_cos,
                               s_player.wpn_dmg);
+        if (hits > 0) rogue_sfx_hit();
     }
     /* Ranged/caster strike frame → fire a projectile (auto-aim a nearby foe). */
     if (s_player.fire_pending) {
@@ -191,6 +209,7 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
     Vec3 dpos; int dtype;
     while (rogue_enemies_pop_death(&dpos, &dtype)) {
         s_kills++;
+        rogue_sfx_enemy_die();
         RogueItem it;
         rogue_item_make_gold(&it, 2 + (int)(loot_rng() % (5 + s_depth * 2)));
         rogue_loot_drop(&it, dpos);
@@ -216,10 +235,15 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
         }
     }
 
+    /* Event SFX from state deltas this frame. */
+    if (s_player.hp < hp0)   rogue_sfx_hurt();
+    if (s_player.gold > gold0) rogue_sfx_pickup();
+
     /* Descend when the hero reaches the down-stairs (keep gear + gold). */
     float ddx = s_player.pos.x - (s_level.down_x + 0.5f);
     float ddz = s_player.pos.z - (s_level.down_z + 0.5f);
     if (ddx*ddx + ddz*ddz < 0.7f*0.7f) {
+        rogue_sfx_descend();
         s_keep_weapon = s_player.weapon;
         s_keep_gold = s_player.gold;
         s_have_keep = true;
@@ -312,6 +336,8 @@ void rogue_game_draw_overlay(uint16_t *fb) {
     rogue_proj_draw(&s_cam, fb);
     rogue_enemies_draw(&s_cam, fb);
     rogue_player_draw(&s_player, &s_cam, fb, 256);
+
+    if (s_title) { rogue_hud_title(fb, s_best_depth); return; }
 
     rogue_hud_draw(fb, &s_player, s_depth, rogue_enemies_alive_count());
 

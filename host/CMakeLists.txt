@@ -63,6 +63,7 @@ add_executable(thumbyrogue_host
     ${ROGUE_SRC}/rogue_loot.c
     ${ROGUE_SRC}/rogue_proj.c
     ${ROGUE_SRC}/rogue_band.c
+    ${ROGUE_SRC}/rogue_sfx.c
     # Lean module set: only what's needed to generate + render a world.
     # ThumbyRogue has NO redstone and NO furnace/smelting, so those
     # SRAM-heavy subsystems are dropped (the three craft_redstone_* hooks
@@ -76,6 +77,7 @@ add_executable(thumbyrogue_host
     ${SRC}/craft_torches.c
     ${SRC}/craft_tool_models.c
     ${SRC}/craft_font.c
+    ${SRC}/craft_audio.c
     ${CRAFT_BAKED_C}
 )
 add_dependencies(thumbyrogue_host generate_craft_textures)

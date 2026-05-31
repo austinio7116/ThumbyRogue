@@ -85,6 +85,29 @@ void rogue_hud_summary(uint16_t *fb, int depth, int gold, int kills, int best) {
     craft_font_draw(fb, cont, (CRAFT_FB_W - w) / 2, 98, RGB(245, 245, 200));
 }
 
+void rogue_hud_title(uint16_t *fb, int best) {
+    for (int i = 0; i < CRAFT_FB_W * CRAFT_FB_H; i++) {
+        uint16_t c = fb[i];
+        fb[i] = (uint16_t)((((c >> 11) & 0x1F) * 2 / 5) << 11 |
+                           (((c >> 5) & 0x3F) * 2 / 5) << 5 |
+                           ((c & 0x1F) * 2 / 5));
+    }
+    int w = craft_font_width_2x("THUMBYROGUE");
+    craft_font_draw_2x(fb, "THUMBYROGUE", (CRAFT_FB_W - w) / 2, 34, RGB(240, 220, 80));
+    const char *sub = "an endless descent";
+    w = craft_font_width(sub);
+    craft_font_draw(fb, sub, (CRAFT_FB_W - w) / 2, 52, RGB(40, 230, 210));
+    if (best > 0) {
+        char buf[24];
+        snprintf(buf, sizeof buf, "Best Depth %d", best);
+        w = craft_font_width(buf);
+        craft_font_draw(fb, buf, (CRAFT_FB_W - w) / 2, 70, RGB(200, 200, 200));
+    }
+    const char *go = "Press A to begin";
+    w = craft_font_width(go);
+    craft_font_draw(fb, go, (CRAFT_FB_W - w) / 2, 96, RGB(245, 245, 200));
+}
+
 void rogue_hud_prompt(uint16_t *fb, const char *msg) {
     int w = craft_font_width(msg);
     int x = (CRAFT_FB_W - w) / 2, y = CRAFT_FB_H - 18;
