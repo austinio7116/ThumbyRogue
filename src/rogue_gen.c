@@ -157,11 +157,12 @@ static int bg_height(int x, int z, uint32_t seed) {
     float n = vnoise(x / 9.0f, z / 9.0f, seed)
             + 0.4f * vnoise(x / 4.0f, z / 4.0f, seed ^ 0x55u);
     n /= 1.4f;
-    /* The dungeon is carved into rock: the surrounding terrain rises ABOVE the
-     * floor (cliffs/massif), so it reads as scenery beyond the walls but is
-     * never walkable — you can't wander out through a ruined gap onto it. */
-    int h = (int)(ROGUE_FLOOR_Y + 1 + n * 5.0f);   /* FLOOR_Y+1 .. FLOOR_Y+6 */
-    if (h < ROGUE_FLOOR_Y + 1) h = ROGUE_FLOOR_Y + 1;
+    /* A LOW enclosing rock lip just high enough that you can't walk/jump out a
+     * ruined gap (top = FLOOR_Y+2, above the ~1.6-block jump), but not so tall
+     * it walls off the iso camera's view. An occasional +1 for a little
+     * craggy variation. */
+    int h = ROGUE_FLOOR_Y + 1;
+    if (n > 0.65f) h += 1;
     if (h >= CRAFT_WORLD_Y) h = CRAFT_WORLD_Y - 1;
     return h;
 }
@@ -213,13 +214,17 @@ static void apply_to_world(uint32_t seed, int depth) {
                     craft_world_set_byte(x, y, z, WALL);
                 continue;
             }
-            /* Surrounding rock: a dark cavern massif rising above the floor on
-             * all sides — encloses the dungeon (you can't walk out a ruined
-             * gap onto it) and gives the scene depth. Uses the band's wall
-             * block so it matches the dungeon's stone. */
+            /* Surrounding terrain: a LOW grass-topped earth lip on all sides —
+             * green for contrast against the grey stone dungeon, but only ~2
+             * tall so it encloses (you can't walk/jump out) without walling
+             * off the iso camera. */
             int th = bg_height(x, z, seed);
-            for (int y = 0; y <= th; y++)
-                craft_world_set_byte(x, y, z, WALL);
+            for (int y = 0; y <= th; y++) {
+                uint8_t blk = BLK_STONE;
+                if (y == th)          blk = BLK_GRASS;
+                else if (y == th - 1) blk = BLK_DIRT;
+                craft_world_set_byte(x, y, z, blk);
+            }
         }
     }
 }
