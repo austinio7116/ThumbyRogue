@@ -34,7 +34,6 @@ static int   s_last_band = -1;
 static int   s_kills;
 static int   s_best_depth;
 static bool  s_title = true;
-static float s_lava_t;     /* lava-burn tick timer */
 static char  s_toast[48];  /* transient pickup/chest message */
 static float s_toast_t;
 static uint32_t s_loot_rng = 0x13572468u;
@@ -98,6 +97,10 @@ static void load_level(void) {
     rogue_shop_place(s_level.room_cx, s_level.room_cz, s_level.n_rooms,
                      s_level.up_x, s_level.up_z, s_level.down_x, s_level.down_z,
                      s_level.floor_y, s_depth, s_seed);
+    /* Bonus chest on each lava island — only reachable by riding the platform. */
+    for (int c = 0; c < s_level.n_chasm; c++)
+        rogue_loot_add_chest_at(s_level.island_x[c] + 0.5f, (float)s_level.floor_y,
+                                s_level.island_z[c] + 0.5f);
     /* Spike traps in some rooms (not the up-stairs). */
     s_n_trap = 0;
     int twant = 1 + s_depth / 2;
@@ -268,17 +271,10 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
         int lz = (int)floorf(s_player.pos.z);
         if (craft_is_lava_id((uint8_t)craft_world_get(lx, ly, lz)) ||
             craft_is_lava_id((uint8_t)craft_world_get(lx, ly - 1, lz))) {
-            /* Lava erupts you back out (no soft-lock in the deeper pits) while
-             * it burns — punishing, not a death trap. */
-            if (s_player.vy < 9.0f) s_player.vy = 11.0f;
-            s_player.on_ground = false;
-            s_lava_t -= dt;
-            if (s_lava_t <= 0) {
-                rogue_player_damage(&s_player, 10 + s_depth, s_player.pos);
-                s_lava_t = 0.30f;
-            }
-        } else {
-            s_lava_t = 0.0f;
+            /* Lava is INSTANT DEATH — bridges and the platform are the only
+             * safe routes (the critical path always has a cross-bridge). */
+            s_player.hp = 0;
+            s_player.alive = false;
         }
     }
 

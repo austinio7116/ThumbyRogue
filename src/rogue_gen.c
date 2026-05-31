@@ -268,9 +268,15 @@ void rogue_gen_dungeon(uint32_t seed, int depth, RogueLevelInfo *out) {
         if (!force && (hash2(s_rooms[i].cx, s_rooms[i].cz, seed ^ 0x1A7Au) % 3u) != 0u)
             continue;
         int cx = s_rooms[i].cx, cz = s_rooms[i].cz;
+        int isx = cx - 4, isz = cz - 4;                      /* bonus island (marooned) */
         for (int dz = -7; dz <= 7; dz++) {
             for (int dx = -7; dx <= 7; dx++) {
-                if (dz == 0 || dz == 1) continue;            /* 2-wide bridge along x */
+                /* CROSS bridge (both axes) so the room is always safely
+                 * crossable from any corridor — lava is instant death, so the
+                 * critical path must never require touching it. */
+                if (dz == 0 || dz == 1 || dx == 0 || dx == 1) continue;
+                /* keep the bonus island solid (marooned in a lava quadrant) */
+                if (dx >= -5 && dx <= -3 && dz >= -5 && dz <= -3) continue;
                 float d = (float)(dx*dx + dz*dz);
                 float rn = 4.6f + 2.4f * (vnoise((cx+dx) * 0.45f, (cz+dz) * 0.45f,
                                                  seed ^ 0x9F1u) - 0.5f) * 2.0f;
@@ -284,6 +290,8 @@ void rogue_gen_dungeon(uint32_t seed, int depth, RogueLevelInfo *out) {
         }
         out->chasm_x[out->n_chasm] = (int16_t)cx;
         out->chasm_z[out->n_chasm] = (int16_t)cz;
+        out->island_x[out->n_chasm] = (int16_t)isx;
+        out->island_z[out->n_chasm] = (int16_t)isz;
         out->n_chasm++;
     }
 

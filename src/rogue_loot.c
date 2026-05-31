@@ -125,6 +125,15 @@ bool rogue_loot_chest_near(float x, float y, float z, int *out_index) {
     return false;
 }
 
+void rogue_loot_add_chest_at(float x, float y, float z) {
+    for (int i = 0; i < MAX_CHEST; i++) {
+        if (s_c[i].used) continue;
+        s_c[i].used = true; s_c[i].opened = false;
+        s_c[i].pos = v3(x, y, z);
+        return;
+    }
+}
+
 void rogue_loot_open_chest(int index, int depth, uint32_t seed) {
     if (index < 0 || index >= MAX_CHEST || !s_c[index].used || s_c[index].opened) return;
     s_c[index].opened = true;

@@ -32,6 +32,8 @@ bool rogue_loot_take(int index, RogueItem *out);
  * pedestal chests require a jump up to open). */
 bool rogue_loot_chest_near(float x, float y, float z, int *out_index);
 void rogue_loot_open_chest(int index, int depth, uint32_t seed);
+/* Place a single chest at an exact spot (e.g. a bonus chest on a lava island). */
+void rogue_loot_add_chest_at(float x, float y, float z);
 
 void rogue_loot_draw(const CraftCamera *cam, uint16_t *fb);
 

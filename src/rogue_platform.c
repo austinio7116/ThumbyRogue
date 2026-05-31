@@ -34,19 +34,19 @@ void rogue_platform_place(const int16_t *room_cx, const int16_t *room_cz,
     float y = (float)floor_y;          /* top surface at normal walk height */
     int placed = 0;
 
-    /* A platform ferrying across each lava lake (parallel to the bridge, but
-     * over the lava) — guarantees a visible moving platform over a chasm. */
+    /* One platform per chasm, ferrying from the bridge OUT to the marooned
+     * bonus-chest island — the only way to reach that loot. */
     for (int c = 0; c < n_chasm && placed < MAX_PLAT; c++) {
         int cx = chasm_x[c], cz = chasm_z[c];
         Plat *p = &s_p[placed++];
         p->used = true;
-        p->a = v3(cx - 5.0f, y, cz + 4.0f);
-        p->b = v3(cx + 5.0f, y, cz + 4.0f);
+        p->a = v3((float)cx,        y, (float)(cz - 4));  /* cross-arm boarding point */
+        p->b = v3((float)(cx - 4),  y, (float)(cz - 4));  /* the marooned island */
         r = hh(r);
         p->t = (float)(r & 0xFF) / 255.0f;
         p->dir = 1.0f;
-        p->speed = 0.40f + 0.04f * depth;
-        if (p->speed > 0.7f) p->speed = 0.7f;
+        p->speed = 0.45f + 0.04f * depth;
+        if (p->speed > 0.75f) p->speed = 0.75f;
         p->pos = p->prev = p->a;
     }
 
