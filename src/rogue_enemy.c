@@ -93,6 +93,9 @@ static const int MODEL_N[EN_TYPE_COUNT] = {
 };
 
 /* --- RNG (local, for spawn jitter / wander) ---------------------- */
+static bool s_dark = false;   /* torch out → enemies bolder + hit harder */
+void rogue_enemies_set_dark(bool dark) { s_dark = dark; }
+
 static uint32_t s_rng = 0x1234567u;
 static uint32_t rng(void){ s_rng^=s_rng<<13; s_rng^=s_rng>>17; s_rng^=s_rng<<5; return s_rng; }
 static float frand(void){ return (float)(rng() & 0xFFFF) / 65536.0f; }
@@ -198,10 +201,11 @@ void rogue_enemies_update(RoguePlayer *p, float dt, int floor_y) {
         float dx = p->pos.x - e->pos.x, dz = p->pos.z - e->pos.z;
         float dist = sqrtf(dx*dx + dz*dz);
         float nx = dist > 0.001f ? dx/dist : 0, nz = dist > 0.001f ? dz/dist : 0;
+        float aggro = d->aggro * (s_dark ? 1.7f : 1.0f);   /* sense you in the dark */
 
         switch (e->state) {
         case AI_WANDER:
-            if (p->alive && dist < d->aggro) { e->state = AI_CHASE; e->state_t = 0; break; }
+            if (p->alive && dist < aggro) { e->state = AI_CHASE; e->state_t = 0; break; }
             if (e->state_t > 1.2f) {
                 e->state_t = 0;
                 float a = frand() * 6.28f;
@@ -214,7 +218,7 @@ void rogue_enemies_update(RoguePlayer *p, float dt, int floor_y) {
             }
             break;
         case AI_CHASE:
-            if (!p->alive || dist > d->aggro * 1.4f) { e->state = AI_WANDER; e->state_t = 0; break; }
+            if (!p->alive || dist > aggro * 1.4f) { e->state = AI_WANDER; e->state_t = 0; break; }
             e->yaw = atan2f(nx, nz);
             if (dist <= d->atk_range && e->atk_cd <= 0) {
                 e->state = AI_WINDUP; e->state_t = 0;
@@ -231,6 +235,7 @@ void rogue_enemies_update(RoguePlayer *p, float dt, int floor_y) {
             if (e->state_t == 0.0f || e->state_t < dt + 0.0001f) {
                 if (p->alive && dist <= d->atk_range + (e->champion ? 0.8f : 0.4f)) {
                     int dmg = (int)(d->base_dmg * d->dmg_mul) * (e->champion ? 2 : 1);
+                    if (s_dark) dmg = dmg * 3 / 2;     /* the dark bites harder */
                     rogue_player_damage(p, dmg, e->pos);
                 }
             }

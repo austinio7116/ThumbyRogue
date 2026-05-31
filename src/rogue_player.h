@@ -38,6 +38,7 @@ typedef struct {
     float wpn_range, wpn_arc_cos, wpn_dur, wpn_proj_speed;
     int   wpn_dmg;
     int   gold;
+    float torch_fuel;     /* seconds of light left; 0 = darkness */
 } RoguePlayer;
 
 void rogue_player_init(RoguePlayer *p, Vec3 spawn);

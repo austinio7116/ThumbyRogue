@@ -133,6 +133,11 @@ int main(int argc, char **argv) {
         /* Settle (past the band banner ~2.2s), then dump. */
         CraftRawButtons none = {0};
         for (int i = 0; i < 80; i++) rogue_game_tick(&none, 1.0f / 30.0f);
+        if (getenv("ROGUE_DEAD")) {
+            extern void rogue_game_debug_kill(void);
+            rogue_game_debug_kill();
+            rogue_game_tick(&none, 1.0f / 30.0f);
+        }
         render_frame();
         dump_ppm(shot_path);
         SDL_Quit();

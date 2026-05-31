@@ -13,7 +13,7 @@
 #include <stdbool.h>
 
 typedef enum { WCLASS_MELEE, WCLASS_RANGED, WCLASS_CASTER } WeaponClass;
-typedef enum { ITEM_NONE, ITEM_WEAPON, ITEM_GOLD, ITEM_POTION } ItemKind;
+typedef enum { ITEM_NONE, ITEM_WEAPON, ITEM_GOLD, ITEM_POTION, ITEM_TORCH } ItemKind;
 typedef enum { RAR_COMMON, RAR_MAGIC, RAR_RARE, RAR_UNIQUE, RAR_COUNT } Rarity;
 
 typedef struct {
@@ -37,6 +37,7 @@ uint16_t rogue_rarity_color(Rarity r);
 
 void rogue_item_make_gold(RogueItem *it, int amount);
 void rogue_item_make_potion(RogueItem *it, int heal);
+void rogue_item_make_torch(RogueItem *it, int seconds);
 
 /* Roll a random weapon for the given depth using `seed` (caller varies it). */
 void rogue_item_roll_weapon(RogueItem *it, int depth, uint32_t seed);

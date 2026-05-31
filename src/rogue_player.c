@@ -62,6 +62,7 @@ void rogue_player_init(RoguePlayer *p, Vec3 spawn) {
     p->hurt_flash = 0.0f;
     p->fire_pending = false;
     p->gold = 0;
+    p->torch_fuel = 55.0f;
     RogueItem starter;
     rogue_item_starter(&starter);
     rogue_player_equip(p, &starter);

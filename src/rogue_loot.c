@@ -67,6 +67,10 @@ void rogue_loot_update(RoguePlayer *p, float dt) {
             p->hp += g->item.amount;
             if (p->hp > p->max_hp) p->hp = p->max_hp;
             g->alive = false;
+        } else if (g->item.kind == ITEM_TORCH) {
+            p->torch_fuel += g->item.amount;
+            if (p->torch_fuel > 90.0f) p->torch_fuel = 90.0f;
+            g->alive = false;
         }
         /* weapons are NOT auto-picked — equipped via MENU */
     }

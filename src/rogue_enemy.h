@@ -18,6 +18,7 @@
 typedef enum { EN_RAT, EN_SLIME, EN_SKELETON, EN_SPIDER, EN_TYPE_COUNT } EnemyType;
 
 void rogue_enemies_clear(void);
+void rogue_enemies_set_dark(bool dark);   /* torch-out danger modifier */
 
 /* Populate the level with depth-scaled enemies, avoiding the up-stairs
  * room. `rooms` are candidate room centres; `n` how many. */

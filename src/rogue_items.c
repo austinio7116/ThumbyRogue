@@ -57,6 +57,14 @@ void rogue_item_make_potion(RogueItem *it, int heal) {
     snprintf(it->name, sizeof it->name, "Potion (+%d)", heal);
 }
 
+void rogue_item_make_torch(RogueItem *it, int seconds) {
+    memset(it, 0, sizeof *it);
+    it->kind = ITEM_TORCH;
+    it->amount = seconds;
+    it->color = RGB(255, 170, 40);
+    snprintf(it->name, sizeof it->name, "Torch");
+}
+
 void rogue_item_starter(RogueItem *it) {
     memset(it, 0, sizeof *it);
     const WeaponBase *b = &BASES[0];   /* Dagger */

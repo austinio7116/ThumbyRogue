@@ -26,7 +26,15 @@ static int   s_depth;
 static float s_dead_t;     /* >0 while the death banner shows */
 static float s_band_banner_t;  /* >0 while the band-name banner shows */
 static int   s_last_band = -1;
+static int   s_kills;
+static int   s_best_depth;
 static uint32_t s_loot_rng = 0x13572468u;
+
+/* Spike traps — always visible (fair), damage on contact with a cooldown. */
+#define MAX_TRAPS 8
+static Vec3  s_trap[MAX_TRAPS];
+static int   s_n_trap;
+static float s_trap_cd[MAX_TRAPS];
 static uint32_t loot_rng(void){ s_loot_rng^=s_loot_rng<<13; s_loot_rng^=s_loot_rng>>17; s_loot_rng^=s_loot_rng<<5; return s_loot_rng; }
 
 static const RogueCuboid down_stair[] = {
@@ -61,6 +69,20 @@ static void load_level(void) {
     rogue_loot_place_chests(s_level.room_cx, s_level.room_cz, s_level.n_rooms,
                             s_level.up_x, s_level.up_z, s_level.floor_y,
                             s_depth, s_seed);
+    /* Spike traps in some rooms (not the up-stairs). */
+    s_n_trap = 0;
+    int twant = 1 + s_depth / 2;
+    if (twant > MAX_TRAPS) twant = MAX_TRAPS;
+    for (int a = 0; a < twant * 4 && s_n_trap < twant; a++) {
+        int r = (int)(loot_rng() % (uint32_t)(s_level.n_rooms > 0 ? s_level.n_rooms : 1));
+        if (s_level.room_cx[r] == s_level.up_x && s_level.room_cz[r] == s_level.up_z) continue;
+        s_trap[s_n_trap] = v3(s_level.room_cx[r] + 0.5f + ((int)(loot_rng()%3)-1),
+                              (float)s_level.floor_y,
+                              s_level.room_cz[r] + 0.5f + ((int)(loot_rng()%3)-1));
+        s_trap_cd[s_n_trap] = 0.0f;
+        s_n_trap++;
+    }
+
     /* Announce a new band the first time we enter it. */
     int band = (s_depth - 1) / ROGUE_BAND_FLOORS;
     if (band != s_last_band) { s_last_band = band; s_band_banner_t = 2.2f; }
@@ -83,9 +105,11 @@ void rogue_game_init(uint32_t seed) {
     craft_render_set_lowres(false);
     craft_render_set_coarse_skip(false);
     craft_render_set_torch_light(false);
-    craft_render_set_player_light(false);
-    craft_render_set_time(80.0f);
+    craft_render_set_player_light(true);   /* the hero's torch lights the scene */
+    craft_render_set_time(240.0f);         /* deep-night ambient → dark dungeon */
 
+    s_kills = 0;
+    s_best_depth = 0;
     load_level();
     s_prev = (CraftRawButtons){0};
 }
@@ -93,15 +117,18 @@ void rogue_game_init(uint32_t seed) {
 static bool edge(bool now, bool prev) { return now && !prev; }
 
 void rogue_game_tick(const CraftRawButtons *btn, float dt) {
-    /* Death → show banner, then restart the run from depth 1 (permadeath:
-     * gear + gold are lost, back to the starter dagger). */
+    /* Death → run-summary screen; A starts a fresh run (permadeath: gear +
+     * gold lost, back to the starter dagger). */
     if (!s_player.alive) {
+        if (s_depth > s_best_depth) s_best_depth = s_depth;
         s_dead_t += dt;
-        if (s_dead_t > 2.2f) {
+        /* require a brief beat before accepting input, then wait for A */
+        if (s_dead_t > 0.6f && edge(btn->a, s_prev.a)) {
             s_dead_t = 0.0f;
             s_seed = s_seed * 1664525u + 1013904223u;
             s_depth = 1;
             s_have_keep = false;
+            s_kills = 0;
             load_level();
         }
         rogue_camera_update(dt);
@@ -116,8 +143,24 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
     bool atk_edge   = edge(btn->a, s_prev.a);
     bool dodge_edge = edge(btn->b, s_prev.b);
 
+    /* Torch burns down; out of fuel → darkness + bolder, deadlier foes. */
+    if (s_player.torch_fuel > 0) s_player.torch_fuel -= dt;
+    if (s_player.torch_fuel < 0) s_player.torch_fuel = 0;
+    craft_render_set_player_light(s_player.torch_fuel > 0);
+    rogue_enemies_set_dark(s_player.torch_fuel <= 0);
+
     rogue_player_update(&s_player, btn, atk_edge, dodge_edge, dt,
                         rogue_camera_snapped_yaw(), s_level.floor_y);
+
+    /* Spike traps. */
+    for (int i = 0; i < s_n_trap; i++) {
+        if (s_trap_cd[i] > 0) s_trap_cd[i] -= dt;
+        float dx = s_player.pos.x - s_trap[i].x, dz = s_player.pos.z - s_trap[i].z;
+        if (dx*dx + dz*dz < 0.45f*0.45f && s_trap_cd[i] <= 0) {
+            rogue_player_damage(&s_player, 12 + s_depth * 2, s_trap[i]);
+            s_trap_cd[i] = 1.1f;
+        }
+    }
 
     /* Melee strike frame → damage every enemy in the swing arc. */
     if (s_player.atk_hit_pending) {
@@ -147,12 +190,14 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
     /* Drop loot from anything that died this frame. */
     Vec3 dpos; int dtype;
     while (rogue_enemies_pop_death(&dpos, &dtype)) {
+        s_kills++;
         RogueItem it;
         rogue_item_make_gold(&it, 2 + (int)(loot_rng() % (5 + s_depth * 2)));
         rogue_loot_drop(&it, dpos);
         int r = loot_rng() % 100;
-        if (r < 12) { rogue_item_roll_weapon(&it, s_depth, loot_rng()); rogue_loot_drop(&it, dpos); }
-        else if (r < 24) { rogue_item_make_potion(&it, 30); rogue_loot_drop(&it, dpos); }
+        if (r < 12)      { rogue_item_roll_weapon(&it, s_depth, loot_rng()); rogue_loot_drop(&it, dpos); }
+        else if (r < 22) { rogue_item_make_potion(&it, 30); rogue_loot_drop(&it, dpos); }
+        else if (r < 34) { rogue_item_make_torch(&it, 25); rogue_loot_drop(&it, dpos); }
     }
 
     /* MENU: interact — equip a ground weapon (swap), or open a chest. */
@@ -199,6 +244,8 @@ const char *rogue_game_weapon_name(void) { return s_player.weapon.name; }
 /* Test hook: drop a strong weapon at the hero's feet then run the real
  * equip path (weapon_near -> take -> equip -> drop old). Verifies the
  * gear-defined playstyle swap end-to-end. */
+void rogue_game_debug_kill(void) { s_player.hp = 0; s_player.alive = false; s_kills = 7; }
+
 void rogue_game_debug_set_depth(int depth) {
     s_depth = depth < 1 ? 1 : depth;
     s_last_band = -1;
@@ -247,6 +294,20 @@ void rogue_game_draw_overlay(uint16_t *fb) {
     Vec3 upos = v3(s_level.up_x + 0.5f,   (float)s_level.floor_y, s_level.up_z + 0.5f);
     rogue_render_model(&s_cam, fb, upos, 0.0f, up_stair, 3, 0.5f, 2.5f, 0.0f, 256);
     rogue_render_model(&s_cam, fb, dpos, 0.0f, down_stair, 3, 0.5f, 2.5f, 0.0f, 256);
+
+    /* Spike traps — dark pad + steel spikes (telegraphed; pulses when armed). */
+    for (int i = 0; i < s_n_trap; i++) {
+        float warn = (s_trap_cd[i] > 0) ? 0.0f : 0.18f;
+        RogueCuboid m[5] = {
+            { 0.0f, 0.03f, 0.0f, 0.42f, 0.03f, 0.42f, RGB(35, 30, 30) },
+            { -0.2f, 0.12f, -0.2f, 0.04f, 0.10f, 0.04f, RGB(190,190,200) },
+            {  0.2f, 0.12f, -0.2f, 0.04f, 0.10f, 0.04f, RGB(190,190,200) },
+            { -0.2f, 0.12f,  0.2f, 0.04f, 0.10f, 0.04f, RGB(190,190,200) },
+            {  0.2f, 0.12f,  0.2f, 0.04f, 0.10f, 0.04f, RGB(190,190,200) },
+        };
+        rogue_render_model(&s_cam, fb, s_trap[i], 0.0f, m, 5, 0.45f, 0.3f, warn, 256);
+    }
+
     rogue_loot_draw(&s_cam, fb);
     rogue_proj_draw(&s_cam, fb);
     rogue_enemies_draw(&s_cam, fb);
@@ -266,7 +327,8 @@ void rogue_game_draw_overlay(uint16_t *fb) {
         }
     }
     if (!s_player.alive) {
-        rogue_hud_banner(fb, "YOU DIED", RGB(220, 40, 40));
+        int best = s_depth > s_best_depth ? s_depth : s_best_depth;
+        rogue_hud_summary(fb, s_depth, s_player.gold, s_kills, best);
     } else if (s_band_banner_t > 0) {
         const RogueBand *b = rogue_band_get(s_depth);
         rogue_hud_banner(fb, b->name, b->tint);
