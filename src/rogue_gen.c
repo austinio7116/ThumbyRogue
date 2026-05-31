@@ -295,6 +295,24 @@ void rogue_gen_dungeon(uint32_t seed, int depth, RogueLevelInfo *out) {
         out->n_chasm++;
     }
 
+    /* Shallow water pools: organic 1-deep wadeable pools in ~1/4 of rooms (not
+     * chasm or stairs rooms) for variety. Water is non-solid, so you step down
+     * a block and wade through (slowed); the engine animates the surface. */
+    for (int i = 0; i < s_n_rooms; i++) {
+        if (i == up || i == down) continue;
+        if ((hash2(s_rooms[i].cx, s_rooms[i].cz, seed ^ 0x2233u) & 3u) != 0u) continue;
+        if ((hash2(s_rooms[i].cx, s_rooms[i].cz, seed ^ 0x1A7Au) % 3u) == 0u) continue; /* not lava rooms */
+        int cx = s_rooms[i].cx, cz = s_rooms[i].cz;
+        for (int dz = -5; dz <= 5; dz++)
+            for (int dx = -5; dx <= 5; dx++) {
+                float d = (float)(dx*dx + dz*dz);
+                float rn = 3.2f + 2.0f * (vnoise((cx+dx)*0.5f, (cz+dz)*0.5f, seed ^ 0x77u) - 0.5f) * 2.0f;
+                if (d > rn*rn) continue;
+                int x = cx + dx, z = cz + dz;
+                if (is_walk(x, z)) craft_world_set_byte(x, ROGUE_FLOOR_Y - 1, z, BLK_WATER);
+            }
+    }
+
     /* Verticality: raised plateaus + stepping-stone pillars in ~40% of rooms.
      * All 1 block high, so they're always jumpable from the ground and never
      * wall off the validated path — they just add high ground + hop routes. */

@@ -163,6 +163,10 @@ void rogue_player_update(RoguePlayer *p, const CraftRawButtons *btn,
 
     /* Horizontal: walk (slowed mid-swing, hastened by move-speed) + knockback. */
     float sp = PLAYER_SPEED * (1.0f + p->stats.move_spd * 0.01f) * (p->atk_t > 0 ? 0.4f : 1.0f);
+    /* Wading through water slows you down. */
+    if (craft_is_water_id((uint8_t)craft_world_get((int)floorf(p->pos.x),
+                          (int)floorf(p->pos.y), (int)floorf(p->pos.z))))
+        sp *= 0.55f;
     if (len > 0.0001f) {
         if (p->atk_t <= 0) p->yaw = atan2f(mx, mz);
         if (p->on_ground) p->move_phase += dt * 8.0f;
