@@ -42,6 +42,8 @@ static bool  s_title = true;
 static bool  s_skip;
 static int   s_skip_target;
 static float s_lbrb_t;
+
+static float s_anim_t;     /* animated-tile clock (water/lava/portal) */
 static char  s_toast[48];  /* transient pickup/chest message */
 static float s_toast_t;
 static uint32_t s_loot_rng = 0x13572468u;
@@ -255,6 +257,13 @@ void rogue_game_init(uint32_t seed) {
 static bool edge(bool now, bool prev) { return now && !prev; }
 
 void rogue_game_tick(const CraftRawButtons *btn, float dt) {
+    /* Advance the animated-tile clock every frame (water 4Hz, lava 2Hz,
+     * portal 3Hz). The renderer already blends water see-through; this is
+     * what makes the dank-green surface actually ripple. Runs in every
+     * state so the world keeps animating behind menus too. */
+    s_anim_t += dt;
+    craft_blocks_animate_water(s_anim_t);
+
     /* Title screen — slowly orbit the camera until A starts the run. */
     if (s_title) {
         if (edge(btn->a, s_prev.a)) s_title = false;
@@ -672,6 +681,17 @@ void rogue_game_debug_weapon_sheet(void) {
         rogue_inventory_add(&it);
     }
     rogue_inventory_open();
+}
+
+/* Move the hero onto the first water pool found (water-render verification). */
+int rogue_game_debug_goto_water(void) {
+    for (int z = 0; z < CRAFT_WORLD_Z; z++)
+        for (int x = 0; x < CRAFT_WORLD_X; x++)
+            if (craft_is_water_id((uint8_t)craft_world_get(x, s_level.floor_y - 1, z))) {
+                s_player.pos = v3(x + 0.5f, (float)s_level.floor_y, z + 0.5f);
+                return 1;
+            }
+    return 0;
 }
 
 /* Spawn a spread of floating damage numbers near the hero (FX verification). */

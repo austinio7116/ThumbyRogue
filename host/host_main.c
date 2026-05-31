@@ -254,7 +254,12 @@ int main(int argc, char **argv) {
                 }
             printf("[census] lava=%ld lamp(brazier)=%ld\n", lava, lamp);
         }
-        for (int i = 0; i < 80; i++) rogue_game_tick(&none, 1.0f / 30.0f);
+        if (getenv("ROGUE_WATER")) {
+            extern int rogue_game_debug_goto_water(void);
+            printf("[water] found pool: %d\n", rogue_game_debug_goto_water());
+        }
+        { int settle = getenv("ROGUE_SETTLE") ? atoi(getenv("ROGUE_SETTLE")) : 80;
+          for (int i = 0; i < settle; i++) rogue_game_tick(&none, 1.0f / 30.0f); }
         if (getenv("ROGUE_FXWPN")) {   /* equip a weapon, swing/fire, catch the FX mid-action */
             extern void rogue_game_debug_force_weapon(int);
             rogue_game_debug_force_weapon(atoi(getenv("ROGUE_FXWPN")));
