@@ -54,9 +54,10 @@ void rogue_hud_draw(uint16_t *fb, const RoguePlayer *p, int depth, int enemies) 
     craft_font_draw(fb, buf, bx, ty + 4, RGB(240, 210, 60));
 
     /* Equipped weapon name, bottom (rarity-tinted). */
-    uint16_t wc = rogue_rarity_color(p->weapon.rarity);
-    w = craft_font_width(p->weapon.name);
-    craft_font_draw(fb, p->weapon.name, (CRAFT_FB_W - w) / 2,
+    const RogueItem *wpn = &p->equip[SLOT_WEAPON];
+    uint16_t wc = rogue_rarity_color(wpn->rarity);
+    w = craft_font_width(wpn->name);
+    craft_font_draw(fb, wpn->name, (CRAFT_FB_W - w) / 2,
                     CRAFT_FB_H - 8, wc);
 }
 

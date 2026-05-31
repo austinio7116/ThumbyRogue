@@ -53,8 +53,8 @@ static const RogueCuboid up_stair[] = {
     { 0.0f, 1.25f, 0.0f, 0.06f, 1.20f, 0.06f, RGB(245,180, 60) },
 };
 
-/* Carry the equipped weapon + gold across floors; only rebuild on death. */
-static RogueItem s_keep_weapon;
+/* Carry the full paperdoll + gold across floors; only rebuild on death. */
+static RogueItem s_keep_equip[SLOT_COUNT];
 static int s_keep_gold;
 static bool s_have_keep;
 
@@ -62,7 +62,9 @@ static void load_level(void) {
     rogue_gen_dungeon(s_seed, s_depth, &s_level);
     rogue_player_init(&s_player, s_level.spawn);
     if (s_have_keep) {
-        rogue_player_equip(&s_player, &s_keep_weapon);
+        for (int i = 0; i < SLOT_COUNT; i++) s_player.equip[i] = s_keep_equip[i];
+        rogue_player_recompute(&s_player);
+        s_player.hp = s_player.max_hp;
         s_player.gold = s_keep_gold;
     }
     rogue_camera_init(s_player.pos);
@@ -218,13 +220,23 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
         }
     }
 
+    /* Effective per-hit damage with a crit roll (from aggregated stats). */
+    int outdmg = s_player.wpn_dmg;
+    if ((int)(loot_rng() % 100) < s_player.stats.crit)
+        outdmg = outdmg * s_player.stats.crit_dmg / 100;
+
     /* Melee strike frame → damage every enemy in the swing arc. */
     if (s_player.atk_hit_pending) {
         s_player.atk_hit_pending = false;
         int hits = rogue_enemies_hit_arc(s_player.pos, s_player.yaw,
-                              s_player.wpn_range, s_player.wpn_arc_cos,
-                              s_player.wpn_dmg);
-        if (hits > 0) rogue_sfx_hit();
+                              s_player.wpn_range, s_player.wpn_arc_cos, outdmg);
+        if (hits > 0) {
+            rogue_sfx_hit();
+            if (s_player.stats.life_on_hit) {
+                s_player.hp += s_player.stats.life_on_hit * hits;
+                if (s_player.hp > s_player.max_hp) s_player.hp = s_player.max_hp;
+            }
+        }
     }
     /* Ranged/caster strike frame → fire a projectile (auto-aim a nearby foe). */
     if (s_player.fire_pending) {
@@ -236,7 +248,7 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
                 aim = atan2f(dx, dz);
         }
         rogue_proj_fire(s_player.pos, aim, s_player.wpn_proj_speed,
-                        s_player.wpn_dmg, s_player.wpn_class == WCLASS_CASTER,
+                        outdmg, s_player.wpn_class == WCLASS_CASTER,
                         s_player.wpn_range);
     }
 
@@ -253,19 +265,21 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
         rogue_item_make_gold(&it, 2 + (int)(loot_rng() % (5 + s_depth * 2)));
         rogue_loot_drop(&it, dpos);
         int r = loot_rng() % 100;
-        if (r < 12)      { rogue_item_roll_weapon(&it, s_depth, loot_rng()); rogue_loot_drop(&it, dpos); }
+        if (r < 16)      { rogue_item_roll_drop(&it, s_depth, loot_rng()); rogue_loot_drop(&it, dpos); }
         else if (r < 22) { rogue_item_make_potion(&it, 30); rogue_loot_drop(&it, dpos); }
         else if (r < 34) { rogue_item_make_torch(&it, 25); rogue_loot_drop(&it, dpos); }
     }
 
-    /* MENU: interact — equip a ground weapon (swap), or open a chest. */
+    /* MENU: interact — equip a ground item into its slot (swap), or open a
+     * chest. (The full paperdoll inventory screen lands in Inv 2.) */
     if (edge(btn->menu, s_prev.menu)) {
         RogueItem w; int idx;
         if (rogue_loot_weapon_near(s_player.pos.x, s_player.pos.z, &w, &idx)) {
-            RogueItem old = s_player.weapon, taken;
+            RogueItem taken;
             if (rogue_loot_take(idx, &taken)) {
+                RogueItem old = s_player.equip[taken.slot];
                 rogue_player_equip(&s_player, &taken);
-                rogue_loot_drop(&old, s_player.pos);
+                if (rogue_item_is_equip(&old)) rogue_loot_drop(&old, s_player.pos);
             }
         } else {
             int ci;
@@ -283,7 +297,7 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
     float ddz = s_player.pos.z - (s_level.down_z + 0.5f);
     if (ddx*ddx + ddz*ddz < 0.7f*0.7f) {
         rogue_sfx_descend();
-        s_keep_weapon = s_player.weapon;
+        for (int i = 0; i < SLOT_COUNT; i++) s_keep_equip[i] = s_player.equip[i];
         s_keep_gold = s_player.gold;
         s_have_keep = true;
         s_depth++;
@@ -303,12 +317,26 @@ int rogue_game_depth(void) { return s_depth; }
 int rogue_game_player_hp(void) { return s_player.hp; }
 int rogue_game_player_gold(void) { return s_player.gold; }
 float rogue_game_player_y(void) { return s_player.pos.y; }
-const char *rogue_game_weapon_name(void) { return s_player.weapon.name; }
+const char *rogue_game_weapon_name(void) { return s_player.equip[SLOT_WEAPON].name; }
 
 /* Test hook: drop a strong weapon at the hero's feet then run the real
  * equip path (weapon_near -> take -> equip -> drop old). Verifies the
  * gear-defined playstyle swap end-to-end. */
 void rogue_game_debug_kill(void) { s_player.hp = 0; s_player.alive = false; s_kills = 7; }
+
+int rogue_game_player_maxhp(void) { return s_player.max_hp; }
+int rogue_game_player_armor(void) { return s_player.stats.armor; }
+int rogue_game_player_wdmg(void)  { return s_player.wpn_dmg; }
+
+/* Roll + equip one item into every slot (verify stat aggregation). */
+void rogue_game_debug_gear_up(void) {
+    for (int s = 0; s < SLOT_COUNT; s++) {
+        RogueItem it;
+        rogue_item_roll_gear(&it, (EquipSlot)s, 10, loot_rng());
+        rogue_player_equip(&s_player, &it);
+    }
+    s_player.hp = s_player.max_hp;
+}
 
 void rogue_game_debug_set_depth(int depth) {
     s_depth = depth < 1 ? 1 : depth;
@@ -318,14 +346,15 @@ void rogue_game_debug_set_depth(int depth) {
 
 void rogue_game_debug_drop_weapon(void) {
     RogueItem it;
-    rogue_item_roll_weapon(&it, 8, loot_rng());
+    rogue_item_roll_drop(&it, 8, loot_rng());
     rogue_loot_drop(&it, s_player.pos);
     RogueItem w; int idx;
     if (rogue_loot_weapon_near(s_player.pos.x, s_player.pos.z, &w, &idx)) {
-        RogueItem old = s_player.weapon, taken;
+        RogueItem taken;
         if (rogue_loot_take(idx, &taken)) {
+            RogueItem old = s_player.equip[taken.slot];
             rogue_player_equip(&s_player, &taken);
-            rogue_loot_drop(&old, s_player.pos);
+            if (rogue_item_is_equip(&old)) rogue_loot_drop(&old, s_player.pos);
         }
     }
 }
@@ -388,7 +417,7 @@ void rogue_game_draw_overlay(uint16_t *fb) {
         RogueItem w; int idx, ci;
         char buf[40];
         if (rogue_loot_weapon_near(s_player.pos.x, s_player.pos.z, &w, &idx)) {
-            snprintf(buf, sizeof buf, "MENU: %s (%d)", w.name, w.dmg);
+            snprintf(buf, sizeof buf, "MENU equip %s [%s]", w.name, rogue_slot_name((EquipSlot)w.slot));
             rogue_hud_prompt(fb, buf);
         } else if (rogue_loot_chest_near(s_player.pos.x, s_player.pos.y, s_player.pos.z, &ci)) {
             rogue_hud_prompt(fb, "MENU: open chest");

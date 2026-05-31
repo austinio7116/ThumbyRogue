@@ -137,7 +137,17 @@ int main(int argc, char **argv) {
         extern int rogue_enemies_alive_count(void);
         extern void rogue_game_demo_step(float dt, int frame);
         extern void rogue_game_debug_drop_weapon(void);
+        extern void rogue_game_debug_gear_up(void);
+        extern int rogue_game_player_maxhp(void), rogue_game_player_armor(void), rogue_game_player_wdmg(void);
+        extern const char *rogue_game_weapon_name(void);
         press_start();
+        printf("[stats] base: maxhp=%d armor=%d wdmg=%d wpn=%s\n",
+               rogue_game_player_maxhp(), rogue_game_player_armor(),
+               rogue_game_player_wdmg(), rogue_game_weapon_name());
+        rogue_game_debug_gear_up();
+        printf("[stats] geared: maxhp=%d armor=%d wdmg=%d wpn=%s\n",
+               rogue_game_player_maxhp(), rogue_game_player_armor(),
+               rogue_game_player_wdmg(), rogue_game_weapon_name());
         float t = 0;
         for (int f = 0; f < 25 * 30; f++) {
             if (f == 10) rogue_game_debug_drop_weapon();   /* test equip swap */

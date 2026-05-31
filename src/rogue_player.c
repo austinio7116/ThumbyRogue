@@ -70,23 +70,39 @@ void rogue_player_init(RoguePlayer *p, Vec3 spawn) {
     p->fire_pending = false;
     p->gold = 0;
     p->torch_fuel = 55.0f;
+    for (int i = 0; i < SLOT_COUNT; i++) p->equip[i].kind = ITEM_NONE;
     RogueItem starter;
     rogue_item_starter(&starter);
-    rogue_player_equip(p, &starter);
+    p->equip[SLOT_WEAPON] = starter;
+    rogue_player_recompute(p);
+    p->hp = p->max_hp;
+}
+
+void rogue_player_recompute(RoguePlayer *p) {
+    rogue_stats_compute(&p->stats, p->equip);
+    const RogueItem *w = &p->equip[SLOT_WEAPON];
+    p->wpn_class = w->wclass;
+    p->wpn_range = w->range;
+    p->wpn_arc_cos = w->arc_cos;
+    p->wpn_proj_speed = w->proj_speed;
+    /* attack speed shortens the swing/cooldown */
+    float spd = 1.0f - p->stats.atk_spd * 0.01f;
+    if (spd < 0.4f) spd = 0.4f;
+    p->wpn_dur = w->cooldown * spd;
+    /* effective damage = (base + flat) * (1 + dmg%) */
+    int dmg = (w->base_dmg + p->stats.flat_dmg);
+    dmg = dmg + dmg * p->stats.dmg_pct / 100;
+    if (dmg < 1) dmg = 1;
+    p->wpn_dmg = dmg;
+    int old_max = p->max_hp;
+    p->max_hp = p->stats.max_life;
+    if (old_max > 0 && p->hp > p->max_hp) p->hp = p->max_hp;
 }
 
 void rogue_player_equip(RoguePlayer *p, const RogueItem *it) {
-    p->weapon = *it;
-    p->wpn_class = it->wclass;
-    p->wpn_dmg = it->dmg;
-    p->wpn_range = it->range;
-    p->wpn_arc_cos = it->arc_cos;
-    p->wpn_dur = it->cooldown;
-    p->wpn_proj_speed = it->proj_speed;
-    int new_max = 100 + it->bonus_life;
-    /* keep current HP ratio sane when max changes */
-    if (p->hp > new_max) p->hp = new_max;
-    p->max_hp = new_max;
+    if (!rogue_item_is_equip(it)) return;
+    p->equip[it->slot] = *it;
+    rogue_player_recompute(p);
 }
 
 static bool solid_cell(int x, int y, int z) {
@@ -145,8 +161,8 @@ void rogue_player_update(RoguePlayer *p, const CraftRawButtons *btn,
     float len = sqrtf(mx*mx + mz*mz);
     if (len > 0.0001f) { mx /= len; mz /= len; }
 
-    /* Horizontal: walk (slowed mid-swing) + decaying knockback. */
-    float sp = PLAYER_SPEED * (p->atk_t > 0 ? 0.4f : 1.0f);
+    /* Horizontal: walk (slowed mid-swing, hastened by move-speed) + knockback. */
+    float sp = PLAYER_SPEED * (1.0f + p->stats.move_spd * 0.01f) * (p->atk_t > 0 ? 0.4f : 1.0f);
     if (len > 0.0001f) {
         if (p->atk_t <= 0) p->yaw = atan2f(mx, mz);
         if (p->on_ground) p->move_phase += dt * 8.0f;
@@ -223,6 +239,10 @@ void rogue_player_update(RoguePlayer *p, const CraftRawButtons *btn,
 
 bool rogue_player_damage(RoguePlayer *p, int dmg, Vec3 from) {
     if (!p->alive || p->invuln_t > 0) return false;
+    /* armor + resist mitigation */
+    float red = rogue_stats_reduction(p->stats.armor);
+    dmg = (int)(dmg * (1.0f - red) * (1.0f - p->stats.resist * 0.01f));
+    if (dmg < 1) dmg = 1;
     p->hp -= dmg;
     p->hurt_flash = 0.30f;
     p->invuln_t = 0.45f;   /* brief mercy i-frames after a hit */

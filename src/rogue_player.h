@@ -11,6 +11,7 @@
 #include "craft_render.h"
 #include "craft_buttons.h"
 #include "rogue_items.h"
+#include "rogue_stats.h"
 
 typedef struct {
     Vec3  pos;            /* feet position */
@@ -38,17 +39,21 @@ typedef struct {
     float hurt_flash;     /* red wash on taking damage */
     bool  fire_pending;   /* ranged/caster: launch a projectile this frame */
 
-    /* equipped weapon — defines the playstyle */
-    RogueItem   weapon;
+    /* 6-slot paperdoll; the WEAPON slot defines the attack playstyle. */
+    RogueItem   equip[SLOT_COUNT];
+    RogueStats  stats;
     WeaponClass wpn_class;
     float wpn_range, wpn_arc_cos, wpn_dur, wpn_proj_speed;
-    int   wpn_dmg;
+    int   wpn_dmg;        /* effective per-hit damage (base + stats) */
     int   gold;
     float torch_fuel;     /* seconds of light left; 0 = darkness */
 } RoguePlayer;
 
 void rogue_player_init(RoguePlayer *p, Vec3 spawn);
+/* Equip an item into its slot (item->slot); recomputes stats. */
 void rogue_player_equip(RoguePlayer *p, const RogueItem *it);
+/* Recompute aggregated stats + derived weapon params after any gear change. */
+void rogue_player_recompute(RoguePlayer *p);
 
 /* atk_edge / jump_edge are just-pressed edges computed by the caller.
  * `floor_y` is unused now that the hero has full gravity/Y-collision, but

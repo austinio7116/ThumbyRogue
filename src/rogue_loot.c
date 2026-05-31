@@ -88,7 +88,7 @@ void rogue_loot_update(RoguePlayer *p, float dt) {
 bool rogue_loot_weapon_near(float x, float z, RogueItem *out, int *out_index) {
     float best = INTERACT_R * INTERACT_R; int bi = -1;
     for (int i = 0; i < MAX_GROUND; i++) {
-        if (!s_g[i].alive || s_g[i].item.kind != ITEM_WEAPON) continue;
+        if (!s_g[i].alive || !rogue_item_is_equip(&s_g[i].item)) continue;
         float dx = s_g[i].pos.x - x, dz = s_g[i].pos.z - z;
         float d = dx*dx + dz*dz;
         if (d < best) { best = d; bi = i; }
@@ -123,7 +123,7 @@ void rogue_loot_open_chest(int index, int depth, uint32_t seed) {
     Vec3 base = s_c[index].pos;
     /* Always a weapon + some gold; sometimes a potion. */
     RogueItem it;
-    rogue_item_roll_weapon(&it, depth + 1, xs());   /* chest gear skews better */
+    rogue_item_roll_drop(&it, depth + 1, xs());   /* chest gear skews better */
     Vec3 a = base; a.x += 0.6f; rogue_loot_drop(&it, a);
     rogue_item_make_gold(&it, 8 + (int)(frand() * (12 + depth * 6)));
     Vec3 b = base; b.x -= 0.6f; rogue_loot_drop(&it, b);
@@ -156,12 +156,12 @@ void rogue_loot_draw(const CraftCamera *cam, uint16_t *fb) {
     for (int i = 0; i < MAX_GROUND; i++) {
         Ground *g = &s_g[i];
         if (!g->alive) continue;
-        uint16_t c = (g->item.kind == ITEM_WEAPON)
-            ? rogue_rarity_color(g->item.rarity) : g->item.color;
+        bool eq = rogue_item_is_equip(&g->item);
+        uint16_t c = eq ? rogue_rarity_color(g->item.rarity) : g->item.color;
         float bob = 0.12f + 0.05f * sinf(g->spin * 1.7f);
         Vec3 pos = g->pos; pos.y += bob;
         RogueCuboid m[1] = { { 0.0f, 0.10f, 0.0f, 0.10f, 0.10f, 0.10f, c } };
-        float flash = (g->item.kind == ITEM_WEAPON && g->item.rarity >= RAR_RARE) ? 0.3f : 0.0f;
+        float flash = (eq && g->item.rarity >= RAR_RARE) ? 0.3f : 0.0f;
         rogue_render_model(cam, fb, pos, g->spin, m, 1, 0.16f, 0.30f, flash, 256);
     }
 }
