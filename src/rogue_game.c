@@ -8,6 +8,7 @@
 #include "rogue_items.h"
 #include "rogue_loot.h"
 #include "rogue_proj.h"
+#include "rogue_band.h"
 #include "craft_world.h"
 #include "craft_render.h"
 #include <math.h>
@@ -23,6 +24,8 @@ static RogueLevelInfo s_level;
 static uint32_t s_seed;
 static int   s_depth;
 static float s_dead_t;     /* >0 while the death banner shows */
+static float s_band_banner_t;  /* >0 while the band-name banner shows */
+static int   s_last_band = -1;
 static uint32_t s_loot_rng = 0x13572468u;
 static uint32_t loot_rng(void){ s_loot_rng^=s_loot_rng<<13; s_loot_rng^=s_loot_rng>>17; s_loot_rng^=s_loot_rng<<5; return s_loot_rng; }
 
@@ -58,6 +61,9 @@ static void load_level(void) {
     rogue_loot_place_chests(s_level.room_cx, s_level.room_cz, s_level.n_rooms,
                             s_level.up_x, s_level.up_z, s_level.floor_y,
                             s_depth, s_seed);
+    /* Announce a new band the first time we enter it. */
+    int band = (s_depth - 1) / ROGUE_BAND_FLOORS;
+    if (band != s_last_band) { s_last_band = band; s_band_banner_t = 2.2f; }
 }
 
 void rogue_game_init(uint32_t seed) {
@@ -65,6 +71,8 @@ void rogue_game_init(uint32_t seed) {
     s_depth = 1;
     s_dead_t = 0.0f;
     s_have_keep = false;
+    s_last_band = -1;
+    s_band_banner_t = 0.0f;
     s_loot_rng = seed | 1u;
 
     craft_render_set_fog(false);
@@ -174,6 +182,8 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
         load_level();
     }
 
+    if (s_band_banner_t > 0) s_band_banner_t -= dt;
+
     rogue_camera_follow(s_player.pos, dt);
     rogue_camera_update(dt);
     rogue_camera_get(&s_cam);
@@ -189,6 +199,12 @@ const char *rogue_game_weapon_name(void) { return s_player.weapon.name; }
 /* Test hook: drop a strong weapon at the hero's feet then run the real
  * equip path (weapon_near -> take -> equip -> drop old). Verifies the
  * gear-defined playstyle swap end-to-end. */
+void rogue_game_debug_set_depth(int depth) {
+    s_depth = depth < 1 ? 1 : depth;
+    s_last_band = -1;
+    load_level();
+}
+
 void rogue_game_debug_drop_weapon(void) {
     RogueItem it;
     rogue_item_roll_weapon(&it, 8, loot_rng());
@@ -249,5 +265,10 @@ void rogue_game_draw_overlay(uint16_t *fb) {
             rogue_hud_prompt(fb, "MENU: open chest");
         }
     }
-    if (!s_player.alive) rogue_hud_banner(fb, "YOU DIED", RGB(220, 40, 40));
+    if (!s_player.alive) {
+        rogue_hud_banner(fb, "YOU DIED", RGB(220, 40, 40));
+    } else if (s_band_banner_t > 0) {
+        const RogueBand *b = rogue_band_get(s_depth);
+        rogue_hud_banner(fb, b->name, b->tint);
+    }
 }

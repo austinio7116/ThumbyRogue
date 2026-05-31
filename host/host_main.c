@@ -98,6 +98,10 @@ int main(int argc, char **argv) {
     craft_blocks_build_textures();
     craft_tool_models_init();
     rogue_game_init(seed);
+    if (getenv("ROGUE_DEPTH")) {
+        extern void rogue_game_debug_set_depth(int);
+        rogue_game_debug_set_depth(atoi(getenv("ROGUE_DEPTH")));
+    }
 
     /* Headless autopilot: hold forward + mash attack for ~12s, logging
      * HP / depth / foes each second — verifies the combat loop end-to-end. */
@@ -126,9 +130,9 @@ int main(int argc, char **argv) {
     }
 
     if (shot_path) {
-        /* Settle the camera follow over a few frames, then dump. */
+        /* Settle (past the band banner ~2.2s), then dump. */
         CraftRawButtons none = {0};
-        for (int i = 0; i < 30; i++) rogue_game_tick(&none, 1.0f / 30.0f);
+        for (int i = 0; i < 80; i++) rogue_game_tick(&none, 1.0f / 30.0f);
         render_frame();
         dump_ppm(shot_path);
         SDL_Quit();

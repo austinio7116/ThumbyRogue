@@ -7,8 +7,8 @@
 #define HALF_PI (M_PI * 0.5f)
 
 #define CAM_PITCH   (-0.62f)   /* ~ -35.5°, classic iso 3/4 tilt */
-#define CAM_DIST    14.0f      /* distance from focus along view dir */
-#define CAM_FOV     0.95f
+#define CAM_DIST    9.0f       /* distance from focus along view dir (zoomed in) */
+#define CAM_FOV     0.92f
 #define FOCUS_LERP  9.0f       /* focus catch-up rate (1/s) */
 #define YAW_LERP    11.0f      /* yaw snap-tween rate (1/s) */
 

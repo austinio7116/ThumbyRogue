@@ -1,7 +1,9 @@
 #include "rogue_gen.h"
 #include "rogue_level.h"      /* ROGUE_FLOOR_Y */
+#include "rogue_band.h"
 #include "craft_world.h"
 #include "craft_blocks.h"
+#include <math.h>
 
 #define GW   CRAFT_WORLD_X
 #define GD   CRAFT_WORLD_Z
@@ -134,19 +136,82 @@ static int farthest_room(int from) {
     return best;
 }
 
-static void apply_to_world(void) {
+/* --- background value noise (rolling Minecraft-ish terrain) ------ */
+static uint32_t hash2(int x, int z, uint32_t seed) {
+    uint32_t h = (uint32_t)(x * 374761393) ^ (uint32_t)(z * 668265263) ^ (seed * 2246822519u);
+    h = (h ^ (h >> 13)) * 1274126177u;
+    return h ^ (h >> 16);
+}
+static float vnoise(float fx, float fz, uint32_t seed) {
+    int x0 = (int)floorf(fx), z0 = (int)floorf(fz);
+    float tx = fx - x0, tz = fz - z0;
+    float a = hash2(x0,   z0,   seed) / 4294967295.0f;
+    float b = hash2(x0+1, z0,   seed) / 4294967295.0f;
+    float c = hash2(x0,   z0+1, seed) / 4294967295.0f;
+    float d = hash2(x0+1, z0+1, seed) / 4294967295.0f;
+    tx = tx * tx * (3.0f - 2.0f * tx);
+    tz = tz * tz * (3.0f - 2.0f * tz);
+    return a + (b - a) * tx + (c - a) * tz + (a - b - c + d) * tx * tz;
+}
+static int bg_height(int x, int z, uint32_t seed) {
+    float n = vnoise(x / 9.0f, z / 9.0f, seed)
+            + 0.4f * vnoise(x / 4.0f, z / 4.0f, seed ^ 0x55u);
+    n /= 1.4f;
+    int h = (int)(ROGUE_FLOOR_Y - 3 + n * 6.0f);
+    if (h < 1) h = 1;
+    if (h >= CRAFT_WORLD_Y) h = CRAFT_WORLD_Y - 1;
+    return h;
+}
+
+static bool is_walk(int x, int z) {
+    if ((unsigned)x >= GW || (unsigned)z >= GD) return false;
+    return s_walk[z * GW + x] != 0;
+}
+
+/* Build the world: open natural terrain everywhere, rooms as flat clearings,
+ * thin (1-cell) ruined low walls outlining them. */
+static void apply_to_world(uint32_t seed, int depth) {
+    const RogueBand *band = rogue_band_get(depth);
+    const uint8_t FLOOR = band->floor, WALL = band->wall;
+
     craft_world_clear();
-    /* Floor substrate. */
-    for (int y = 0; y < ROGUE_FLOOR_Y; y++)
-        for (int z = 0; z < GD; z++)
-            for (int x = 0; x < GW; x++)
-                craft_world_set_byte(x, y, z, FLOOR_BLK);
-    /* Wall layer everywhere, then carve walkable cells to air. */
-    for (int y = ROGUE_FLOOR_Y; y < ROGUE_FLOOR_Y + WALL_H; y++)
-        for (int z = 0; z < GD; z++)
-            for (int x = 0; x < GW; x++)
-                craft_world_set_byte(x, y, z,
-                    s_walk[z * GW + x] ? BLK_AIR : WALL_BLK);
+
+    for (int z = 0; z < GD; z++) {
+        for (int x = 0; x < GW; x++) {
+            if (is_walk(x, z)) {
+                /* Room/corridor: flat clearing — solid floor, open above. */
+                for (int y = 0; y < ROGUE_FLOOR_Y; y++)
+                    craft_world_set_byte(x, y, z, FLOOR);
+                continue;
+            }
+            /* Border cell = touches a walkable neighbour → thin low wall. */
+            bool border = is_walk(x+1,z) || is_walk(x-1,z) ||
+                          is_walk(x,z+1) || is_walk(x,z-1);
+            if (border) {
+                uint32_t hh = hash2(x, z, seed ^ 0xBEEFu);
+                if ((hh % 100u) < 18u) {
+                    /* ruined gap — leave the floor exposed (a breach) */
+                    for (int y = 0; y < ROGUE_FLOOR_Y; y++)
+                        craft_world_set_byte(x, y, z, FLOOR);
+                    continue;
+                }
+                int wh = 2 + (int)((hh >> 8) % 2u);     /* 2 or 3 tall */
+                for (int y = 0; y < ROGUE_FLOOR_Y; y++)
+                    craft_world_set_byte(x, y, z, FLOOR);
+                for (int y = ROGUE_FLOOR_Y; y < ROGUE_FLOOR_Y + wh; y++)
+                    craft_world_set_byte(x, y, z, WALL);
+                continue;
+            }
+            /* Open background: rolling natural terrain for life. */
+            int th = bg_height(x, z, seed);
+            for (int y = 0; y <= th; y++) {
+                uint8_t blk = BLK_STONE;
+                if (y == th)        blk = BLK_GRASS;
+                else if (y > th - 3) blk = BLK_DIRT;
+                craft_world_set_byte(x, y, z, blk);
+            }
+        }
+    }
 }
 
 void rogue_gen_dungeon(uint32_t seed, int depth, RogueLevelInfo *out) {
@@ -173,7 +238,7 @@ void rogue_gen_dungeon(uint32_t seed, int depth, RogueLevelInfo *out) {
                        s_rooms[down].cx, s_rooms[down].cz);
     }
 
-    apply_to_world();
+    apply_to_world(seed, depth);
     craft_world_rebuild_lightmap();
 
     out->floor_y = ROGUE_FLOOR_Y;

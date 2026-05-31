@@ -1,5 +1,6 @@
 #include "rogue_enemy.h"
 #include "rogue_render.h"
+#include "rogue_band.h"
 #include "craft_world.h"
 #include "craft_blocks.h"
 #include <math.h>
@@ -22,6 +23,7 @@ typedef struct {
     float     wander_dx, wander_dz;
     float     hurt_flash;
     float     atk_cd;
+    bool      champion;     /* band-end mini-boss: bigger + tougher */
 } Enemy;
 
 static Enemy s_en[ROGUE_MAX_ENEMIES];
@@ -134,6 +136,11 @@ void rogue_enemies_spawn(const int16_t *room_cx, const int16_t *room_cz,
     s_rng = seed ^ (0xABCD1234u * (uint32_t)(depth + 1));
     if (!s_rng) s_rng = 1;
 
+    const RogueBand *band = rogue_band_get(depth);
+    int wsum = band->w_rat + band->w_slime + band->w_skel + band->w_spider;
+    if (wsum <= 0) wsum = 1;
+    bool boss_floor = rogue_band_is_boss_floor(depth);
+
     int want = 4 + depth;                 /* scale population with depth */
     if (want > ROGUE_MAX_ENEMIES) want = ROGUE_MAX_ENEMIES;
 
@@ -144,12 +151,12 @@ void rogue_enemies_spawn(const int16_t *room_cx, const int16_t *room_cz,
         if (room_cx[r] == up_x && room_cz[r] == up_z) continue;  /* never spawn on start */
         Enemy *e = &s_en[placed];
         e->alive = true;
-        /* Depth-weighted type: more skeletons/spiders deeper. */
-        int roll = (int)(frand() * 100);
+        /* Band-weighted roster. */
+        int roll = (int)(frand() * wsum);
         EnemyType t;
-        if (roll < 30) t = EN_RAT;
-        else if (roll < 55) t = EN_SLIME;
-        else if (roll < 80) t = EN_SKELETON;
+        if (roll < band->w_rat) t = EN_RAT;
+        else if (roll < band->w_rat + band->w_slime) t = EN_SLIME;
+        else if (roll < band->w_rat + band->w_slime + band->w_skel) t = EN_SKELETON;
         else t = EN_SPIDER;
         e->type = t;
         e->pos = v3(room_cx[r] + 0.5f + (frand()-0.5f)*2.0f, (float)floor_y,
@@ -162,6 +169,9 @@ void rogue_enemies_spawn(const int16_t *room_cx, const int16_t *room_cz,
         e->wander_dx = e->wander_dz = 0.0f;
         e->hurt_flash = 0.0f;
         e->atk_cd = 0.0f;
+        /* The first enemy on a band-end floor is a champion (mini-boss). */
+        e->champion = (boss_floor && placed == 0);
+        if (e->champion) e->hp *= 3;
         placed++;
     }
 }
@@ -219,8 +229,8 @@ void rogue_enemies_update(RoguePlayer *p, float dt, int floor_y) {
         case AI_STRIKE:
             /* The blow lands once, if the player is still in reach. */
             if (e->state_t == 0.0f || e->state_t < dt + 0.0001f) {
-                if (p->alive && dist <= d->atk_range + 0.4f) {
-                    int dmg = (int)(d->base_dmg * d->dmg_mul);
+                if (p->alive && dist <= d->atk_range + (e->champion ? 0.8f : 0.4f)) {
+                    int dmg = (int)(d->base_dmg * d->dmg_mul) * (e->champion ? 2 : 1);
                     rogue_player_damage(p, dmg, e->pos);
                 }
             }
@@ -279,9 +289,24 @@ void rogue_enemies_draw(const CraftCamera *cam, uint16_t *fb) {
             float k = e->state_t / d->windup;
             flash = 0.4f + 0.5f * k;
         }
-        rogue_render_model(cam, fb, e->pos, e->yaw,
-                           MODEL[e->type], MODEL_N[e->type],
-                           d->radius + 0.05f, d->height, flash, 256);
+        if (e->champion) {
+            /* Scale the model up + a permanent menacing red wash. */
+            const float sc = 1.7f;
+            RogueCuboid big[16];
+            int n = MODEL_N[e->type]; if (n > 16) n = 16;
+            for (int k = 0; k < n; k++) {
+                big[k] = MODEL[e->type][k];
+                big[k].cx *= sc; big[k].cy *= sc; big[k].cz *= sc;
+                big[k].hx *= sc; big[k].hy *= sc; big[k].hz *= sc;
+            }
+            if (flash < 0.25f) flash = 0.25f;
+            rogue_render_model(cam, fb, e->pos, e->yaw, big, n,
+                               d->radius * sc + 0.05f, d->height * sc, flash, 256);
+        } else {
+            rogue_render_model(cam, fb, e->pos, e->yaw,
+                               MODEL[e->type], MODEL_N[e->type],
+                               d->radius + 0.05f, d->height, flash, 256);
+        }
     }
 }
 
