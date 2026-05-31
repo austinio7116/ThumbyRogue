@@ -163,37 +163,62 @@ void rogue_inventory_draw(uint16_t *fb, const RoguePlayer *p) {
     if (s_cur < 6) { sel = &p->equip[PD[s_cur]]; ssl = PD[s_cur]; }
     else if (s_cur - 6 < s_bag_n) { sel = &s_bag[s_cur - 6]; ssl = (EquipSlot)sel->slot; }
 
-    int dy = CRAFT_FB_H - 18;
-    fr(fb, 0, dy - 1, CRAFT_FB_W, 19, RGB(8, 7, 12));
+    /* Three-line detail panel: name(+aspect), what-it-does (stats+affixes),
+     * then the action/compare line. */
+    int dy = CRAFT_FB_H - 22;
+    fr(fb, 0, dy - 1, CRAFT_FB_W, 23, RGB(8, 7, 12));
     if (sel && sel->kind != ITEM_NONE) {
         uint16_t nc = rogue_item_is_equip(sel) ? rogue_rarity_color(sel->rarity) : sel->color;
         craft_font_draw(fb, sel->name, 3, dy, nc);
-        /* legendary aspect tag on the name row */
         if (rogue_item_is_equip(sel) && sel->aspect) {
             const char *ad = rogue_aspect_desc((AspectId)sel->aspect);
             craft_font_draw(fb, ad, CRAFT_FB_W - craft_font_width(ad) - 3, dy, RGB(220,130,40));
         }
+
+        /* line 2 — what the item does */
+        char info[48]; int n = 0; info[0] = 0;
         if (rogue_item_is_equip(sel)) {
-            /* compare vs currently equipped in that slot (for backpack items) */
+            if (sel->kind == ITEM_WEAPON)
+                n += snprintf(info + n, sizeof info - n, "DMG%d ", sel->base_dmg);
+            if (sel->armor > 0)
+                n += snprintf(info + n, sizeof info - n, "ARM%d ", sel->armor);
+            for (int a = 0; a < sel->n_affix && n < (int)sizeof info - 12; a++) {
+                char ab[20]; rogue_affix_label(ab, sizeof ab, &sel->affix[a]);
+                n += snprintf(info + n, sizeof info - n, "%s ", ab);
+            }
+            if (sel->sockets)
+                n += snprintf(info + n, sizeof info - n, "[%d sock]", sel->sockets);
+        } else if (sel->kind == ITEM_POTION) {
+            snprintf(info, sizeof info, "Restores %d health", sel->amount);
+        } else if (sel->kind == ITEM_GEM) {
+            static const char *gd[GEM_COUNT] = { "", "+20 Life", "+8% Resist", "+4% Crit", "+10 Armor" };
+            snprintf(info, sizeof info, "Gem: %s (socket into gear)", gd[sel->amount % GEM_COUNT]);
+        } else if (sel->kind == ITEM_TORCH) {
+            snprintf(info, sizeof info, "Relights torch +%ds", sel->amount);
+        }
+        craft_font_draw(fb, info, 3, dy + 8, RGB(150, 210, 150));
+
+        /* line 3 — action + compare */
+        if (rogue_item_is_equip(sel)) {
             const RogueItem *eq = &p->equip[ssl];
             int sd = (sel->kind==ITEM_WEAPON? sel->base_dmg:0) + sel->armor;
             int ed = (eq->kind==ITEM_WEAPON? eq->base_dmg:0) + eq->armor;
             if (s_cur >= 6 && rogue_item_is_equip(eq)) {
                 int d = sd - ed;
-                snprintf(buf, sizeof buf, "%s%d vs %s  A:equip B:salv",
+                snprintf(buf, sizeof buf, "A equip (%s%d %s)  B salvage",
                          d>=0?"+":"", d, rogue_slot_name(ssl));
             } else if (s_cur >= 6) {
-                snprintf(buf, sizeof buf, "%s  A:equip B:salvage", rogue_slot_name(ssl));
+                snprintf(buf, sizeof buf, "A equip %s  B salvage", rogue_slot_name(ssl));
             } else {
-                snprintf(buf, sizeof buf, "%s  A:unequip", rogue_slot_name(ssl));
+                snprintf(buf, sizeof buf, "A unequip to bag");
             }
-            craft_font_draw(fb, buf, 3, dy + 8, RGB(200,200,210));
+            craft_font_draw(fb, buf, 3, dy + 16, RGB(200,200,210));
         } else if (sel->kind == ITEM_POTION) {
-            craft_font_draw(fb, "A:drink", 3, dy + 8, RGB(200,200,210));
+            craft_font_draw(fb, "A drink", 3, dy + 16, RGB(200,200,210));
         } else if (sel->kind == ITEM_GEM) {
-            craft_font_draw(fb, "A:socket into gear  B:salvage", 3, dy + 8, RGB(200,200,210));
+            craft_font_draw(fb, "A socket   B salvage", 3, dy + 16, RGB(200,200,210));
         }
     } else {
-        craft_font_draw(fb, "MENU:close  dpad:move", 3, dy + 4, RGB(150,150,160));
+        craft_font_draw(fb, "MENU close   dpad move", 3, dy + 8, RGB(150,150,160));
     }
 }

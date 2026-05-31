@@ -25,13 +25,17 @@ static const WeaponBase WBASE[] = {
 
 /* --- gear bases (per non-weapon slot) ---------------------------- */
 typedef struct { const char *name; int armor; uint16_t color; } GearBase;
-static const GearBase OFFHAND[] = { {"Shield",8,RGB(150,140,120)}, {"Focus",2,RGB(120,90,200)} };
+static const GearBase OFFHAND[] = {
+    {"Shield", 8, RGB(150,140,120)},   /* armour */
+    {"Tome",   2, RGB(120,90,200)},    /* caster off-hand */
+    {"Charm",  3, RGB(200,160,90)},    /* trinket */
+};
 static const GearBase HELM[]    = { {"Cap",3,RGB(140,120,90)}, {"Helm",6,RGB(170,170,180)}, {"Crown",4,RGB(230,200,80)} };
 static const GearBase ARMORB[]  = { {"Tunic",5,RGB(120,90,60)}, {"Mail",9,RGB(150,150,160)}, {"Plate",14,RGB(180,185,200)} };
 static const GearBase AMULET[]  = { {"Amulet",0,RGB(230,200,80)}, {"Pendant",0,RGB(200,120,220)} };
 static const GearBase RINGB[]   = { {"Ring",0,RGB(230,200,80)}, {"Band",0,RGB(190,190,200)} };
 static const GearBase *GBASE[SLOT_COUNT] = { 0, OFFHAND, HELM, ARMORB, AMULET, RINGB };
-static const int GBASE_N[SLOT_COUNT] = { 0, 2, 3, 3, 2, 2 };
+static const int GBASE_N[SLOT_COUNT] = { 0, 3, 3, 3, 2, 2 };
 
 uint16_t rogue_rarity_color(Rarity r) {
     switch (r) {
