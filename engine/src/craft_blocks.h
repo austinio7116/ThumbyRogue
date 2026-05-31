@@ -170,6 +170,7 @@ typedef enum {
     BLK_PALM_LEAF       = 102,  /* palm frond — cutout, NOT biome-tinted */
     BLK_FLOWER_VINE     = 103,  /* jungle dangling vine + blossoms (CROSS) */
     BLK_BLOSSOM_LEAVES  = 104,  /* warm-climate blossoming leaves (CUBE) */
+    BLK_RFLOOR          = 105,  /* ThumbyRogue dungeon flagstone floor */
     BLK_COUNT
 } BlockId;
 
@@ -295,6 +296,7 @@ static inline bool craft_block_opaque(BlockId blk) {
  * blocks (furnace, future chest) live above BLK_STICK in the enum so
  * they need an explicit allow-list. */
 static inline bool craft_block_solid(BlockId blk) {
+    if (blk == BLK_RFLOOR) return true;   /* ThumbyRogue floor — solid cube */
     if (blk == BLK_AIR || craft_is_water_id((uint8_t)blk) || blk == BLK_TORCH) return false;
     if (craft_is_lava_id((uint8_t)blk)) return false;   /* fluid — you sink into it */
     if (blk == BLK_PORTAL) return false; /* walk-through shimmer */

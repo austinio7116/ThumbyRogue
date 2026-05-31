@@ -6,7 +6,7 @@
 /* Authored bands; the sequence loops after the last (depth keeps scaling). */
 static const RogueBand BANDS[] = {
     /* name        floor          wall          pillar         rat sl sk sp  tint */
-    { "THE CRYPT",  BLK_COBBLE,    BLK_OBSIDIAN, BLK_PLANK,     35,25,30,10, RGB(180,180,190) },
+    { "THE CRYPT",  BLK_RFLOOR,    BLK_COBBLE,   BLK_PLANK,     35,25,30,10, RGB(180,180,190) },
     { "THE CAVERNS",BLK_GRAVEL,   BLK_STONE,    BLK_OBSIDIAN,  20,35,15,30, RGB(150,140,120) },
     { "FUNGAL DEEP",BLK_DIRT,     BLK_COBBLE,   BLK_SLIME_BLOCK,15,45,10,30, RGB(110,200,110) },
     { "FROSTVAULT", BLK_SNOW,     BLK_ICE,      BLK_SNOWY_ROCK,25,20,40,15, RGB(170,210,240) },

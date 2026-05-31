@@ -218,6 +218,33 @@ static void speckle(uint16_t *dst, uint32_t seed, int r, int g, int b, int jit) 
     }
 }
 
+/* ThumbyRogue dungeon floor: four large mortared flagstones with a soft
+ * top-left bevel and very low grain — reads cleanly at iso distance instead
+ * of the noisy speckle of natural stone. */
+static void flagstone_pattern(uint16_t *dst, uint32_t seed) {
+    uint32_t s = seed;
+    static const int base[4] = { 120, 108, 114, 100 };
+    for (int y = 0; y < CRAFT_TEX_SIZE; y++) {
+        for (int x = 0; x < CRAFT_TEX_SIZE; x++) {
+            int sx = x >> 3, sy = y >> 3;          /* which 8x8 flagstone */
+            int lx = x & 7,  ly = y & 7;
+            int c;
+            if (lx == 0 || ly == 0) {              /* recessed mortar joint */
+                c = 56 + (int)(xs32(&s) & 7);
+            } else {
+                c = base[sy * 2 + sx];
+                c += (4 - lx) + (4 - ly);          /* gentle top-left bevel */
+                if (lx == 7 || ly == 7) c -= 14;   /* shaded far edge */
+                c += ((int)(xs32(&s) & 7) - 3);    /* faint grain */
+            }
+            if (c < 0) c = 0;
+            if (c > 200) c = 200;
+            int b = c - 4; if (b < 0) b = 0;
+            dst[y * CRAFT_TEX_SIZE + x] = rgb565(c + 6, c + 2, b);  /* faintly warm */
+        }
+    }
+}
+
 /* Brick-like mortar pattern at the grid lines — used by cobble. */
 static void cobble_pattern(uint16_t *dst, uint32_t seed) {
     uint32_t s = seed;
@@ -774,6 +801,11 @@ void craft_blocks_build_textures(void) {
     cobble_pattern(&craft_textures[(BLK_COBBLE * 3 + 0) * CRAFT_TEX_PIXELS], 0xC0B);
     cobble_pattern(&craft_textures[(BLK_COBBLE * 3 + 1) * CRAFT_TEX_PIXELS], 0xC0B);
     cobble_pattern(&craft_textures[(BLK_COBBLE * 3 + 2) * CRAFT_TEX_PIXELS], 0xC0B);
+
+    /* ROGUE FLAGSTONE FLOOR — clean mortared flagstones. */
+    flagstone_pattern(&craft_textures[(BLK_RFLOOR * 3 + 0) * CRAFT_TEX_PIXELS], 0xF1A65);
+    flagstone_pattern(&craft_textures[(BLK_RFLOOR * 3 + 1) * CRAFT_TEX_PIXELS], 0xF1A65);
+    flagstone_pattern(&craft_textures[(BLK_RFLOOR * 3 + 2) * CRAFT_TEX_PIXELS], 0xF1A65);
 
     /* PLANK — horizontal bands. */
     plank_pattern(&craft_textures[(BLK_PLANK * 3 + 0) * CRAFT_TEX_PIXELS], 0xFADE);
