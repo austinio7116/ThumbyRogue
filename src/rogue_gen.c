@@ -320,19 +320,21 @@ void rogue_gen_dungeon(uint32_t seed, int depth, RogueLevelInfo *out) {
         }
     }
 
-    /* Scatter glowing braziers (lit-lamp blocks) through ~2/3 of the rooms
-     * so the dungeon has fixed light sources beyond the hero's torch. The
-     * lightmap rebuild below propagates their glow. */
-    for (int i = 0; i < s_n_rooms; i++) {
-        if (i == up || i == down) continue;     /* keep stairs cells clear */
+    /* Minecraft-style torches light ~2/3 of the rooms. BLK_TORCH is a proper
+     * light source (lightmap propagates its glow) and the raycaster passes
+     * through it, so the cell is an invisible light; rogue_game draws the
+     * actual torch model (stick + flame) at each recorded position. */
+    out->n_torch = 0;
+    for (int i = 0; i < s_n_rooms && out->n_torch < 16; i++) {
+        if (i == up || i == down) continue;
         if ((hash2(s_rooms[i].cx, s_rooms[i].cz, seed ^ 0x10Cu) % 3u) == 0u) continue;
-        /* Offset to a corner so the brazier never blocks the room centre. */
         int bx = s_rooms[i].cx + 2, bz = s_rooms[i].cz + 2;
         if (!is_walk(bx, bz)) { bx = s_rooms[i].cx - 2; bz = s_rooms[i].cz - 2; }
         if (!is_walk(bx, bz)) continue;
-        for (int y = 0; y < ROGUE_FLOOR_Y; y++)
-            craft_world_set_byte(bx, y, bz, FLOOR_BLK);
-        craft_world_set_byte(bx, ROGUE_FLOOR_Y, bz, BLK_LAMP_ON);
+        craft_world_set_byte(bx, ROGUE_FLOOR_Y, bz, BLK_TORCH);
+        out->torch_x[out->n_torch] = (int16_t)bx;
+        out->torch_z[out->n_torch] = (int16_t)bz;
+        out->n_torch++;
     }
 
     craft_world_rebuild_lightmap();

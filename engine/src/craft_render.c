@@ -1497,16 +1497,19 @@ void craft_render_strip(const CraftCamera *cam, uint16_t *fb,
                          * walls. A few samples along the segment is enough for
                          * chunky voxel shadows. */
                         if (pfloor > 0) {
+                            int blocked = 0;
                             for (int ls = 1; ls <= 4; ls++) {
                                 float lt = ls * 0.2f;       /* 0.2..0.8 */
                                 int qx = (int)floorf(lpx + ((h.fx + 0.5f) - lpx) * lt);
                                 int qy = (int)floorf(lpy + ((h.fy + 0.5f) - lpy) * lt);
                                 int qz = (int)floorf(lpz + ((h.fz + 0.5f) - lpz) * lt);
-                                if (craft_block_opaque((BlockId)craft_world_get(qx, qy, qz))) {
-                                    pfloor >>= 2;           /* in shadow → mostly ambient */
-                                    break;
-                                }
+                                if (craft_block_opaque((BlockId)craft_world_get(qx, qy, qz)))
+                                    blocked++;
                             }
+                            /* Soft, graded shadow (not all-or-nothing): each
+                             * occluding sample dims the torch a little, so
+                             * shadows still read but you can see into them. */
+                            if (blocked) pfloor = pfloor * (100 - 16 * blocked) / 100;
                         }
                     }
 #else
@@ -1516,6 +1519,11 @@ void craft_render_strip(const CraftCamera *cam, uint16_t *fb,
 #endif
                     if (face_shade_v < pfloor) face_shade_v = pfloor;
                 }
+#ifdef ROGUE_FULLFRAME_RENDER
+                /* A dim ambient floor so shadows / unlit areas stay readable
+                 * (you can always see, just darker away from the torch). */
+                if (face_shade_v < 74) face_shade_v = 74;
+#endif
                 c = shade(c, face_shade_v);
 
                 if (h.passed_water) {

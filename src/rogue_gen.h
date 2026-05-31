@@ -21,6 +21,8 @@ typedef struct {
     int16_t room_cz[ROGUE_MAX_LEVEL_ROOMS];
     int  n_chasm;                  /* lava-chasm rooms (bridge + platform) */
     int16_t chasm_x[3], chasm_z[3];
+    int  n_torch;                  /* wall/floor torch light positions */
+    int16_t torch_x[16], torch_z[16];
 } RogueLevelInfo;
 
 void rogue_gen_dungeon(uint32_t seed, int depth, RogueLevelInfo *out);

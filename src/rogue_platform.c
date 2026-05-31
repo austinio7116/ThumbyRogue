@@ -50,25 +50,10 @@ void rogue_platform_place(const int16_t *room_cx, const int16_t *room_cz,
         p->pos = p->prev = p->a;
     }
 
-    /* A few more scattered through other rooms. */
-    int want = placed + 1 + depth / 4;
-    if (want > MAX_PLAT) want = MAX_PLAT;
-    for (int a = 0; a < want * 5 && placed < want; a++) {
-        r = hh(r);
-        int idx = (int)(r % (uint32_t)(n_rooms > 0 ? n_rooms : 1));
-        int cx = room_cx[idx], cz = room_cz[idx];
-        if (cx == up_x && cz == up_z) continue;
-        Plat *p = &s_p[placed];
-        p->used = true;
-        if (hh(r) & 1) { p->a = v3(cx - 4.0f, y, cz + 3.0f); p->b = v3(cx + 4.0f, y, cz + 3.0f); }
-        else           { p->a = v3(cx + 3.0f, y, cz - 4.0f); p->b = v3(cx + 3.0f, y, cz + 4.0f); }
-        p->t = (float)(hh(r) & 0xFF) / 255.0f;
-        p->dir = 1.0f;
-        p->speed = 0.35f + 0.05f * depth;
-        if (p->speed > 0.7f) p->speed = 0.7f;
-        p->pos = p->prev = p->a;
-        placed++;
-    }
+    /* Platforms ONLY span lava chasms — over open lava the path is clear, so
+     * they never clip through walls/scenery and they always have a purpose
+     * (an alternate route across the lake). No more random room platforms. */
+    (void)room_cx; (void)room_cz; (void)n_rooms; (void)up_x; (void)up_z;
 }
 
 void rogue_platform_update(float dt) {
@@ -110,11 +95,13 @@ void rogue_platform_draw(const CraftCamera *cam, uint16_t *fb) {
     for (int i = 0; i < MAX_PLAT; i++) {
         Plat *p = &s_p[i];
         if (!p->used) continue;
-        /* Slab sits just under its top surface; runic edge for visibility. */
-        RogueCuboid m[2] = {
-            { 0.0f, -PLAT_TH, 0.0f, PLAT_HX, PLAT_TH, PLAT_HZ, RGB(70, 60, 80) },
-            { 0.0f, -0.02f,   0.0f, PLAT_HX, 0.03f,   PLAT_HZ, RGB(150, 120, 200) },
+        /* Carved stone slab with a warm metal-trim top edge — reads clearly
+         * over the dark lava without the odd purple. */
+        RogueCuboid m[3] = {
+            { 0.0f, -PLAT_TH, 0.0f, PLAT_HX,        PLAT_TH, PLAT_HZ,        RGB(96, 92, 86)  },
+            { 0.0f, -0.04f,   0.0f, PLAT_HX,        0.04f,   PLAT_HZ,        RGB(150,145,135) },
+            { 0.0f, -0.04f,   0.0f, PLAT_HX*0.9f,   0.05f,   PLAT_HZ*0.9f,   RGB(196,150, 70) },
         };
-        rogue_render_model(cam, fb, p->pos, 0.0f, m, 2, PLAT_HX + 0.1f, 0.4f, 0.15f, 256);
+        rogue_render_model(cam, fb, p->pos, 0.0f, m, 3, PLAT_HX + 0.1f, 0.4f, 0.0f, 256);
     }
 }

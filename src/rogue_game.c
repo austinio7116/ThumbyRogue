@@ -54,6 +54,12 @@ static const RogueCuboid up_stair[] = {
     { 0.0f, 0.30f, 0.0f, 0.26f, 0.20f, 0.26f, RGB(120,120,128) },
     { 0.0f, 1.25f, 0.0f, 0.06f, 1.20f, 0.06f, RGB(245,180, 60) },
 };
+/* Minecraft-style floor torch: a thin wooden stick topped with a flame. */
+static const RogueCuboid torch_model[] = {
+    { 0.0f, 0.24f, 0.0f, 0.035f, 0.24f, 0.035f, RGB(110, 75, 40)  },  /* stick */
+    { 0.0f, 0.50f, 0.0f, 0.075f, 0.06f, 0.075f, RGB(255, 150, 30) },  /* ember */
+    { 0.0f, 0.58f, 0.0f, 0.055f, 0.06f, 0.055f, RGB(255, 225, 120) }, /* flame */
+};
 
 /* Carry the full paperdoll + gold across floors; only rebuild on death. */
 static RogueItem s_keep_equip[SLOT_COUNT];
@@ -468,6 +474,12 @@ void rogue_game_draw_overlay(uint16_t *fb) {
     Vec3 upos = v3(s_level.up_x + 0.5f,   (float)s_level.floor_y, s_level.up_z + 0.5f);
     rogue_render_model(&s_cam, fb, upos, 0.0f, up_stair, 3, 0.5f, 2.5f, 0.0f, 256);
     rogue_render_model(&s_cam, fb, dpos, 0.0f, down_stair, 3, 0.5f, 2.5f, 0.0f, 256);
+
+    /* Wall/floor torches (the room light sources). */
+    for (int i = 0; i < s_level.n_torch; i++) {
+        Vec3 tp = v3(s_level.torch_x[i] + 0.5f, (float)s_level.floor_y, s_level.torch_z[i] + 0.5f);
+        rogue_render_model(&s_cam, fb, tp, 0.0f, torch_model, 3, 0.12f, 0.7f, 0.0f, 256);
+    }
 
     /* Spike traps — dark pad + steel spikes (telegraphed; pulses when armed). */
     for (int i = 0; i < s_n_trap; i++) {
