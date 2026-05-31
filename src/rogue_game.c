@@ -329,19 +329,30 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
     rogue_proj_update(dt, s_level.floor_y);
     rogue_loot_update(&s_player, dt);
 
-    /* Drop loot from anything that died this frame. */
+    /* Drop loot from anything that died this frame — weighted by the slain
+     * creature's loot class (goblins/kobolds → gear, fire sprites → gems,
+     * slimes/zombies → potions, demons → rare gear, the rest → mostly gold). */
     Vec3 dpos; int dtype;
     while (rogue_enemies_pop_death(&dpos, &dtype)) {
         s_kills++;
         rogue_sfx_enemy_die();
         RogueItem it;
-        rogue_item_make_gold(&it, 2 + (int)(loot_rng() % (5 + s_depth * 2)));
+        EnemyLoot lk = rogue_enemy_loot(dtype);
+        int goldmul = (lk == LOOT_RARE) ? 4 : (lk == LOOT_GOLD ? 2 : 1);
+        rogue_item_make_gold(&it, 2 + (int)(loot_rng() % (5 + s_depth * 2)) * goldmul);
         rogue_loot_drop(&it, dpos);
         int r = loot_rng() % 100;
-        if (r < 16)      { rogue_item_roll_drop(&it, s_depth, loot_rng()); rogue_loot_drop(&it, dpos); }
-        else if (r < 22) { rogue_item_make_potion(&it, 30); rogue_loot_drop(&it, dpos); }
-        else if (r < 38) { rogue_item_make_torch(&it, 35); rogue_loot_drop(&it, dpos); }
-        else if (r < 44) { rogue_item_make_gem(&it, (GemType)(1 + loot_rng()%4)); rogue_loot_drop(&it, dpos); }
+        switch (lk) {
+        case LOOT_GEAR:   if (r < 45) { rogue_item_roll_drop(&it, s_depth, loot_rng()); rogue_loot_drop(&it, dpos); } break;
+        case LOOT_GEM:    if (r < 50) { rogue_item_make_gem(&it, (GemType)(1 + loot_rng()%4)); rogue_loot_drop(&it, dpos); } break;
+        case LOOT_POTION: if (r < 45) { rogue_item_make_potion(&it, 30); rogue_loot_drop(&it, dpos); } break;
+        case LOOT_RARE:   /* demons always cough up good gear */
+            rogue_item_roll_drop(&it, s_depth + 3, loot_rng()); rogue_loot_drop(&it, dpos);
+            if (r < 50) { rogue_item_make_gem(&it, (GemType)(1 + loot_rng()%4)); rogue_loot_drop(&it, dpos); }
+            break;
+        default:          if (r < 10) { rogue_item_roll_drop(&it, s_depth, loot_rng()); rogue_loot_drop(&it, dpos); } break;
+        }
+        if (r >= 88) { rogue_item_make_torch(&it, 30); rogue_loot_drop(&it, dpos); }  /* torches universal */
     }
 
     /* Chests open automatically when you reach them (loot spills, then

@@ -10,10 +10,13 @@
 
 #define ROGUE_BAND_FLOORS 4
 
+#define ROGUE_BAND_ROSTER 5
+
 typedef struct {
     const char *name;
     uint8_t floor, wall, pillar;        /* block ids for the reskin */
-    uint8_t w_rat, w_slime, w_skel, w_spider;  /* roster weights */
+    uint8_t roster[ROGUE_BAND_ROSTER];  /* EnemyType ids this band spawns */
+    uint8_t roster_n;
     uint16_t tint;                      /* banner colour */
 } RogueBand;
 

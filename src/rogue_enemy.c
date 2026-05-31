@@ -34,20 +34,51 @@ static Vec3      s_death_pos[ROGUE_MAX_ENEMIES];
 static EnemyType s_death_type[ROGUE_MAX_ENEMIES];
 static int       s_death_n;
 
+/* Enemy projectiles (skeleton archers, fire sprites). */
+typedef struct { bool alive; Vec3 pos; float vx, vz, life; int dmg; uint16_t col; } EShot;
+#define MAX_ESHOT 12
+static EShot s_eshot[MAX_ESHOT];
+static void eshot_fire(Vec3 from, float tx, float tz, int dmg, uint16_t col) {
+    float dx = tx - from.x, dz = tz - from.z;
+    float l = sqrtf(dx*dx + dz*dz); if (l < 0.001f) l = 1.0f;
+    for (int i = 0; i < MAX_ESHOT; i++) {
+        if (s_eshot[i].alive) continue;
+        EShot *s = &s_eshot[i];
+        s->alive = true; s->pos = from; s->pos.y += 0.6f;
+        s->vx = dx/l * 9.0f; s->vz = dz/l * 9.0f;
+        s->life = 2.0f; s->dmg = dmg; s->col = col;
+        return;
+    }
+}
+
 /* --- per-type stats ---------------------------------------------- */
 typedef struct {
     float speed, aggro, atk_range, windup, dmg_mul;
     int   base_hp, base_dmg;
     float radius, height;
+    uint8_t ranged, flyer, loot;
 } EnemyDef;
 
 static const EnemyDef DEFS[EN_TYPE_COUNT] = {
-    /* speed aggro range windup dmgmul hp dmg  radius height */
-    [EN_RAT]      = { 3.6f, 7.0f,  0.9f, 0.30f, 1.0f,  14, 5,  0.30f, 0.45f },
-    [EN_SLIME]    = { 2.4f, 8.0f,  1.0f, 0.45f, 1.0f,  22, 7,  0.42f, 0.55f },
-    [EN_SKELETON] = { 3.0f, 11.0f, 1.3f, 0.55f, 1.2f,  30, 10, 0.34f, 1.55f },
-    [EN_SPIDER]   = { 4.2f, 10.0f, 1.1f, 0.35f, 1.0f,  20, 8,  0.50f, 0.45f },
+    /* speed aggro range windup dmgmul hp  dmg radius height  rng fly loot */
+    [EN_RAT]       = { 3.6f, 7.0f,  0.9f, 0.30f, 1.0f, 14,  5, 0.30f, 0.45f, 0,0, LOOT_GOLD   },
+    [EN_SLIME]     = { 2.4f, 8.0f,  1.0f, 0.45f, 1.0f, 22,  7, 0.42f, 0.55f, 0,0, LOOT_POTION },
+    [EN_SKELETON]  = { 3.0f, 11.f,  1.3f, 0.55f, 1.2f, 30, 10, 0.34f, 1.55f, 0,0, LOOT_GEAR   },
+    [EN_SPIDER]    = { 4.2f, 10.f,  1.1f, 0.35f, 1.0f, 20,  8, 0.50f, 0.45f, 0,0, LOOT_GOLD   },
+    [EN_BAT]       = { 5.2f, 9.0f,  0.8f, 0.20f, 0.8f, 10,  5, 0.28f, 0.40f, 0,1, LOOT_GOLD   },
+    [EN_KOBOLD]    = { 4.0f, 10.f,  1.0f, 0.30f, 1.0f, 16,  7, 0.28f, 0.85f, 0,0, LOOT_GEAR   },
+    [EN_GOBLIN]    = { 3.4f, 11.f,  1.2f, 0.40f, 1.1f, 34, 12, 0.32f, 1.05f, 0,0, LOOT_GEAR   },
+    [EN_ZOMBIE]    = { 1.8f, 9.0f,  1.1f, 0.55f, 1.2f, 52, 14, 0.34f, 1.45f, 0,0, LOOT_POTION },
+    [EN_ARCHER]    = { 2.6f, 13.f,  8.5f, 0.55f, 1.0f, 26,  9, 0.32f, 1.50f, 1,0, LOOT_GEAR   },
+    [EN_FIRESPRITE]= { 3.0f, 11.f,  8.0f, 0.45f, 1.0f, 18, 10, 0.30f, 0.60f, 1,1, LOOT_GEM    },
+    [EN_DEMON]     = { 2.9f, 12.f,  1.5f, 0.55f, 1.3f, 84, 20, 0.58f, 1.85f, 0,0, LOOT_RARE   },
 };
+static const char *NAMES[EN_TYPE_COUNT] = {
+    "Rat","Slime","Skeleton","Spider","Bat","Kobold","Goblin","Zombie",
+    "Skeleton Archer","Fire Sprite","Demon"
+};
+EnemyLoot rogue_enemy_loot(int t){ return (t>=0&&t<EN_TYPE_COUNT)?(EnemyLoot)DEFS[t].loot:LOOT_GOLD; }
+const char *rogue_enemy_name(int t){ return (t>=0&&t<EN_TYPE_COUNT)?NAMES[t]:"?"; }
 
 /* --- cuboid models (feet at y=0, face +Z) ------------------------ */
 static const RogueCuboid M_RAT[] = {
@@ -84,12 +115,86 @@ static const RogueCuboid M_SPIDER[] = {
     {-0.34f,0.16f,-0.20f,0.18f,0.03f,0.03f, RGB(30,22,34) },
     { 0.34f,0.16f,-0.20f,0.18f,0.03f,0.03f, RGB(30,22,34) },
 };
-static const RogueCuboid *MODEL[EN_TYPE_COUNT] = { M_RAT, M_SLIME, M_SKELETON, M_SPIDER };
+static const RogueCuboid M_BAT[] = {
+    { 0.0f, 0.50f, 0.0f, 0.10f, 0.09f, 0.13f, RGB(50,40,55) },     /* body (hovers) */
+    {-0.26f,0.52f, 0.0f, 0.16f, 0.02f, 0.10f, RGB(35,28,40) },     /* wings */
+    { 0.26f,0.52f, 0.0f, 0.16f, 0.02f, 0.10f, RGB(35,28,40) },
+    {-0.05f,0.55f,0.11f, 0.03f,0.03f,0.02f, RGB(220,60,60) },      /* eyes */
+    { 0.05f,0.55f,0.11f, 0.03f,0.03f,0.02f, RGB(220,60,60) },
+};
+static const RogueCuboid M_KOBOLD[] = {
+    { 0.0f, 0.35f, 0.0f, 0.13f, 0.18f, 0.10f, RGB(120,150,90) },   /* body */
+    { 0.0f, 0.60f, 0.04f,0.10f, 0.09f, 0.10f, RGB(140,170,100) },  /* head */
+    { 0.0f, 0.62f, 0.18f,0.05f, 0.04f, 0.05f, RGB(150,180,110) },  /* snout */
+    {-0.09f,0.74f, 0.0f, 0.03f, 0.06f, 0.02f, RGB(110,140,80) },   /* ears */
+    { 0.09f,0.74f, 0.0f, 0.03f, 0.06f, 0.02f, RGB(110,140,80) },
+    {-0.07f,0.10f, 0.0f, 0.04f, 0.10f, 0.05f, RGB(90,120,70) },    /* legs */
+    { 0.07f,0.10f, 0.0f, 0.04f, 0.10f, 0.05f, RGB(90,120,70) },
+    { 0.16f,0.45f, 0.0f, 0.02f, 0.26f, 0.02f, RGB(150,120,80) },   /* spear */
+};
+static const RogueCuboid M_GOBLIN[] = {
+    { 0.0f, 0.55f, 0.0f, 0.17f, 0.20f, 0.12f, RGB(80,140,70) },    /* body */
+    { 0.0f, 0.82f, 0.02f,0.13f, 0.11f, 0.12f, RGB(95,160,80) },    /* head */
+    {-0.16f,0.84f, 0.0f, 0.06f, 0.05f, 0.03f, RGB(70,120,60) },    /* big ears */
+    { 0.16f,0.84f, 0.0f, 0.06f, 0.05f, 0.03f, RGB(70,120,60) },
+    {-0.07f,0.80f,0.12f, 0.03f,0.03f,0.02f, RGB(230,210,40) },     /* eyes */
+    { 0.07f,0.80f,0.12f, 0.03f,0.03f,0.02f, RGB(230,210,40) },
+    {-0.22f,0.55f, 0.0f, 0.05f, 0.16f, 0.05f, RGB(80,140,70) },    /* arms */
+    { 0.22f,0.55f, 0.0f, 0.05f, 0.16f, 0.05f, RGB(80,140,70) },
+    {-0.10f,0.16f, 0.0f, 0.05f, 0.16f, 0.05f, RGB(70,120,60) },    /* legs */
+    { 0.10f,0.16f, 0.0f, 0.05f, 0.16f, 0.05f, RGB(70,120,60) },
+    { 0.30f,0.40f, 0.0f, 0.05f, 0.05f, 0.05f, RGB(110,90,60) },    /* club head */
+};
+static const RogueCuboid M_ZOMBIE[] = {
+    { 0.0f, 0.70f, 0.0f, 0.16f, 0.28f, 0.11f, RGB(90,120,80) },    /* torso */
+    { 0.0f, 1.06f, 0.0f, 0.12f, 0.12f, 0.12f, RGB(110,140,95) },   /* head */
+    {-0.06f,1.08f,0.11f, 0.03f,0.03f,0.02f, RGB(40,60,40) },       /* eyes */
+    { 0.06f,1.08f,0.11f, 0.03f,0.03f,0.02f, RGB(40,60,40) },
+    {-0.22f,0.78f,0.18f, 0.05f, 0.06f, 0.20f, RGB(95,125,82) },    /* arms out */
+    { 0.22f,0.78f,0.18f, 0.05f, 0.06f, 0.20f, RGB(95,125,82) },
+    {-0.09f,0.20f, 0.0f, 0.06f, 0.20f, 0.06f, RGB(80,110,72) },    /* legs */
+    { 0.09f,0.20f, 0.0f, 0.06f, 0.20f, 0.06f, RGB(80,110,72) },
+};
+static const RogueCuboid M_ARCHER[] = {
+    { 0.0f, 1.36f, 0.0f, 0.13f, 0.12f, 0.12f, RGB(225,222,205) },  /* skull */
+    {-0.06f,1.40f,0.10f, 0.03f,0.03f,0.03f, RGB(20,20,20) },       /* eyes */
+    { 0.06f,1.40f,0.10f, 0.03f,0.03f,0.03f, RGB(20,20,20) },
+    { 0.0f, 1.02f, 0.0f, 0.13f, 0.20f, 0.07f, RGB(200,200,185) },  /* ribs */
+    {-0.18f,0.92f, 0.0f, 0.04f, 0.24f, 0.04f, RGB(210,210,195) },  /* arms */
+    { 0.18f,0.92f, 0.0f, 0.04f, 0.24f, 0.04f, RGB(210,210,195) },
+    {-0.08f,0.30f, 0.0f, 0.05f, 0.30f, 0.05f, RGB(210,210,195) },  /* legs */
+    { 0.08f,0.30f, 0.0f, 0.05f, 0.30f, 0.05f, RGB(210,210,195) },
+    { 0.26f,0.95f, 0.0f, 0.02f, 0.30f, 0.02f, RGB(140,100,55) },   /* bow */
+};
+static const RogueCuboid M_FIRESPRITE[] = {
+    { 0.0f, 0.55f, 0.0f, 0.16f, 0.18f, 0.16f, RGB(255,140,30) },   /* fiery core (hovers) */
+    { 0.0f, 0.62f, 0.0f, 0.10f, 0.12f, 0.10f, RGB(255,220,110) },  /* hot centre */
+    {-0.10f,0.58f,0.13f, 0.03f,0.03f,0.02f, RGB(255,255,200) },    /* eyes */
+    { 0.10f,0.58f,0.13f, 0.03f,0.03f,0.02f, RGB(255,255,200) },
+    {-0.18f,0.45f, 0.0f, 0.05f, 0.10f, 0.05f, RGB(255,90,20) },    /* flame wisps */
+    { 0.18f,0.45f, 0.0f, 0.05f, 0.10f, 0.05f, RGB(255,90,20) },
+};
+static const RogueCuboid M_DEMON[] = {
+    { 0.0f, 0.95f, 0.0f, 0.28f, 0.34f, 0.18f, RGB(150,30,30) },    /* hulking body */
+    { 0.0f, 1.42f, 0.0f, 0.17f, 0.15f, 0.16f, RGB(170,40,35) },    /* head */
+    {-0.12f,1.62f, 0.0f, 0.04f, 0.10f, 0.04f, RGB(60,20,20) },     /* horns */
+    { 0.12f,1.62f, 0.0f, 0.04f, 0.10f, 0.04f, RGB(60,20,20) },
+    {-0.08f,1.46f,0.13f, 0.04f,0.04f,0.03f, RGB(255,200,30) },     /* glowing eyes */
+    { 0.08f,1.46f,0.13f, 0.04f,0.04f,0.03f, RGB(255,200,30) },
+    {-0.36f,0.95f, 0.0f, 0.07f, 0.30f, 0.07f, RGB(150,30,30) },    /* arms */
+    { 0.36f,0.95f, 0.0f, 0.07f, 0.30f, 0.07f, RGB(150,30,30) },
+    {-0.14f,0.30f, 0.0f, 0.08f, 0.30f, 0.08f, RGB(120,25,25) },    /* legs */
+    { 0.14f,0.30f, 0.0f, 0.08f, 0.30f, 0.08f, RGB(120,25,25) },
+};
+
+#define MN(a) (int)(sizeof(a)/sizeof(RogueCuboid))
+static const RogueCuboid *MODEL[EN_TYPE_COUNT] = {
+    M_RAT, M_SLIME, M_SKELETON, M_SPIDER, M_BAT, M_KOBOLD, M_GOBLIN,
+    M_ZOMBIE, M_ARCHER, M_FIRESPRITE, M_DEMON
+};
 static const int MODEL_N[EN_TYPE_COUNT] = {
-    (int)(sizeof(M_RAT)/sizeof(RogueCuboid)),
-    (int)(sizeof(M_SLIME)/sizeof(RogueCuboid)),
-    (int)(sizeof(M_SKELETON)/sizeof(RogueCuboid)),
-    (int)(sizeof(M_SPIDER)/sizeof(RogueCuboid)),
+    MN(M_RAT), MN(M_SLIME), MN(M_SKELETON), MN(M_SPIDER), MN(M_BAT),
+    MN(M_KOBOLD), MN(M_GOBLIN), MN(M_ZOMBIE), MN(M_ARCHER), MN(M_FIRESPRITE), MN(M_DEMON)
 };
 
 /* --- RNG (local, for spawn jitter / wander) ---------------------- */
@@ -102,6 +207,7 @@ static float frand(void){ return (float)(rng() & 0xFFFF) / 65536.0f; }
 
 void rogue_enemies_clear(void) {
     for (int i = 0; i < ROGUE_MAX_ENEMIES; i++) s_en[i].alive = false;
+    for (int i = 0; i < MAX_ESHOT; i++) s_eshot[i].alive = false;
     s_death_n = 0;
 }
 
@@ -140,8 +246,7 @@ void rogue_enemies_spawn(const int16_t *room_cx, const int16_t *room_cz,
     if (!s_rng) s_rng = 1;
 
     const RogueBand *band = rogue_band_get(depth);
-    int wsum = band->w_rat + band->w_slime + band->w_skel + band->w_spider;
-    if (wsum <= 0) wsum = 1;
+    int rn = band->roster_n > 0 ? band->roster_n : 1;
     bool boss_floor = rogue_band_is_boss_floor(depth);
 
     int want = 4 + depth;                 /* scale population with depth */
@@ -154,13 +259,8 @@ void rogue_enemies_spawn(const int16_t *room_cx, const int16_t *room_cz,
         if (room_cx[r] == up_x && room_cz[r] == up_z) continue;  /* never spawn on start */
         Enemy *e = &s_en[placed];
         e->alive = true;
-        /* Band-weighted roster. */
-        int roll = (int)(frand() * wsum);
-        EnemyType t;
-        if (roll < band->w_rat) t = EN_RAT;
-        else if (roll < band->w_rat + band->w_slime) t = EN_SLIME;
-        else if (roll < band->w_rat + band->w_slime + band->w_skel) t = EN_SKELETON;
-        else t = EN_SPIDER;
+        /* Pick from this band's roster. */
+        EnemyType t = (EnemyType)band->roster[(int)(frand() * rn) % rn];
         e->type = t;
         e->pos = v3(room_cx[r] + 0.5f + (frand()-0.5f)*2.0f, (float)floor_y,
                     room_cz[r] + 0.5f + (frand()-0.5f)*2.0f);
@@ -220,10 +320,14 @@ void rogue_enemies_update(RoguePlayer *p, float dt, int floor_y) {
         case AI_CHASE:
             if (!p->alive || dist > aggro * 1.4f) { e->state = AI_WANDER; e->state_t = 0; break; }
             e->yaw = atan2f(nx, nz);
-            if (dist <= d->atk_range && e->atk_cd <= 0) {
-                e->state = AI_WINDUP; e->state_t = 0;
+            if (d->ranged) {
+                /* Kite: hold mid-range, back off if the hero closes, shoot. */
+                if (dist < d->atk_range * 0.45f) en_move(e, -nx, -nz, d->speed * dt, floor_y);
+                else if (dist > d->atk_range)    en_move(e, nx, nz, d->speed * dt, floor_y);
+                if (dist <= d->atk_range && e->atk_cd <= 0) { e->state = AI_WINDUP; e->state_t = 0; }
             } else {
-                en_move(e, nx, nz, d->speed * dt, floor_y);
+                if (dist <= d->atk_range && e->atk_cd <= 0) { e->state = AI_WINDUP; e->state_t = 0; }
+                else en_move(e, nx, nz, d->speed * dt, floor_y);
             }
             break;
         case AI_WINDUP:
@@ -231,23 +335,40 @@ void rogue_enemies_update(RoguePlayer *p, float dt, int floor_y) {
             if (e->state_t >= d->windup) { e->state = AI_STRIKE; e->state_t = 0; }
             break;
         case AI_STRIKE:
-            /* The blow lands once, if the player is still in reach. */
             if (e->state_t == 0.0f || e->state_t < dt + 0.0001f) {
-                if (p->alive && dist <= d->atk_range + (e->champion ? 0.8f : 0.4f)) {
-                    int dmg = (int)(d->base_dmg * d->dmg_mul) * (e->champion ? 2 : 1);
-                    if (s_dark) dmg = dmg * 3 / 2;     /* the dark bites harder */
+                int dmg = (int)(d->base_dmg * d->dmg_mul) * (e->champion ? 2 : 1);
+                if (s_dark) dmg = dmg * 3 / 2;     /* the dark bites harder */
+                if (d->ranged) {
+                    /* loose a projectile toward the hero */
+                    uint16_t col = (e->type == EN_FIRESPRITE) ? RGB(255,140,30) : RGB(230,230,210);
+                    eshot_fire(e->pos, p->pos.x, p->pos.z, dmg, col);
+                } else if (p->alive && dist <= d->atk_range + (e->champion ? 0.8f : 0.4f)) {
                     if (rogue_player_damage(p, dmg, e->pos) &&
-                        (p->stats.aspects & (1u << ASP_THORNS))) {
-                        /* Thorns: reflect a chunk back at the attacker. */
+                        (p->stats.aspects & (1u << ASP_THORNS)))
                         en_apply_damage(e, 6 + dmg / 2, p->pos.x, p->pos.z);
-                    }
                 }
             }
             if (e->state_t >= 0.18f) {
                 e->state = AI_CHASE;
-                e->atk_cd = 0.8f;
+                e->atk_cd = d->ranged ? 1.4f : 0.8f;
             }
             break;
+        }
+    }
+
+    /* Advance enemy projectiles → hit the player / walls / expire. */
+    for (int i = 0; i < MAX_ESHOT; i++) {
+        EShot *s = &s_eshot[i];
+        if (!s->alive) continue;
+        s->pos.x += s->vx * dt; s->pos.z += s->vz * dt;
+        s->life -= dt;
+        if (s->life <= 0) { s->alive = false; continue; }
+        if (craft_block_solid(craft_world_get((int)floorf(s->pos.x), floor_y,
+                                               (int)floorf(s->pos.z)))) { s->alive = false; continue; }
+        float dx = p->pos.x - s->pos.x, dz = p->pos.z - s->pos.z;
+        if (p->alive && dx*dx + dz*dz < 0.45f*0.45f) {
+            rogue_player_damage(p, s->dmg, s->pos);
+            s->alive = false;
         }
     }
 }
@@ -330,6 +451,13 @@ void rogue_enemies_draw(const CraftCamera *cam, uint16_t *fb) {
                                MODEL[e->type], MODEL_N[e->type],
                                d->radius + 0.05f, d->height, flash, 256);
         }
+    }
+    /* enemy projectiles */
+    for (int i = 0; i < MAX_ESHOT; i++) {
+        EShot *s = &s_eshot[i];
+        if (!s->alive) continue;
+        RogueCuboid m[1] = { { 0.0f, 0.0f, 0.0f, 0.09f, 0.07f, 0.09f, s->col } };
+        rogue_render_model(cam, fb, s->pos, atan2f(s->vx, s->vz), m, 1, 0.12f, 0.1f, 0.5f, 256);
     }
 }
 

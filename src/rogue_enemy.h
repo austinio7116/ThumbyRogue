@@ -15,7 +15,17 @@
 
 #define ROGUE_MAX_ENEMIES 14
 
-typedef enum { EN_RAT, EN_SLIME, EN_SKELETON, EN_SPIDER, EN_TYPE_COUNT } EnemyType;
+typedef enum {
+    EN_RAT, EN_SLIME, EN_SKELETON, EN_SPIDER,
+    EN_BAT, EN_KOBOLD, EN_GOBLIN, EN_ZOMBIE,
+    EN_ARCHER, EN_FIRESPRITE, EN_DEMON,
+    EN_TYPE_COUNT
+} EnemyType;
+
+/* What a slain enemy tends to drop (the game weights its loot roll by this). */
+typedef enum { LOOT_GOLD, LOOT_GEAR, LOOT_GEM, LOOT_POTION, LOOT_RARE } EnemyLoot;
+EnemyLoot rogue_enemy_loot(int type);
+const char *rogue_enemy_name(int type);
 
 void rogue_enemies_clear(void);
 void rogue_enemies_set_dark(bool dark);   /* torch-out danger modifier */
