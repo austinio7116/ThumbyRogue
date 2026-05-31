@@ -16,7 +16,21 @@ item gets full due consideration and nothing is dropped. Updated as work lands.
 - Flagstone floor with **4 tessellating slab variants**; brick walls restored.
 - **Organic** lava chasms (noise-edged lakes) sunk below a bridge; more chests.
 
-## 🔜 Planned (ordered)
+## ✅ Done — P1..P6 (phase pass)
+- **P1** wide enemy roster (11 types incl. ranged archers/fire-sprites, flyers,
+  demons) + per-type loot drops + per-band rosters.
+- **P2** Diablo loot beams, clearer treasure chests, found-item toasts.
+- **P3** lava = instant death; cross-bridge keeps the path safe; moving platform
+  is the only way to a bonus chest on a marooned lava island.
+- **P4** fog-of-war minimap (explored floor/walls/lava + player/stairs markers).
+- **P5** shallow wadeable water pools (slow you), animated.
+- **P6** particle system (hit sparks, death poofs, projectile trails + impacts,
+  pickup sparkles) + a readable melee swing-crescent.
+
+Note: device .bss ~482KB/520KB — getting tight. Reclaim the 48KB sliding-window
+mod-hash (bounded levels never edit blocks) before adding much more.
+
+## 🔜 Planned (ordered) — original P-list, now complete; see above
 
 ### P1 — Wide enemy roster + item drops  *(next)*
 - Add many cuboid creatures beyond rat/slime/skeleton/spider: **skeleton archer**

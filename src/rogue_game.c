@@ -13,6 +13,7 @@
 #include "rogue_platform.h"
 #include "rogue_inventory.h"
 #include "rogue_shop.h"
+#include "rogue_particle.h"
 #include "craft_world.h"
 #include "craft_blocks.h"
 #include "craft_render.h"
@@ -77,6 +78,7 @@ static bool s_have_keep;
 
 static void load_level(void) {
     memset(s_visited, 0, sizeof s_visited);
+    rogue_particle_clear();
     rogue_gen_dungeon(s_seed, s_depth, &s_level);
     rogue_player_init(&s_player, s_level.spawn);
     if (s_have_keep) {
@@ -322,6 +324,11 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
             rogue_enemies_hit_radius(s_player.pos.x, s_player.pos.z, 2.2f, outdmg / 2);
         if (hits > 0) {
             rogue_sfx_hit();
+            /* spark burst at the swing point */
+            Vec3 hp = v3(s_player.pos.x + sinf(s_player.yaw) * s_player.wpn_range * 0.7f,
+                         s_player.pos.y + 0.6f,
+                         s_player.pos.z + cosf(s_player.yaw) * s_player.wpn_range * 0.7f);
+            rogue_particle_burst(hp, 8, 5.0f, 0.35f, RGB(255,240,180), 0.07f);
             int heal = s_player.stats.life_on_hit * hits;
             if (asp & (1u << ASP_LIFESTEAL)) heal += outdmg / 8;  /* Vampiric */
             if (heal) {
@@ -347,6 +354,7 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
     rogue_enemies_update(&s_player, dt, s_level.floor_y);
     rogue_proj_update(dt, s_level.floor_y);
     rogue_loot_update(&s_player, dt);
+    rogue_particle_update(dt);
 
     /* Drop loot from anything that died this frame — weighted by the slain
      * creature's loot class (goblins/kobolds → gear, fire sprites → gems,
@@ -355,6 +363,11 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
     while (rogue_enemies_pop_death(&dpos, &dtype)) {
         s_kills++;
         rogue_sfx_enemy_die();
+        /* death poof — fire sprites burst in flame, others in dust */
+        Vec3 pp = dpos; pp.y += 0.4f;
+        uint16_t pc = (dtype == EN_FIRESPRITE) ? RGB(255,140,30)
+                    : (dtype == EN_DEMON) ? RGB(200,40,40) : RGB(170,160,150);
+        rogue_particle_burst(pp, 12, 4.5f, 0.55f, pc, 0.09f);
         RogueItem it;
         EnemyLoot lk = rogue_enemy_loot(dtype);
         int goldmul = (lk == LOOT_RARE) ? 4 : (lk == LOOT_GOLD ? 2 : 1);
@@ -568,6 +581,7 @@ void rogue_game_draw_overlay(uint16_t *fb) {
     rogue_proj_draw(&s_cam, fb);
     rogue_enemies_draw(&s_cam, fb);
     rogue_player_draw(&s_player, &s_cam, fb, 256);
+    rogue_particle_draw(&s_cam, fb);
 
     if (s_title) { rogue_hud_title(fb, s_best_depth); return; }
     if (rogue_inventory_is_open()) { rogue_inventory_draw(fb, &s_player); return; }

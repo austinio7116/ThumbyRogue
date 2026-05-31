@@ -163,7 +163,7 @@ int main(int argc, char **argv) {
             }
             { extern float rogue_game_player_y(void);
               if (f >= 8 && f <= 24) printf("[y] f=%d y=%.2f\n", f, rogue_game_player_y()); }
-            if (shot_path && f == 90) { render_frame(); dump_ppm(shot_path); }
+            if (shot_path && f == 80) { render_frame(); dump_ppm(shot_path); }
         }
         SDL_Quit();
         return 0;

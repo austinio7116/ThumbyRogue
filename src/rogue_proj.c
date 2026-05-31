@@ -1,6 +1,7 @@
 #include "rogue_proj.h"
 #include "rogue_render.h"
 #include "rogue_enemy.h"
+#include "rogue_particle.h"
 #include "craft_world.h"
 #include "craft_blocks.h"
 #include <math.h>
@@ -55,12 +56,16 @@ void rogue_proj_update(float dt, int floor_y) {
         float dx = p->vx * dt, dz = p->vz * dt;
         p->pos.x += dx; p->pos.z += dz;
         p->travelled += sqrtf(dx*dx + dz*dz);
+        uint16_t tc = p->caster ? RGB(150,210,255) : RGB(230,200,120);
+        rogue_particle_spawn(p->pos, 0, 0, 0, 0.18f, tc, 0.05f, 0.0f);  /* trail */
         if (p->travelled > p->max_range) { p->alive = false; continue; }
         if (cell_solid((int)floorf(p->pos.x), floor_y, (int)floorf(p->pos.z))) {
+            rogue_particle_burst(p->pos, 6, 4.0f, 0.30f, tc, 0.07f);    /* wall impact */
             p->alive = false; continue;
         }
         if (p->hit_cd > 0) p->hit_cd -= dt;
         if (p->hit_cd <= 0 && rogue_enemies_hit_point(p->pos.x, p->pos.z, 0.35f, p->dmg)) {
+            rogue_particle_burst(p->pos, 8, 5.0f, 0.35f, tc, 0.08f);    /* hit burst */
             if (p->pierce) p->hit_cd = 0.12f;   /* keep flying, re-hit periodically */
             else           p->alive = false;
         }

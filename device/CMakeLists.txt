@@ -78,6 +78,7 @@ add_executable(thumbyrogue
     ${ROGUE_SRC}/rogue_stats.c
     ${ROGUE_SRC}/rogue_inventory.c
     ${ROGUE_SRC}/rogue_shop.c
+    ${ROGUE_SRC}/rogue_particle.c
     ${ROGUE_SRC}/rogue_loot.c
     ${ROGUE_SRC}/rogue_proj.c
     ${ROGUE_SRC}/rogue_band.c

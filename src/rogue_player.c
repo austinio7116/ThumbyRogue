@@ -277,4 +277,21 @@ void rogue_player_draw(const RoguePlayer *p, const CraftCamera *cam,
 
     rogue_render_model(cam, fb, p->pos, p->yaw, parts, HERO_NPARTS,
                        0.32f, 1.15f, flash, tint_q8);
+
+    /* Readable melee swing: a bright crescent slash sweeps in front during
+     * the early part of the swing (ranged/caster show their projectile). */
+    if (p->atk_t > 0 && p->wpn_class == WCLASS_MELEE) {
+        float ph = 1.0f - (p->atk_t / p->wpn_dur);     /* 0..1 */
+        if (ph < 0.75f) {
+            float r = p->wpn_range * 0.7f;
+            RogueCuboid slash[5];
+            for (int k = 0; k < 5; k++) {
+                float a = -0.8f + 0.4f * k;             /* arc across the facing */
+                slash[k] = (RogueCuboid){ sinf(a) * r, 0.55f, cosf(a) * r,
+                                          0.07f, 0.11f, 0.07f, 0xCEFF };  /* cyan-white */
+            }
+            rogue_render_model(cam, fb, p->pos, p->yaw, slash, 5,
+                               r + 0.2f, 1.0f, 0.0f, 256);
+        }
+    }
 }

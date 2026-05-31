@@ -1,6 +1,7 @@
 #include "rogue_loot.h"
 #include "rogue_render.h"
 #include "rogue_inventory.h"
+#include "rogue_particle.h"
 #include "craft_world.h"
 #include "craft_blocks.h"
 #include <math.h>
@@ -73,6 +74,7 @@ void rogue_loot_update(RoguePlayer *p, float dt) {
         g->spin += dt * 2.4f;
         float dx = g->pos.x - p->pos.x, dz = g->pos.z - p->pos.z;
         if (dx*dx + dz*dz > PICKUP_R*PICKUP_R) continue;
+        uint16_t sc = rogue_item_is_equip(&g->item) ? rogue_rarity_color(g->item.rarity) : g->item.color;
         if (g->item.kind == ITEM_GOLD) {
             p->gold += g->item.amount;
             g->alive = false;
@@ -91,6 +93,10 @@ void rogue_loot_update(RoguePlayer *p, float dt) {
                 rogue_game_toast(msg);
                 g->alive = false;
             }
+        }
+        if (!g->alive) {   /* just collected → a little sparkle */
+            Vec3 sp = g->pos; sp.y += 0.3f;
+            rogue_particle_burst(sp, 6, 3.0f, 0.30f, sc, 0.06f);
         }
     }
 }
