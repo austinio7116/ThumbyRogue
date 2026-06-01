@@ -816,6 +816,16 @@ int rogue_game_debug_goto_prop(int kind) {
     return 0;
 }
 
+/* Drop a gold pile + a rare weapon next to the hero (loot-render check:
+ * gold should be a ground coin, gear a rarity beam). */
+void rogue_game_debug_drop_loot(void) {
+    RogueItem it;
+    rogue_item_make_gold(&it, 25);
+    rogue_loot_drop(&it, v3(s_player.pos.x - 1.0f, s_player.pos.y, s_player.pos.z + 0.4f));
+    rogue_item_roll_weapon(&it, 8, loot_rng()); it.rarity = RAR_RARE;
+    rogue_loot_drop(&it, v3(s_player.pos.x + 1.0f, s_player.pos.y, s_player.pos.z + 0.4f));
+}
+
 /* Spawn a spread of floating damage numbers near the hero (FX verification). */
 void rogue_game_debug_dmgnum(void) {
     Vec3 p = s_player.pos;

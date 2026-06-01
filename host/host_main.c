@@ -310,6 +310,10 @@ int main(int argc, char **argv) {
             extern void rogue_game_debug_dmgnum(void);
             rogue_game_debug_dmgnum();
         }
+        if (getenv("ROGUE_LOOT")) {
+            extern void rogue_game_debug_drop_loot(void);
+            rogue_game_debug_drop_loot();
+        }
         if (getenv("ROGUE_MAP")) {   /* reveal map + open inventory grid to view it */
             extern void rogue_game_debug_fill_bag(void), rogue_game_debug_reveal_map(void);
             rogue_game_debug_fill_bag();

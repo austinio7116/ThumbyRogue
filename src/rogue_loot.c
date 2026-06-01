@@ -196,6 +196,15 @@ void rogue_loot_draw(const CraftCamera *cam, uint16_t *fb) {
     for (int i = 0; i < MAX_GROUND; i++) {
         Ground *g = &s_g[i];
         if (!g->alive) continue;
+        /* Gold is just coin(s) on the ground — a low spinning gold disc, NO
+         * loot beam, so it doesn't read like a rare/legendary drop. */
+        if (g->item.kind == ITEM_GOLD) {
+            float bob = 0.05f + 0.025f * sinf(g->spin * 2.0f);
+            Vec3 cp = g->pos; cp.y += bob;
+            RogueCuboid coin[1] = { { 0.0f, 0.05f, 0.0f, 0.13f, 0.03f, 0.13f, RGB(245, 205, 55) } };
+            rogue_render_model(cam, fb, cp, g->spin, coin, 1, 0.16f, 0.16f, 0.12f, 256);
+            continue;
+        }
         bool eq = rogue_item_is_equip(&g->item);
         uint16_t c = eq ? rogue_rarity_color(g->item.rarity) : g->item.color;
         /* Shaft of light: a tall coloured outer glow with a near-white bright
