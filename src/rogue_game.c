@@ -114,6 +114,25 @@ static const RogueCuboid torch_model[] = {
     { 0.0f, 0.58f, 0.0f, 0.055f, 0.06f, 0.055f, RGB(255, 225, 120) }, /* flame */
 };
 
+/* Furniture props (drawn like torches). Table: a plank top on four legs.
+ * Brazier: a dark iron bowl on a tripod with a flame (a torch light cell
+ * is placed under it in the generator so it actually lights the room). */
+static const RogueCuboid table_model[] = {
+    { 0.0f,  0.46f,  0.0f,  0.40f, 0.05f, 0.30f, RGB(120, 82, 44) },  /* top slab */
+    { -0.32f,0.21f, -0.22f, 0.05f, 0.21f, 0.05f, RGB(86, 56, 28) },   /* legs */
+    {  0.32f,0.21f, -0.22f, 0.05f, 0.21f, 0.05f, RGB(86, 56, 28) },
+    { -0.32f,0.21f,  0.22f, 0.05f, 0.21f, 0.05f, RGB(86, 56, 28) },
+    {  0.32f,0.21f,  0.22f, 0.05f, 0.21f, 0.05f, RGB(86, 56, 28) },
+};
+static const RogueCuboid brazier_model[] = {
+    { -0.16f,0.20f, -0.10f, 0.03f, 0.22f, 0.03f, RGB(60, 60, 66) },   /* tripod legs */
+    {  0.16f,0.20f, -0.10f, 0.03f, 0.22f, 0.03f, RGB(60, 60, 66) },
+    {  0.0f, 0.20f,  0.18f, 0.03f, 0.22f, 0.03f, RGB(60, 60, 66) },
+    { 0.0f,  0.44f,  0.0f,  0.22f, 0.07f, 0.22f, RGB(48, 48, 54) },   /* iron bowl */
+    { 0.0f,  0.54f,  0.0f,  0.14f, 0.06f, 0.14f, RGB(255, 150, 30) }, /* ember */
+    { 0.0f,  0.62f,  0.0f,  0.09f, 0.07f, 0.09f, RGB(255, 225, 120) },/* flame */
+};
+
 /* Carry the full paperdoll + gold across floors; only rebuild on death. */
 static RogueItem s_keep_equip[SLOT_COUNT];
 static int s_keep_gold;
@@ -239,7 +258,7 @@ void rogue_game_init(uint32_t seed) {
     craft_render_set_fog(false);
     craft_render_set_clouds(false);
     craft_render_set_far_lod(false);
-    craft_render_set_groundcover(false);
+    craft_render_set_groundcover(true);    /* render the cross-sprite scenery */
     craft_render_set_interlace(false);
     craft_render_set_lowres(false);
     craft_render_set_coarse_skip(false);
@@ -744,6 +763,59 @@ int rogue_game_debug_goto_water(void) {
     return 0;
 }
 
+/* Move the hero next to the first room scenery found (scenery render
+ * verification). Stands a few cells camera-side so the clutter is in view. */
+static bool dbg_standable(int x, int z) {
+    int fy = s_level.floor_y;
+    return craft_block_solid((BlockId)craft_world_get(x, fy - 1, z)) &&
+           craft_world_get(x, fy, z)     == BLK_AIR &&
+           craft_world_get(x, fy + 1, z) == BLK_AIR;
+}
+int rogue_game_debug_goto_deco(void) {
+    int mcx = CRAFT_WORLD_X / 2, mcz = CRAFT_WORLD_Z / 2;
+    int bx = -1, bz = -1, bestd = 1 << 30;
+    /* Prefer a bulky cube set-piece (bookcase/sarcophagus/crystal) near the
+     * map centre — the most photogenic scenery. */
+    for (int z = 0; z < CRAFT_WORLD_Z; z++)
+        for (int x = 0; x < CRAFT_WORLD_X; x++) {
+            uint8_t b = (uint8_t)craft_world_get(x, s_level.floor_y, z);
+            if (b >= BLK_BOOKCASE && b <= BLK_CRYSTAL) {
+                int d = (x - mcx) * (x - mcx) + (z - mcz) * (z - mcz);
+                if (d < bestd) { bestd = d; bx = x; bz = z; }
+            }
+        }
+    if (bx < 0) return 0;
+    /* Find a standable floor cell a few steps camera-side (-z) of the feature,
+     * scanning outward so we never teleport onto the surround terrain. */
+    for (int r = 2; r <= 5; r++) {
+        if (dbg_standable(bx, bz - r)) {
+            s_player.pos = v3(bx + 0.5f, (float)s_level.floor_y, bz - r + 0.5f);
+            rogue_camera_init(s_player.pos);
+            return 1;
+        }
+    }
+    for (int dz = -4; dz <= 4; dz++)
+        for (int dx = -4; dx <= 4; dx++)
+            if (dbg_standable(bx + dx, bz + dz)) {
+                s_player.pos = v3(bx + dx + 0.5f, (float)s_level.floor_y, bz + dz + 0.5f);
+                rogue_camera_init(s_player.pos);
+                return 1;
+            }
+    return 1;
+}
+
+/* Stand next to the first prop of the given kind (PROP_TABLE/PROP_BRAZIER). */
+int rogue_game_debug_goto_prop(int kind) {
+    for (int i = 0; i < s_level.n_prop; i++)
+        if (s_level.prop_kind[i] == kind) {
+            s_player.pos = v3(s_level.prop_x[i] + 0.5f, (float)s_level.floor_y,
+                              s_level.prop_z[i] - 3.0f);
+            rogue_camera_init(s_player.pos);
+            return 1;
+        }
+    return 0;
+}
+
 /* Spawn a spread of floating damage numbers near the hero (FX verification). */
 void rogue_game_debug_dmgnum(void) {
     Vec3 p = s_player.pos;
@@ -849,6 +921,15 @@ void rogue_game_draw_overlay(uint16_t *fb) {
     for (int i = 0; i < s_level.n_torch; i++) {
         Vec3 tp = v3(s_level.torch_x[i] + 0.5f, (float)s_level.floor_y, s_level.torch_z[i] + 0.5f);
         rogue_render_model(&s_cam, fb, tp, 0.0f, torch_model, 3, 0.12f, 0.7f, 0.0f, 256);
+    }
+
+    /* Furniture props (tables, braziers). */
+    for (int i = 0; i < s_level.n_prop; i++) {
+        Vec3 pp = v3(s_level.prop_x[i] + 0.5f, (float)s_level.floor_y, s_level.prop_z[i] + 0.5f);
+        if (s_level.prop_kind[i] == PROP_TABLE)
+            rogue_render_model(&s_cam, fb, pp, 0.0f, table_model, 5, 0.45f, 0.55f, 0.0f, 256);
+        else /* PROP_BRAZIER */
+            rogue_render_model(&s_cam, fb, pp, 0.0f, brazier_model, 6, 0.30f, 0.72f, 0.0f, 256);
     }
 
     /* Spike traps — dark pad + steel spikes (telegraphed; pulses when armed). */

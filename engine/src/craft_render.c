@@ -442,6 +442,12 @@ static const uint8_t s_block_class[BLK_COUNT] = {
     [BLK_LILY_PAD]           = BCLASS_SPRITE3D,
     [BLK_LEVER_OFF]          = BCLASS_SPRITE3D,
     [BLK_LEVER_ON]           = BCLASS_SPRITE3D,
+    /* ThumbyRogue cross-sprite scenery (bones, rubble, shards, fungi, web). */
+    [BLK_BONES]              = BCLASS_CROSS,
+    [BLK_RUBBLE]             = BCLASS_CROSS,
+    [BLK_SHARDS]             = BCLASS_CROSS,
+    [BLK_FUNGI]              = BCLASS_CROSS,
+    [BLK_COBWEB]             = BCLASS_CROSS,
 };
 
 /* Main door/trapdoor panel slab in cell-local (0..1) coords — mirrors

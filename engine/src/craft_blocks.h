@@ -178,8 +178,29 @@ typedef enum {
     BLK_MYCELIUM        = 110,  /* Fungal Deep floor — bioluminescent purple substrate */
     BLK_FUNGAL_WALL     = 111,  /* Fungal Deep wall — mossy organic growth */
     BLK_MUSHROOM        = 112,  /* Fungal Deep pillar — giant mushroom stalk */
+    /* --- ThumbyRogue room scenery (full-cube props placed in rooms) ---- *
+     * Bulky clutter that dresses the larger rooms per band: a library
+     * bookcase, a barrel and a supply crate, a stone sarcophagus, an
+     * ossuary bone wall, and a glowing crystal cluster (a light source). */
+    BLK_BOOKCASE        = 113,  /* library shelves — book spines on the sides */
+    BLK_BARREL          = 114,  /* wooden barrel — staves + iron hoops */
+    BLK_CRATE           = 115,  /* supply crate — planks with corner braces */
+    BLK_SARCOPHAGUS     = 116,  /* stone coffin — carved effigy lid */
+    BLK_CRYSTAL         = 117,  /* glowing crystal cluster cube — emits light */
+    /* --- 2D cross-sprite scenery (non-solid, like tall grass) ---------- *
+     * Two perpendicular cutout quads (magenta = transparent). Small
+     * organic clutter scattered to fill rooms with variety without ugly
+     * solid cubes — bones, rubble, crystal shards, fungi, cobwebs. */
+    BLK_BONES           = 118,  /* scattered bones + a small skull */
+    BLK_RUBBLE          = 119,  /* broken rock debris */
+    BLK_SHARDS          = 120,  /* small glowing crystal shards */
+    BLK_FUNGI           = 121,  /* little mushroom cluster */
+    BLK_COBWEB          = 122,  /* corner cobweb */
     BLK_COUNT
 } BlockId;
+
+/* True for the ThumbyRogue cross-sprite scenery (BCLASS_CROSS, non-solid). */
+#define ROGUE_IS_SPRITE_SCENERY(b) ((b) >= BLK_BONES && (b) <= BLK_COBWEB)
 
 /* Alias: the original BLK_WATER is now the source level (L0). */
 #define BLK_WATER_L0 BLK_WATER
@@ -294,6 +315,8 @@ static inline bool craft_block_opaque(BlockId blk) {
      * transparent texels, so they must not read as opaque cubes. */
     if (blk == BLK_TALL_GRASS || blk == BLK_FLOWER_RED ||
         blk == BLK_FLOWER_YELLOW || blk == BLK_FLOWER_VINE) return false;
+    /* ThumbyRogue cross-sprite scenery (bones, rubble, shards, …). */
+    if (ROGUE_IS_SPRITE_SCENERY(blk)) return false;
     return blk != BLK_AIR && !craft_is_water_id((uint8_t)blk) && blk != BLK_GLASS;
 }
 
@@ -303,7 +326,7 @@ static inline bool craft_block_opaque(BlockId blk) {
  * blocks (furnace, future chest) live above BLK_STICK in the enum so
  * they need an explicit allow-list. */
 static inline bool craft_block_solid(BlockId blk) {
-    if (blk >= BLK_RFLOOR && blk <= BLK_MUSHROOM) return true;  /* ThumbyRogue floors/walls -- solid cubes */
+    if (blk >= BLK_RFLOOR && blk <= BLK_CRYSTAL) return true;  /* ThumbyRogue floors/walls/scenery -- solid cubes */
     if (blk == BLK_AIR || craft_is_water_id((uint8_t)blk) || blk == BLK_TORCH) return false;
     if (craft_is_lava_id((uint8_t)blk)) return false;   /* fluid — you sink into it */
     if (blk == BLK_PORTAL) return false; /* walk-through shimmer */

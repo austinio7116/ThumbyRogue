@@ -192,6 +192,16 @@ const char *craft_block_name(BlockId blk) {
         case BLK_WATER_L5:
         case BLK_WATER_L6:
         case BLK_WATER_L7:      return "water";
+        case BLK_BOOKCASE:      return "bookcase";
+        case BLK_BARREL:        return "barrel";
+        case BLK_CRATE:         return "crate";
+        case BLK_SARCOPHAGUS:   return "sarcophagus";
+        case BLK_CRYSTAL:       return "crystal";
+        case BLK_BONES:         return "bones";
+        case BLK_RUBBLE:        return "rubble";
+        case BLK_SHARDS:        return "shards";
+        case BLK_FUNGI:         return "fungi";
+        case BLK_COBWEB:        return "cobweb";
         default:                return "?";
     }
 }
@@ -314,6 +324,294 @@ static void mushroom_pattern(uint16_t *dst, uint32_t seed) {
             dst[y * CRAFT_TEX_SIZE + x] = rgb565(r, g, b);
         }
 }
+
+/* --- ThumbyRogue room scenery -----------------------------------------
+ * Each takes a slot (0=top, 1=side, 2=bottom) so faces can differ — a
+ * bookcase shows shelves on the sides but planks on top, a barrel shows
+ * a lid on top but staves on the side, and so on. */
+#define S CRAFT_TEX_SIZE
+
+/* Bookcase: dark wood frame; sides carry horizontal shelves packed with
+ * varied book spines, top/bottom are plain planks. */
+static void bookcase_pattern(uint16_t *dst, int slot, uint32_t seed) {
+    if (slot != 1) {                       /* top / bottom — plank grain */
+        for (int y = 0; y < S; y++)
+            for (int x = 0; x < S; x++) {
+                int band = (y >> 2) & 1;
+                int c = band ? 96 : 84;
+                uint32_t h = (uint32_t)((x+1)*92821) ^ (uint32_t)((y+1)*68917) ^ seed;
+                c += (int)(h % 11u) - 5;
+                if ((y & 3) == 0) c -= 22;
+                dst[y * S + x] = rgb565(c, (c * 11) >> 4, (c * 6) >> 4);
+            }
+        return;
+    }
+    for (int y = 0; y < S; y++) {
+        int shelf = (y % 5 == 0) || y == S - 1;        /* shelf plank rows */
+        for (int x = 0; x < S; x++) {
+            int frame = (x == 0 || x == S - 1);
+            if (shelf || frame) {                       /* dark wood frame */
+                int c = 60 - ((y & 1) ? 0 : 6);
+                dst[y * S + x] = rgb565(c, (c * 10) >> 4, (c * 5) >> 4);
+                continue;
+            }
+            /* a book: colour keyed to its (column,shelf) so spines vary */
+            uint32_t bk = (uint32_t)((x / 1) * 2654435761u) ^
+                          (uint32_t)((y / 5) * 40503u) ^ seed;
+            bk ^= bk >> 13; bk *= 0x9E3779B1u; bk ^= bk >> 16;
+            int hue = (int)(bk % 6u);
+            int sh  = 150 + (int)((bk >> 8) % 60u);     /* per-book brightness */
+            int r, g, b;
+            switch (hue) {
+                case 0: r = sh;        g = sh*2/5;     b = sh*2/5;     break; /* red */
+                case 1: r = sh*2/5;    g = sh*2/3;     b = sh;         break; /* blue */
+                case 2: r = sh*2/5;    g = sh;         b = sh*2/5;     break; /* green */
+                case 3: r = sh;        g = sh*3/4;     b = sh*2/5;     break; /* gold */
+                case 4: r = sh*3/4;    g = sh*2/5;     b = sh;         break; /* purple */
+                default:r = sh*3/4;    g = sh*3/4;     b = sh*3/4;     break; /* tan */
+            }
+            if (x == S - 2) { r = r*3/4; g = g*3/4; b = b*3/4; }   /* edge shade */
+            dst[y * S + x] = rgb565(r, g, b);
+        }
+    }
+}
+
+/* Barrel: top is a planked lid (concentric); sides are vertical staves
+ * with two dark iron hoops. */
+static void barrel_pattern(uint16_t *dst, int slot, uint32_t seed) {
+    if (slot == 0) {                       /* lid — concentric planks */
+        for (int y = 0; y < S; y++)
+            for (int x = 0; x < S; x++) {
+                int dx = x - 8, dy = y - 8;
+                int rr = dx*dx + dy*dy;
+                int ring = (rr / 14) & 1;
+                int c = ring ? 120 : 104;
+                if (rr > 60) c -= 28;                  /* dark rim hoop */
+                uint32_t h = (uint32_t)((x+3)*92821) ^ (uint32_t)((y+5)*68917) ^ seed;
+                c += (int)(h % 9u) - 4;
+                dst[y * S + x] = rgb565(c + 24, (c * 11) >> 4, (c * 6) >> 4);
+            }
+        return;
+    }
+    for (int y = 0; y < S; y++)
+        for (int x = 0; x < S; x++) {
+            int stave = (x >> 1) & 1;                  /* alternating staves */
+            int c = stave ? 128 : 110;
+            int edge = (x % 4 == 0);                    /* stave seam */
+            if (edge) c -= 30;
+            if (y == 2 || y == 3 || y == 12 || y == 13) /* two iron hoops */
+                { c = 70; dst[y * S + x] = rgb565(c, c, c + 6); continue; }
+            uint32_t h = (uint32_t)((x+1)*92821) ^ (uint32_t)((y+7)*68917) ^ seed;
+            c += (int)(h % 11u) - 5;
+            dst[y * S + x] = rgb565(c + 30, (c * 11) >> 4, (c * 5) >> 4);
+        }
+}
+
+/* Crate: planks with a lighter outer frame and corner nails (same on
+ * every face). */
+static void crate_pattern(uint16_t *dst, int slot, uint32_t seed) {
+    (void)slot;
+    for (int y = 0; y < S; y++)
+        for (int x = 0; x < S; x++) {
+            int frame = (x < 2 || x >= S - 2 || y < 2 || y >= S - 2);
+            int band  = (y >> 2) & 1;
+            int c = band ? 138 : 120;
+            if (frame) c += 24;                         /* lighter border beam */
+            uint32_t h = (uint32_t)((x+1)*92821) ^ (uint32_t)((y+1)*68917) ^ seed;
+            c += (int)(h % 11u) - 5;
+            if ((y & 3) == 0 && !frame) c -= 18;        /* plank seams */
+            /* corner nails */
+            if (((x == 2 || x == S - 3) && (y == 2 || y == S - 3))) c = 80;
+            dst[y * S + x] = rgb565(c, (c * 12) >> 4, (c * 7) >> 4);
+        }
+}
+
+/* Sarcophagus: top is a carved effigy lid (a pale figure down the
+ * centre on stone); sides are recessed stone panels. */
+static void sarcophagus_pattern(uint16_t *dst, int slot, uint32_t seed) {
+    for (int y = 0; y < S; y++)
+        for (int x = 0; x < S; x++) {
+            uint32_t h = (uint32_t)((x+2)*73856093) ^ (uint32_t)((y+9)*19349663) ^ seed;
+            h ^= h >> 13; h *= 0x9E3779B1u; h ^= h >> 16;
+            int c = 120 + (int)(h % 17u) - 8;          /* mottled stone */
+            if (slot == 0) {
+                /* Coffin lid: an elongated hexagon outline (the classic
+                 * tapered-shoulder casket), a carved head disc up top and a
+                 * folded-arms cross on the chest — reads clearly top-down. */
+                int dx = x - 8;
+                int adx = dx < 0 ? -dx : dx;
+                /* hexagon half-width: widest at the shoulders (y~5), tapering
+                 * to the head (top) and the foot (bottom). */
+                int hw;
+                if (y < 4)      hw = 2 + y;             /* head taper */
+                else if (y < 7) hw = 6;                 /* shoulders */
+                else            hw = 6 - (y - 7) / 2;   /* foot taper */
+                int inside = (y >= 1 && y <= 14 && adx <= hw);
+                int edge   = inside && (adx >= hw - 1 || y == 1 || y == 14);
+                if (!inside) { c -= 30; }               /* recessed margin */
+                else if (edge) { c = 150 + (int)(h % 9u); }   /* raised lid rim */
+                else {
+                    c = 96 + (int)(h % 8u);             /* sunken lid panel */
+                    int head = (y >= 2 && y <= 5 && dx*dx + (y-4)*(y-4) <= 4);
+                    int armV = (y >= 7 && y <= 12 && adx <= 1);          /* body line */
+                    int armH = (y == 8 && adx <= 3);                     /* folded arms */
+                    if (head || armV || armH) c = 190 + (int)(h % 12u);  /* pale effigy */
+                }
+            } else {
+                int border = (x < 2 || x >= S - 2 || y < 2 || y >= S - 2);
+                if (border) c -= 30;                    /* recessed panel */
+            }
+            dst[y * S + x] = rgb565(c, c, c + 6);       /* faintly cool */
+        }
+}
+
+/* Crystal cluster: bright faceted gem (cyan→violet), luminous since it
+ * emits light. Diagonal facet banding + a few specular sparkles. */
+static void crystal_pattern(uint16_t *dst, int slot, uint32_t seed) {
+    (void)slot;
+    for (int y = 0; y < S; y++)
+        for (int x = 0; x < S; x++) {
+            int facet = ((x + y) >> 2) & 1;             /* diagonal facets */
+            int facet2 = ((x - y + 16) >> 2) & 1;
+            uint32_t h = (uint32_t)((x+1)*92821) ^ (uint32_t)((y+1)*68917) ^ seed;
+            h ^= h >> 13; h *= 0x9E3779B1u; h ^= h >> 16;
+            int base = facet ? 210 : 150;
+            base += facet2 ? 22 : -22;
+            base += (int)(h % 13u) - 6;
+            int r = base * 2 / 5, g = base * 4 / 5, b = base;   /* cyan-violet */
+            if ((h % 23u) == 0u) { r = 255; g = 255; b = 255; }  /* sparkle */
+            /* dark seams between cluster shards */
+            if (((x + 2*y) % 7) == 0) { r = r/2; g = g/2; b = b/2; }
+            dst[y * S + x] = rgb565(r, g, b);
+        }
+}
+
+/* --- 2D cross-sprite scenery -------------------------------------------
+ * Filled magenta (transparent) then a small ground-hugging silhouette is
+ * stamped in the lower rows; the DDA cutout path traces through magenta.
+ * tv runs 0 (cell top) .. 15 (cell bottom) so floor clutter lives high in
+ * tv (bottom of the cell). Same art on every face. */
+#define MAG rgb565(255, 0, 255)
+static inline void spr_clear(uint16_t *dst) {
+    for (int i = 0; i < S * S; i++) dst[i] = MAG;
+}
+static inline void spr_disc(uint16_t *dst, int cx, int cy, int rr, uint16_t c) {
+    for (int y = 0; y < S; y++)
+        for (int x = 0; x < S; x++) {
+            int dx = x - cx, dy = y - cy;
+            if (dx*dx + dy*dy <= rr) dst[y * S + x] = c;
+        }
+}
+
+/* Scattered bones: a small skull + two crossed long bones, ivory. */
+static void bones_pattern(uint16_t *dst, uint32_t seed) {
+    (void)seed;
+    spr_clear(dst);
+    uint16_t bone = rgb565(224, 218, 196), shade = rgb565(168, 160, 140);
+    /* two crossed long bones (diagonals with knobbed ends) */
+    for (int i = -4; i <= 4; i++) {
+        int x1 = 8 + i, y1 = 11 - i;     /* "/" bone */
+        int x2 = 8 + i, y2 = 11 + i;     /* "\" bone */
+        if (x1 >= 0 && x1 < S && y1 >= 6 && y1 < S) dst[y1 * S + x1] = bone;
+        if (x2 >= 0 && x2 < S && y2 >= 6 && y2 < S) dst[y2 * S + x2] = bone;
+    }
+    spr_disc(dst, 3, 7,  1, bone); spr_disc(dst, 13, 7,  1, bone); /* bone knobs */
+    spr_disc(dst, 3, 15, 1, bone); spr_disc(dst, 13, 15, 1, bone);
+    /* skull, bottom-left */
+    spr_disc(dst, 6, 13, 5, bone);
+    dst[12 * S + 5] = rgb565(40, 36, 30);      /* eye sockets */
+    dst[12 * S + 8] = rgb565(40, 36, 30);
+    dst[14 * S + 6] = shade; dst[14 * S + 7] = shade;  /* jaw shadow */
+}
+
+/* Broken rock debris: a couple of overlapping grey boulders, bottom. */
+static void rubble_pattern(uint16_t *dst, uint32_t seed) {
+    uint32_t s = seed;
+    spr_clear(dst);
+    int cx[3] = { 5, 10, 8 }, cy[3] = { 13, 12, 14 }, rd[3] = { 9, 7, 5 };
+    for (int k = 0; k < 3; k++)
+        for (int y = 0; y < S; y++)
+            for (int x = 0; x < S; x++) {
+                int dx = x - cx[k], dy = y - cy[k];
+                if (dx*dx + dy*dy > rd[k]) continue;
+                int j = (int)(xs32(&s) & 0xf) - 8;
+                int base = 116 + j - (k * 6);          /* each boulder a shade */
+                if (dy <= -1) base += 22;              /* top-lit */
+                dst[y * S + x] = rgb565(base, base, base + 4);
+            }
+}
+
+/* Small crystal shards: a few bright spikes rising from the floor. */
+static void shards_pattern(uint16_t *dst, uint32_t seed) {
+    (void)seed;
+    spr_clear(dst);
+    /* three spikes: (apex_x, apex_y, base_y, half-width-at-base) */
+    int ax[3] = { 5, 8, 11 }, ay[3] = { 6, 3, 7 }, hw[3] = { 2, 2, 2 };
+    for (int k = 0; k < 3; k++)
+        for (int y = ay[k]; y < S; y++) {
+            float f = (float)(y - ay[k]) / (float)(S - 1 - ay[k]);
+            int w = (int)(hw[k] * f + 0.5f);
+            for (int dx = -w; dx <= w; dx++) {
+                int x = ax[k] + dx;
+                if (x < 0 || x >= S) continue;
+                int edge = (dx == -w || dx == w);
+                int tip  = (y <= ay[k] + 1);
+                uint16_t c = tip ? rgb565(235, 248, 255)
+                           : edge ? rgb565(40, 120, 180)
+                                  : rgb565(90, 190, 235);
+                dst[y * S + x] = c;
+            }
+        }
+}
+
+/* Little mushroom cluster: cream stalks + warm caps. */
+static void fungi_pattern(uint16_t *dst, uint32_t seed) {
+    (void)seed;
+    spr_clear(dst);
+    uint16_t stalk = rgb565(222, 212, 184);
+    int mx[3] = { 4, 9, 12 }, capw[3] = { 3, 4, 2 }, capy[3] = { 9, 6, 11 };
+    uint16_t cap[3] = { rgb565(200, 70, 70), rgb565(210, 120, 60), rgb565(170, 90, 190) };
+    for (int k = 0; k < 3; k++) {
+        for (int y = capy[k] + 1; y < S; y++)              /* stalk */
+            { if (mx[k] >= 0 && mx[k] < S) dst[y * S + mx[k]] = stalk; }
+        for (int dx = -capw[k]; dx <= capw[k]; dx++) {     /* dome cap */
+            int x = mx[k] + dx; if (x < 0 || x >= S) continue;
+            int top = capy[k] - (capw[k] - (dx < 0 ? -dx : dx));
+            for (int y = top; y <= capy[k]; y++)
+                if (y >= 0) dst[y * S + x] = cap[k];
+        }
+    }
+}
+
+/* Corner cobweb: faint threads anchored in the top-left corner, radiating
+ * down/right and braced by a couple of quarter-ring arcs. Only the corner
+ * region is webbed; the rest of the cell stays transparent. */
+static void cobweb_pattern(uint16_t *dst, uint32_t seed) {
+    (void)seed;
+    spr_clear(dst);
+    uint16_t web = rgb565(208, 208, 218);
+    const int R = 11;                 /* web only reaches ~11px from the corner */
+    /* four spokes fanning out from (0,0) */
+    for (int t = 0; t <= R; t++) {
+        dst[t * S + t]               = web;          /* 45° */
+        if (t / 2 < S) dst[(t / 2) * S + t] = web;   /* shallow (toward +x) */
+        if (t / 2 < S) dst[t * S + (t / 2)] = web;   /* steep  (toward +y) */
+        if (t == 0) dst[0] = web;
+    }
+    dst[0] = web; for (int x = 0; x <= R; x++) dst[x] = web;        /* top edge anchor */
+    for (int y = 0; y <= R; y++) dst[y * S] = web;                 /* left edge anchor */
+    /* two quarter-ring arcs catching the spokes */
+    int rings[2] = { 5, 9 };
+    for (int k = 0; k < 2; k++) {
+        int rr = rings[k];
+        for (int x = 0; x <= rr; x++) {
+            int y = (int)(0.5f + sqrtf((float)(rr*rr - x*x)));
+            if (y >= 0 && y < S && x < S) dst[y * S + x] = web;
+        }
+    }
+}
+#undef MAG
+#undef S
 
 /* Brick-like mortar pattern at the grid lines — used by cobble. */
 static void cobble_pattern(uint16_t *dst, uint32_t seed) {
@@ -894,6 +1192,23 @@ void craft_blocks_build_textures(void) {
         mycelium_pattern   (&craft_textures[(BLK_MYCELIUM    * 3 + slot) * CRAFT_TEX_PIXELS], 0x5907Eu);
         fungal_wall_pattern(&craft_textures[(BLK_FUNGAL_WALL * 3 + slot) * CRAFT_TEX_PIXELS], 0xF09611u);
         mushroom_pattern   (&craft_textures[(BLK_MUSHROOM    * 3 + slot) * CRAFT_TEX_PIXELS], 0x3057Eu);
+    }
+
+    /* ThumbyRogue room scenery — bulky cube props (top/side/bottom differ). */
+    for (int slot = 0; slot < 3; slot++) {
+        bookcase_pattern    (&craft_textures[(BLK_BOOKCASE    * 3 + slot) * CRAFT_TEX_PIXELS], slot, 0xB00C5u);
+        barrel_pattern      (&craft_textures[(BLK_BARREL      * 3 + slot) * CRAFT_TEX_PIXELS], slot, 0xBA77Eu);
+        crate_pattern       (&craft_textures[(BLK_CRATE       * 3 + slot) * CRAFT_TEX_PIXELS], slot, 0xC8A7Eu);
+        sarcophagus_pattern (&craft_textures[(BLK_SARCOPHAGUS * 3 + slot) * CRAFT_TEX_PIXELS], slot, 0x5A8C0u);
+        crystal_pattern     (&craft_textures[(BLK_CRYSTAL     * 3 + slot) * CRAFT_TEX_PIXELS], slot, 0xC8957u);
+    }
+    /* ThumbyRogue cross-sprite scenery — same silhouette on every face. */
+    for (int slot = 0; slot < 3; slot++) {
+        bones_pattern (&craft_textures[(BLK_BONES  * 3 + slot) * CRAFT_TEX_PIXELS], 0xB04E5u);
+        rubble_pattern(&craft_textures[(BLK_RUBBLE * 3 + slot) * CRAFT_TEX_PIXELS], 0x2BB1Eu);
+        shards_pattern(&craft_textures[(BLK_SHARDS * 3 + slot) * CRAFT_TEX_PIXELS], 0x58A2Du);
+        fungi_pattern (&craft_textures[(BLK_FUNGI  * 3 + slot) * CRAFT_TEX_PIXELS], 0xF0671u);
+        cobweb_pattern(&craft_textures[(BLK_COBWEB * 3 + slot) * CRAFT_TEX_PIXELS], 0xC0BEBu);
     }
 
     /* PLANK — horizontal bands. */

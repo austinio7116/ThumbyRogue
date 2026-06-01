@@ -115,6 +115,13 @@ int main(int argc, char **argv) {
     setvbuf(stdout, NULL, _IONBF, 0);
     const char *shot_path = getenv("ROGUE_SHOT");
 
+    if (getenv("ROGUE_SWEEP")) {   /* reachability sweep: scenery must never block the path */
+        extern int rogue_gen_debug_sweep(int);
+        int n = atoi(getenv("ROGUE_SWEEP"));
+        if (n < 1) n = 200;
+        return rogue_gen_debug_sweep(n) == 0 ? 0 : 1;
+    }
+
     if (SDL_Init(shot_path ? SDL_INIT_EVENTS
                            : (SDL_INIT_VIDEO | SDL_INIT_EVENTS)) != 0)
         fprintf(stderr, "SDL_Init: %s (continuing)\n", SDL_GetError());
@@ -261,6 +268,14 @@ int main(int argc, char **argv) {
         if (getenv("ROGUE_LAVA")) {
             extern int rogue_game_debug_goto_lava(void);
             printf("[lava] found: %d\n", rogue_game_debug_goto_lava());
+        }
+        if (getenv("ROGUE_DECO")) {
+            extern int rogue_game_debug_goto_deco(void);
+            printf("[deco] found scenery: %d\n", rogue_game_debug_goto_deco());
+        }
+        if (getenv("ROGUE_PROP")) {
+            extern int rogue_game_debug_goto_prop(int);
+            printf("[prop] found: %d\n", rogue_game_debug_goto_prop(atoi(getenv("ROGUE_PROP"))));
         }
         { int settle = getenv("ROGUE_SETTLE") ? atoi(getenv("ROGUE_SETTLE")) : 80;
           for (int i = 0; i < settle; i++) rogue_game_tick(&none, 1.0f / 30.0f); }

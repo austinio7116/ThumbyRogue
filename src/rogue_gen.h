@@ -10,6 +10,14 @@
 #include "craft_types.h"
 
 #define ROGUE_MAX_LEVEL_ROOMS 48
+#define ROGUE_MAX_PROPS       24
+
+/* Furniture props drawn per-frame as cuboid models (like torches), kept
+ * out of the world buffer because they need sub-cube geometry. */
+typedef enum {
+    PROP_TABLE   = 0,   /* wooden table — top slab on four legs */
+    PROP_BRAZIER = 1,   /* iron bowl + flame on a tripod (seeds a light cell) */
+} RoguePropKind;
 
 typedef struct {
     Vec3 spawn;            /* hero feet, on the up-stairs */
@@ -24,6 +32,9 @@ typedef struct {
     int16_t island_x[3], island_z[3];  /* bonus-chest island in each chasm */
     int  n_torch;                  /* wall/floor torch light positions */
     int16_t torch_x[16], torch_z[16];
+    int  n_prop;                   /* furniture props (table/brazier models) */
+    int16_t prop_x[ROGUE_MAX_PROPS], prop_z[ROGUE_MAX_PROPS];
+    uint8_t prop_kind[ROGUE_MAX_PROPS];
 } RogueLevelInfo;
 
 void rogue_gen_dungeon(uint32_t seed, int depth, RogueLevelInfo *out);

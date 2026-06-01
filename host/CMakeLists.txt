@@ -91,6 +91,7 @@ add_dependencies(thumbyrogue_host generate_craft_textures)
 target_compile_definitions(thumbyrogue_host PRIVATE
     CRAFT_TEXTURES_BAKED=1
     CRAFT_HOST=1
+    ROGUE_VALIDATE=1           # compile the reachability validator (host only)
     ROGUE_FULLFRAME_RENDER=1   # no craft hotbar plate -> render edge-to-edge
     # ThumbyRogue keeps the engine default 64x64x64 cubic world — one
     # bounded dungeon floor per level.

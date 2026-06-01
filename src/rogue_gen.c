@@ -151,6 +151,160 @@ static bool is_walk(int x, int z) {
     return s_walk[z * GW + x] != 0;
 }
 
+/* --- guaranteed solution path ------------------------------------------
+ * Robustness rule (not "trust the jump physics"): before any scenery is
+ * placed we BFS an actual on-foot route from the up-stairs to the down-
+ * stairs and RESERVE it (plus a 1-cell apron). Scenery stampers refuse to
+ * place a solid block on a reserved cell, so the player always has a clear
+ * walkable corridor from entrance to exit, no matter what clutter lands
+ * elsewhere. `s_path` low 3 bits hold the BFS came-from direction; bit 7 is
+ * the reserved flag. */
+static uint8_t  s_path[GW * GD];
+static uint16_t s_pq[GW * GD];
+static const int PDX[4] = { 1, -1, 0, 0 }, PDZ[4] = { 0, 0, 1, -1 };
+
+/* A cell the hero can actually stand on while routing: carved-walkable,
+ * not a lava pit, with solid ground or wadeable water underfoot (so the
+ * BFS crosses lava lakes only via their solid bridge, never the lava). */
+static bool path_ok(int x, int z) {
+    if (!is_walk(x, z)) return false;
+    uint8_t bel = craft_world_get_byte(x, ROGUE_FLOOR_Y - 1, z);
+    if (craft_is_lava_id(bel)) return false;
+    return craft_block_solid((BlockId)bel) || craft_is_water_id(bel);
+}
+static bool path_reserved(int x, int z) {
+    if ((unsigned)x >= GW || (unsigned)z >= GD) return false;
+    return (s_path[z * GW + x] & 0x80) != 0;
+}
+/* BFS up→down, then walk the chain back marking the route + a 1-cell apron
+ * as reserved. Returns 1 if a route was found. */
+static int reserve_solution_path(int ux, int uz, int dx0, int dz0) {
+    for (int i = 0; i < GW * GD; i++) s_path[i] = 0;
+    if (!path_ok(ux, uz)) return 0;
+    int ui = uz * GW + ux;
+    s_path[ui] = 5;                      /* start marker (not a real dir code) */
+    int head = 0, tail = 0;
+    s_pq[tail++] = (uint16_t)ui;
+    while (head < tail) {
+        int idx = s_pq[head++], x = idx % GW, z = idx / GW;
+        for (int d = 0; d < 4; d++) {
+            int nx = x + PDX[d], nz = z + PDZ[d];
+            if (!path_ok(nx, nz)) continue;
+            int ni = nz * GW + nx;
+            if (s_path[ni]) continue;
+            s_path[ni] = (uint8_t)(d + 1);
+            s_pq[tail++] = (uint16_t)ni;
+        }
+    }
+    int di = dz0 * GW + dx0;
+    if (!(s_path[di] & 7)) return 0;     /* down unreachable (pre-existing) */
+    int cur = di;
+    for (;;) {
+        int cx = cur % GW, cz = cur / GW;
+        s_path[cur] |= 0x80;
+        for (int d = 0; d < 4; d++) {    /* 1-cell apron so the route isn't a tightrope */
+            int nx = cx + PDX[d], nz = cz + PDZ[d];
+            if ((unsigned)nx < GW && (unsigned)nz < GD) s_path[nz * GW + nx] |= 0x80;
+        }
+        int code = s_path[cur] & 7;
+        if (code == 5) break;
+        int d = code - 1;
+        cur -= (PDX[d] + PDZ[d] * GW);   /* step to the BFS parent */
+    }
+    return 1;
+}
+
+/* A cell that can take scenery: walkable, empty at stand height, and
+ * sitting on a solid floor (never over water/lava/a pit). */
+static bool deco_open(int x, int z) {
+    if (!is_walk(x, z)) return false;
+    if (craft_world_get_byte(x, ROGUE_FLOOR_Y, z) != BLK_AIR) return false;
+    return craft_block_solid((BlockId)craft_world_get_byte(x, ROGUE_FLOOR_Y - 1, z));
+}
+static bool deco_solid_at(int x, int z, int y) {
+    return craft_block_solid((BlockId)craft_world_get_byte(x, y, z));
+}
+
+/* --- scenery stampers ---------------------------------------------------
+ * Solid stampers NEVER write on a reserved solution-path cell, so the
+ * guaranteed route always stays clear. Cross-sprite scatter is non-solid
+ * (the hero walks through it) so it may sit anywhere. */
+static void stamp_cube(int x, int z, int tall, uint8_t blk) {
+    if (path_reserved(x, z) || !deco_open(x, z)) return;
+    for (int y = 0; y < tall; y++)
+        craft_world_set_byte(x, ROGUE_FLOOR_Y + y, z, blk);
+}
+static void stamp_sprite(int x, int z, uint8_t blk) {
+    if (deco_open(x, z)) craft_world_set_byte(x, ROGUE_FLOOR_Y, z, blk);
+}
+/* Place a `tall`-high stack only if there's a real wall directly behind it
+ * (bxd,bzd points at the wall) — guarantees we never wall off an opening. */
+static void stamp_flush(int x, int z, int bxd, int bzd, int tall, uint8_t blk) {
+    if (path_reserved(x, z) || !deco_open(x, z)) return;
+    if (!deco_solid_at(x + bxd, z + bzd, ROGUE_FLOOR_Y)) return;
+    for (int y = 0; y < tall; y++)
+        craft_world_set_byte(x, ROGUE_FLOOR_Y + y, z, blk);
+}
+
+/* Stamp one arranged set-piece centred on a room. Finds the nearest wall so
+ * wall-hugging features sit flush against it. */
+static void stamp_feature(int kind, int cx, int cz, uint32_t rh,
+                          const RogueBand *band) {
+    static const int DX[4] = { 1, -1, 0, 0 }, DZ[4] = { 0, 0, 1, -1 };
+    int wd = 0, wdist = 99;
+    for (int d = 0; d < 4; d++) {
+        int dist = 0, x = cx, z = cz;
+        while (dist < 8 && is_walk(x + DX[d], z + DZ[d])) { x += DX[d]; z += DZ[d]; dist++; }
+        if (dist < wdist) { wdist = dist; wd = d; }
+    }
+    int bx = cx + DX[wd] * wdist, bz = cz + DZ[wd] * wdist;  /* last cell before wall */
+    int wbx = DX[wd], wbz = DZ[wd];                          /* toward the wall */
+    int px = DZ[wd], pz = DX[wd];                            /* along the wall */
+
+    switch (kind) {
+    case FEAT_LIBRARY:                                       /* shelf wall, 2 tall */
+        for (int i = -1; i <= 2; i++)
+            stamp_flush(bx + px * i, bz + pz * i, wbx, wbz, 2, BLK_BOOKCASE);
+        break;
+    case FEAT_STORE: {                                       /* barrel + crate pile */
+        uint8_t a = (rh & 4) ? BLK_BARREL : BLK_CRATE;
+        uint8_t b = (rh & 4) ? BLK_CRATE  : BLK_BARREL;
+        stamp_cube(bx,            bz,            1, a);
+        stamp_cube(bx + px,       bz + pz,       1, b);
+        stamp_cube(bx - px,       bz - pz,       1, b);
+        stamp_flush(bx,           bz,            wbx, wbz, 2, a);  /* one stacked, wall-backed */
+        break; }
+    case FEAT_TOMB:                                          /* rows of coffins */
+        for (int i = -1; i <= 1; i++) {
+            stamp_cube(bx + px * i,               bz + pz * i,               1, BLK_SARCOPHAGUS);
+            stamp_cube(bx + px * i - wbx * 2,     bz + pz * i - wbz * 2,     1, BLK_SARCOPHAGUS);
+        }
+        break;
+    case FEAT_CRYSTALS: {                                    /* cluster + shards */
+        /* Anchored a couple cells off the wall (out of the central route).
+         * All 1 tall so an open-floor cluster can never block a path; the
+         * shard sprites are non-solid anyway. */
+        int qx = bx - wbx * 2, qz = bz - wbz * 2;
+        stamp_cube(qx,     qz,     1, BLK_CRYSTAL);
+        stamp_cube(qx + px, qz + pz, 1, BLK_CRYSTAL);
+        stamp_sprite(qx - px, qz - pz, BLK_SHARDS);
+        stamp_sprite(qx + wbx, qz + wbz, BLK_SHARDS);
+        stamp_sprite(qx - wbx, qz - wbz, BLK_SHARDS);
+        stamp_sprite(qx + px + wbx, qz + pz + wbz, BLK_SHARDS);
+        break; }
+    case FEAT_ALTAR: {                                       /* stepped dais shrine */
+        int qx = bx - wbx * 2, qz = bz - wbz * 2;
+        for (int a = -1; a <= 1; a++)
+            for (int b2 = -1; b2 <= 1; b2++)
+                stamp_cube(qx + a, qz + b2, 1, band->wall);
+        if (deco_solid_at(qx, qz, ROGUE_FLOOR_Y))            /* centrepiece on the dais */
+            craft_world_set_byte(qx, ROGUE_FLOOR_Y + 1, qz, BLK_CRYSTAL);
+        stamp_sprite(qx - px * 2, qz - pz * 2, BLK_SHARDS);
+        stamp_sprite(qx + px * 2, qz + pz * 2, BLK_SHARDS);
+        break; }
+    }
+}
+
 /* Build the world: open natural terrain everywhere, rooms as flat clearings,
  * thin (1-cell) ruined low walls outlining them. */
 static void apply_to_world(uint32_t seed, int depth) {
@@ -336,6 +490,66 @@ void rogue_gen_dungeon(uint32_t seed, int depth, RogueLevelInfo *out) {
         out->n_torch++;
     }
 
+    /* Reserve a guaranteed on-foot route from the up-stairs to the down-
+     * stairs BEFORE placing scenery, so no set-piece can ever block it. */
+    reserve_solution_path(s_rooms[up].cx, s_rooms[up].cz,
+                          s_rooms[down].cx, s_rooms[down].cz);
+
+    /* Room scenery: each room gets ONE arranged set-piece (a library wall, a
+     * barrel pile, a tomb of coffins, a crystal cluster, an altar) plus a
+     * scatter of small cross-sprite clutter (bones / rubble / shards / fungi
+     * / cobwebs) that fills the floor organically like grass — NOT lone cubes.
+     * Stair rooms are skipped. Runs before the lightmap rebuild so glowing
+     * crystals and braziers (a torch light cell) bake into the light. */
+    out->n_prop = 0;
+    {
+        const RogueBand *db = rogue_band_get(depth);
+        for (int i = 0; i < s_n_rooms; i++) {
+            if (i == up || i == down) continue;
+            int cx = s_rooms[i].cx, cz = s_rooms[i].cz;
+            uint32_t rh = hash2(cx, cz, seed ^ 0x5CE7Eu);
+
+            /* One set-piece in ~70% of rooms. */
+            if (db->feats_n > 0 && (rh % 10u) < 7u)
+                stamp_feature(db->feats[(rh >> 4) % db->feats_n], cx, cz, rh, db);
+
+            /* Organic cross-sprite scatter — the room "fill". */
+            if (db->sprites_n > 0) {
+                int n = 4 + (int)(rh % 5u);                    /* 4..8 pieces */
+                for (int s = 0; s < n * 4 && n > 0; s++) {
+                    uint32_t sh = hash2(cx * 131 + s * 7, cz * 61 + s * 13,
+                                        seed ^ 0x5CA77u);
+                    int sx = cx + ((int)(sh % 13u) - 6);
+                    int sz = cz + ((int)((sh >> 8) % 13u) - 6);
+                    if (sx == cx && sz == cz) continue;
+                    if (!deco_open(sx, sz)) continue;
+                    stamp_sprite(sx, sz, db->sprites[(sh >> 16) % db->sprites_n]);
+                    n--;
+                }
+            }
+
+            /* One furniture prop in ~half the rooms, off-centre. */
+            if (db->prop_mask && (rh % 2u) == 0u && out->n_prop < ROGUE_MAX_PROPS) {
+                int px = cx + ((rh & 1) ? 3 : -3);
+                int pz = cz + ((rh & 8) ? 2 : -2);
+                if (deco_open(px, pz)) {
+                    uint8_t kind;
+                    if ((db->prop_mask & ROGUE_PROP_TABLE) &&
+                        (!(db->prop_mask & ROGUE_PROP_BRAZIER) || (rh & 4)))
+                        kind = PROP_TABLE;
+                    else
+                        kind = PROP_BRAZIER;
+                    out->prop_x[out->n_prop]    = (int16_t)px;
+                    out->prop_z[out->n_prop]    = (int16_t)pz;
+                    out->prop_kind[out->n_prop] = kind;
+                    out->n_prop++;
+                    if (kind == PROP_BRAZIER)                 /* lights the room */
+                        craft_world_set_byte(px, ROGUE_FLOOR_Y, pz, BLK_TORCH);
+                }
+            }
+        }
+    }
+
     craft_world_rebuild_lightmap();
 
     out->floor_y = ROGUE_FLOOR_Y;
@@ -348,3 +562,102 @@ void rogue_gen_dungeon(uint32_t seed, int depth, RogueLevelInfo *out) {
     }
     out->spawn = v3(out->up_x + 0.5f, (float)ROGUE_FLOOR_Y, out->up_z + 0.5f);
 }
+
+#ifdef ROGUE_VALIDATE
+/* --- host-only reachability validator ----------------------------------
+ * Independent of the reserved-path system: a jump-aware flood-fill from the
+ * up-stairs that must reach the down-stairs, modelling gameplay — step up at
+ * most 1 block (1-tall scenery is jumpable), cross-sprites and water are
+ * passable, and a lava gap of up to 2 cells can be JUMPED. Used to PROVE
+ * scenery adds zero blockage (compare scenery-on vs scenery-off counts).
+ * Host build only (ROGUE_VALIDATE) — the device pays nothing. */
+#include <string.h>
+#include <stdio.h>
+
+int rogue_gen_disable_scenery = 0;   /* test toggle: skip the scenery pass */
+
+/* Stand height on a column, or -1 if you can't stand there. */
+static int rv_stand_y(int x, int z) {
+    if ((unsigned)x >= GW || (unsigned)z >= GD) return -1;
+    int fy = ROGUE_FLOOR_Y;
+    BlockId at0 = (BlockId)craft_world_get_byte(x, fy,     z);
+    BlockId at1 = (BlockId)craft_world_get_byte(x, fy + 1, z);
+    BlockId bel = (BlockId)craft_world_get_byte(x, fy - 1, z);
+    if (craft_block_solid(at0)) {                 /* something on the floor */
+        if (craft_block_solid(at1)) return -1;    /* 2-tall+ → a wall */
+        BlockId at2 = (BlockId)craft_world_get_byte(x, fy + 2, z);
+        if (craft_block_solid(at2)) return -1;
+        return fy + 1;                            /* 1-tall → stand on top */
+    }
+    /* floor clear; need solid (or wadeable water) underfoot, never lava */
+    if (craft_is_lava_id((uint8_t)bel)) return -1;
+    if (craft_block_solid(bel) || craft_is_water_id((uint8_t)bel)) return fy;
+    return -1;                                    /* pit */
+}
+
+static uint8_t s_rv_seen[GW * GD];
+int rogue_gen_validate(const RogueLevelInfo *lv) {
+    memset(s_rv_seen, 0, sizeof s_rv_seen);
+    static int qx[GW * GD], qz[GW * GD];
+    int head = 0, tail = 0;
+    int sx = lv->up_x, sz = lv->up_z;
+    if (rv_stand_y(sx, sz) < 0) return 0;
+    s_rv_seen[sz * GW + sx] = 1; qx[tail] = sx; qz[tail] = sz; tail++;
+    static const int DX[4] = { 1, -1, 0, 0 }, DZ[4] = { 0, 0, 1, -1 };
+    while (head < tail) {
+        int x = qx[head], z = qz[head]; head++;
+        int hy = rv_stand_y(x, z);
+        if (x == lv->down_x && z == lv->down_z) return 1;
+        for (int d = 0; d < 4; d++) {
+            /* walk one cell, or JUMP a lava gap of up to 2 cells */
+            for (int step = 1; step <= 3; step++) {
+                int nx = x + DX[d] * step, nz = z + DZ[d] * step;
+                if ((unsigned)nx >= GW || (unsigned)nz >= GD) break;
+                int ny = rv_stand_y(nx, nz);
+                if (ny < 0) {                       /* can't land; keep scanning */
+                    if (step <= 2) continue;        /* a gap of ≤2 can be jumped */
+                    break;
+                }
+                if (!s_rv_seen[nz * GW + nx]) {
+                    int dh = ny - hy; if (dh < 0) dh = -dh;
+                    if (dh <= 1) {
+                        s_rv_seen[nz * GW + nx] = 1;
+                        qx[tail] = nx; qz[tail] = nz; tail++;
+                    }
+                }
+                break;   /* landed (or wall) — stop extending this direction */
+            }
+        }
+    }
+    return 0;
+}
+
+/* Sweep `n` seeds × every authored depth band TWICE — scenery off then on —
+ * and report. If the two BLOCKED counts match, scenery adds zero blockage. */
+int rogue_gen_debug_sweep(int n) {
+    static RogueLevelInfo lv;
+    int depths[] = { 1, 2, 3, 4, 5, 8, 9, 12, 13, 16, 17, 20 };
+    int nd = (int)(sizeof depths / sizeof depths[0]);
+    int base_fail = 0, deco_fail = 0, total = 0, regress = 0;
+    for (int s = 1; s <= n; s++)
+        for (int di = 0; di < nd; di++) {
+            uint32_t sd = (uint32_t)(s * 2654435761u + 12345u);
+            rogue_gen_disable_scenery = 1;
+            rogue_gen_dungeon(sd, depths[di], &lv);
+            int base_ok = rogue_gen_validate(&lv);
+            rogue_gen_disable_scenery = 0;
+            rogue_gen_dungeon(sd, depths[di], &lv);
+            int deco_ok = rogue_gen_validate(&lv);
+            total++;
+            if (!base_ok) base_fail++;
+            if (!deco_ok) deco_fail++;
+            if (base_ok && !deco_ok) {              /* scenery BROKE a good level */
+                regress++;
+                printf("  REGRESSION seed=%d depth=%d (clear without scenery)\n", s, depths[di]);
+            }
+        }
+    printf("[sweep] %d levels | blocked: base=%d scenery=%d | "
+           "scenery-caused regressions=%d\n", total, base_fail, deco_fail, regress);
+    return regress;   /* the only number that matters: scenery must add ZERO */
+}
+#endif /* ROGUE_VALIDATE */

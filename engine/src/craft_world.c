@@ -490,7 +490,7 @@ static void compute_skyheight_region(int lx0, int lx1, int lz0, int lz1) {
  * relies on; the others are full-byte ids above that range. */
 static inline bool is_light_source(uint8_t b) {
     return (b & 0x3F) == BLK_TORCH || craft_is_lava_id(b) ||
-           b == BLK_PORTAL || b == BLK_LAMP_ON;
+           b == BLK_PORTAL || b == BLK_LAMP_ON || b == BLK_CRYSTAL;
 }
 
 /* Light-source registry (world coords, like the torch list). The
