@@ -14,8 +14,9 @@ you find this run *is* your build. How deep you get is your score.
 > loot, Spelunky's guaranteed-solvable procedural floors, Angband's one-life
 > depth obsession, Dead-Cells/Hades combat readability.
 
-See **[PLAN.md](PLAN.md)** for the full design and phased roadmap, and
-**[docs/guide.html](docs/guide.html)** for an illustrated loot & level-gen guide.
+See **[PLAN.md](PLAN.md)** for the full design and phased roadmap, and the
+**[illustrated user guide](https://austinio7116.github.io/ThumbyRogue/)** (loot,
+level-gen, every band & icon).
 
 ## Status
 
@@ -25,9 +26,9 @@ paths, real-time combat (melee/ranged/caster + dodge→jump), jump/platforming
 (lava pits & bridges, pedestals, moving platforms), 5 depth bands + champions,
 the **Diablo-4-lite loot system** (6 equip slots, rarity + affixes, legendary
 aspects, sockets/gems, salvage, merchant shop) with a paperdoll inventory
-screen, light/torch tension, traps, and procedural audio. See
-**[docs/guide.html](docs/guide.html)** for the illustrated loot & level-gen
-guide.
+screen, light/torch tension, traps, and procedural audio. See the
+**[illustrated user guide](https://austinio7116.github.io/ThumbyRogue/)** for
+the full loot & level-gen breakdown.
 
 ## Layout
 
