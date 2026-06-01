@@ -109,11 +109,13 @@ int main(void) {
 
 #ifdef THUMBYONE_SLOT_MODE
         /* Hold MENU ~1.2s to return to the lobby (short taps still open the
-         * inventory). The run auto-saved on the last descent resumes next time. */
+         * inventory). The full mid-level state is snapshotted on the way out so
+         * the run resumes exactly where you left it. */
         static uint32_t s_menu_held_ms = 0;
         if (btn.menu) {
             s_menu_held_ms += (uint32_t)(dt * 1000.0f);
             if (s_menu_held_ms >= 1200u) {
+                rogue_game_save_full();              /* suspend the live floor */
                 craft_lcd_wait_idle();
                 thumbyone_handoff_request_lobby();   /* reboots to lobby; no return */
             }

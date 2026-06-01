@@ -314,6 +314,14 @@ int main(int argc, char **argv) {
             extern void rogue_game_debug_drop_loot(void);
             rogue_game_debug_drop_loot();
         }
+        if (getenv("ROGUE_SUSPENDTEST")) {   /* suspend save/restore round-trip */
+            extern void rogue_game_debug_drop_loot(void);
+            extern void rogue_game_debug_suspend_test(void);
+            rogue_game_debug_drop_loot();    /* leave some ground loot + a gold coin */
+            { CraftRawButtons u = {0}; u.up = true;
+              for (int i = 0; i < 12; i++) rogue_game_tick(&u, 1.0f/30.0f); }  /* walk off-spawn */
+            rogue_game_debug_suspend_test();
+        }
         if (getenv("ROGUE_MAP")) {   /* reveal map + open inventory grid to view it */
             extern void rogue_game_debug_fill_bag(void), rogue_game_debug_reveal_map(void);
             rogue_game_debug_fill_bag();

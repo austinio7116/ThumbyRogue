@@ -61,4 +61,15 @@ int rogue_enemies_alive_count(void);
 /* Nearest live enemy to (x,z); false if none. (Debug/autopilot helper.) */
 bool rogue_enemies_nearest(float x, float z, float *ex, float *ez);
 
+/* --- mid-level suspend snapshot --------------------------------------- *
+ * Capture/restore the live enemy pool so quitting to the lobby and resuming
+ * puts every creature back where it was (position + hp), not freshly spawned. */
+typedef struct {
+    uint8_t type, champ;
+    int16_t hp;
+    float   x, y, z, yaw;
+} RogueEnemySave;
+int  rogue_enemies_export(RogueEnemySave *out, int max);   /* count of live enemies */
+void rogue_enemies_import(const RogueEnemySave *in, int n);
+
 #endif /* ROGUE_ENEMY_H */

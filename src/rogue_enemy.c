@@ -212,6 +212,37 @@ void rogue_enemies_clear(void) {
     s_death_n = 0;
 }
 
+int rogue_enemies_export(RogueEnemySave *out, int max) {
+    int n = 0;
+    for (int i = 0; i < ROGUE_MAX_ENEMIES && n < max; i++) {
+        if (!s_en[i].alive) continue;
+        out[n].type  = (uint8_t)s_en[i].type;
+        out[n].champ = s_en[i].champion ? 1 : 0;
+        out[n].hp    = (int16_t)s_en[i].hp;
+        out[n].x = s_en[i].pos.x; out[n].y = s_en[i].pos.y; out[n].z = s_en[i].pos.z;
+        out[n].yaw = s_en[i].yaw;
+        n++;
+    }
+    return n;
+}
+
+void rogue_enemies_import(const RogueEnemySave *in, int n) {
+    rogue_enemies_clear();
+    if (n > ROGUE_MAX_ENEMIES) n = ROGUE_MAX_ENEMIES;
+    for (int i = 0; i < n; i++) {
+        Enemy *e = &s_en[i];
+        e->alive = true;
+        e->type = (EnemyType)in[i].type;
+        e->champion = in[i].champ != 0;
+        e->hp = in[i].hp;
+        e->pos = v3(in[i].x, in[i].y, in[i].z);
+        e->yaw = in[i].yaw;
+        e->state = AI_WANDER; e->state_t = 0.0f;
+        e->wander_dx = 0.0f; e->wander_dz = 0.0f;
+        e->hurt_flash = 0.0f; e->atk_cd = 0.0f;
+    }
+}
+
 /* Apply damage + knockback to one enemy; record a death event if it dies. */
 static void en_apply_damage(Enemy *e, int dmg, float fromx, float fromz) {
     e->hp -= dmg;

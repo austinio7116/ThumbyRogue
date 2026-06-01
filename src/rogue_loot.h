@@ -37,4 +37,15 @@ void rogue_loot_add_chest_at(float x, float y, float z);
 
 void rogue_loot_draw(const CraftCamera *cam, uint16_t *fb);
 
+/* --- mid-level suspend snapshot --------------------------------------- *
+ * Ground drops aren't reproducible from the seed (they come from kills /
+ * opened chests), so they're saved in full. Chest *positions* regenerate
+ * deterministically, so only their opened-flags need restoring. */
+#define ROGUE_MAX_GROUND 18
+typedef struct { RogueItem it; Vec3 pos; } RogueGroundSave;
+int  rogue_loot_export_ground(RogueGroundSave *out, int max);   /* live drops */
+void rogue_loot_import_ground(const RogueGroundSave *in, int n);
+uint32_t rogue_loot_chest_mask(void);          /* bit i set = chest i opened */
+void rogue_loot_apply_chest_mask(uint32_t mask);
+
 #endif /* ROGUE_LOOT_H */

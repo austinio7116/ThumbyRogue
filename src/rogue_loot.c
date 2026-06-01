@@ -10,7 +10,7 @@
 void rogue_game_toast(const char *msg);   /* announce pickups/chests */
 
 #define RGB(r,g,b) ((uint16_t)((((r)>>3)<<11)|(((g)>>2)<<5)|((b)>>3)))
-#define MAX_GROUND 18
+#define MAX_GROUND ROGUE_MAX_GROUND   /* shared with the suspend snapshot */
 #define MAX_CHEST  8
 #define PICKUP_R   1.4f    /* gold/potion vacuum radius */
 #define INTERACT_R 1.3f
@@ -220,4 +220,39 @@ void rogue_loot_draw(const CraftCamera *cam, uint16_t *fb) {
         RogueCuboid m[1] = { { 0.0f, 0.10f, 0.0f, 0.10f, 0.10f, 0.10f, c } };
         rogue_render_model(cam, fb, pos, g->spin, m, 1, 0.16f, 0.30f, 0.0f, 256);
     }
+}
+
+/* --- mid-level suspend snapshot ---------------------------------------- */
+int rogue_loot_export_ground(RogueGroundSave *out, int max) {
+    int n = 0;
+    for (int i = 0; i < MAX_GROUND && n < max; i++) {
+        if (!s_g[i].alive) continue;
+        out[n].it = s_g[i].item;
+        out[n].pos = s_g[i].pos;
+        n++;
+    }
+    return n;
+}
+
+void rogue_loot_import_ground(const RogueGroundSave *in, int n) {
+    for (int i = 0; i < MAX_GROUND; i++) s_g[i].alive = false;
+    if (n > MAX_GROUND) n = MAX_GROUND;
+    for (int i = 0; i < n; i++) {
+        s_g[i].alive = true;
+        s_g[i].item  = in[i].it;
+        s_g[i].pos   = in[i].pos;
+        s_g[i].spin  = 0.0f;
+    }
+}
+
+uint32_t rogue_loot_chest_mask(void) {
+    uint32_t m = 0;
+    for (int i = 0; i < MAX_CHEST; i++)
+        if (s_c[i].used && s_c[i].opened) m |= (1u << i);
+    return m;
+}
+
+void rogue_loot_apply_chest_mask(uint32_t mask) {
+    for (int i = 0; i < MAX_CHEST; i++)
+        if (s_c[i].used && (mask & (1u << i))) s_c[i].opened = true;
 }

@@ -18,6 +18,10 @@ void rogue_game_init(uint32_t seed);
  * rogue_game_save persists the current run; load happens automatically in
  * rogue_game_init (resumes a saved run, else starts fresh keeping best depth). */
 void rogue_game_save(int run_active);
+/* Full mid-level suspend (call on quit-to-lobby): snapshots the live floor —
+ * hero position, enemies, ground loot, opened chests — so the run resumes
+ * exactly where it left off. Falls back to a checkpoint if not mid-run. */
+void rogue_game_save_full(void);
 void rogue_game_tick(const CraftRawButtons *btn, float dt);
 void rogue_game_get_camera(CraftCamera *out);    /* render the world with this */
 void rogue_game_draw_overlay(uint16_t *fb);      /* entities + HUD, after strip */

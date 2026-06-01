@@ -142,7 +142,7 @@ static bool s_have_keep;
 int rogue_plat_save(const uint8_t *data, int len);   /* platform-provided */
 int rogue_plat_load(uint8_t *data, int max);
 
-#define ROGUE_SAVE_MAGIC 0x52475633u   /* 'RGV3' — bumped: backpack grew to 21 slots */
+#define ROGUE_SAVE_MAGIC 0x52475634u   /* 'RGV4' — added full mid-level suspend */
 typedef struct {
     uint32_t magic, version;
     uint32_t seed;
@@ -152,21 +152,56 @@ typedef struct {
     RogueItem equip[SLOT_COUNT];
     int32_t  bag_n;
     RogueItem bag[ROGUE_BAG_N];
+    /* --- full mid-level suspend (valid only when `suspended` != 0) ----- *
+     * The floor's blocks/scenery/chest-positions regenerate deterministically
+     * from `seed`, so only the non-reproducible dynamic state is stored: the
+     * hero's exact spot, the live enemies, ground drops, and which chests were
+     * already opened. Lets a lobby-quit resume EXACTLY where you left off. */
+    int32_t  suspended;
+    float    px, py, pz, pyaw;
+    int32_t  n_en;
+    RogueEnemySave  en[ROGUE_MAX_ENEMIES];
+    int32_t  n_ground;
+    RogueGroundSave ground[ROGUE_MAX_GROUND];
+    uint32_t chest_mask;
 } RogueSave;
+_Static_assert(sizeof(RogueSave) <= 8192, "suspend save must fit the standalone 8KB flash region");
 
+/* Fill the common header/inventory fields shared by both save kinds. */
+static void save_fill_common(RogueSave *s, int run_active) {
+    memset(s, 0, sizeof *s);
+    s->magic = ROGUE_SAVE_MAGIC; s->version = 4;
+    s->seed = s_seed;
+    s->depth = run_active ? s_depth : -1;
+    s->kills = s_kills;
+    s->best = (s_depth > s_best_depth) ? s_depth : s_best_depth;
+    s->gold = s_player.gold;
+    s->hp = s_player.hp;
+    s->torch = s_player.torch_fuel;
+    for (int i = 0; i < SLOT_COUNT; i++) s->equip[i] = s_player.equip[i];
+    s->bag_n = rogue_inventory_export(s->bag, ROGUE_BAG_N);
+}
+
+/* Between-floor checkpoint: regenerates the floor at its entrance on resume. */
 void rogue_game_save(int run_active) {
     RogueSave s;
-    memset(&s, 0, sizeof s);
-    s.magic = ROGUE_SAVE_MAGIC; s.version = 3;
-    s.seed = s_seed;
-    s.depth = run_active ? s_depth : -1;
-    s.kills = s_kills;
-    s.best = (s_depth > s_best_depth) ? s_depth : s_best_depth;
-    s.gold = s_player.gold;
-    s.hp = s_player.hp;
-    s.torch = s_player.torch_fuel;
-    for (int i = 0; i < SLOT_COUNT; i++) s.equip[i] = s_player.equip[i];
-    s.bag_n = rogue_inventory_export(s.bag, ROGUE_BAG_N);
+    save_fill_common(&s, run_active);
+    s.suspended = 0;
+    rogue_plat_save((const uint8_t *)&s, (int)sizeof s);
+}
+
+/* Full mid-level suspend (lobby-quit): snapshots the live floor so resuming
+ * drops you back on the same spot with the same enemies / loot / chests. */
+void rogue_game_save_full(void) {
+    if (s_title || !s_player.alive || s_depth <= 0) { rogue_game_save(1); return; }
+    RogueSave s;
+    save_fill_common(&s, 1);
+    s.suspended = 1;
+    s.px = s_player.pos.x; s.py = s_player.pos.y; s.pz = s_player.pos.z;
+    s.pyaw = s_player.yaw;
+    s.n_en = rogue_enemies_export(s.en, ROGUE_MAX_ENEMIES);
+    s.n_ground = rogue_loot_export_ground(s.ground, ROGUE_MAX_GROUND);
+    s.chest_mask = rogue_loot_chest_mask();
     rogue_plat_save((const uint8_t *)&s, (int)sizeof s);
 }
 
@@ -192,6 +227,18 @@ static bool try_resume(void) {
     s_have_keep = true;
     for (int i = 0; i < SLOT_COUNT; i++) s_keep_equip[i] = s.equip[i];
     s_keep_gold = s.gold;
+    if (s.suspended) {
+        /* Mid-level suspend: load_level() regenerated the floor and spawned a
+         * fresh population; replace it with the saved snapshot and put the hero
+         * back exactly where they quit. */
+        rogue_enemies_import(s.en, s.n_en);
+        rogue_loot_import_ground(s.ground, s.n_ground);
+        rogue_loot_apply_chest_mask(s.chest_mask);
+        s_player.pos = v3(s.px, s.py, s.pz);
+        s_player.yaw = s.pyaw;
+        rogue_camera_init(s_player.pos);
+        rogue_camera_get(&s_cam);
+    }
     return true;
 }
 
@@ -824,6 +871,28 @@ void rogue_game_debug_drop_loot(void) {
     rogue_loot_drop(&it, v3(s_player.pos.x - 1.0f, s_player.pos.y, s_player.pos.z + 0.4f));
     rogue_item_roll_weapon(&it, 8, loot_rng()); it.rarity = RAR_RARE;
     rogue_loot_drop(&it, v3(s_player.pos.x + 1.0f, s_player.pos.y, s_player.pos.z + 0.4f));
+}
+
+/* Print the live run state (suspend round-trip verification). */
+void rogue_game_debug_print_state(const char *tag) {
+    RogueGroundSave g[ROGUE_MAX_GROUND];
+    int ng = rogue_loot_export_ground(g, ROGUE_MAX_GROUND);
+    printf("[state %s] depth=%d pos=(%.2f,%.2f) yaw=%.2f en=%d ground=%d gold=%d hp=%d chest=0x%x\n",
+           tag, s_depth, s_player.pos.x, s_player.pos.z, s_player.yaw,
+           rogue_enemies_alive_count(), ng, s_player.gold, s_player.hp,
+           rogue_loot_chest_mask());
+}
+
+/* Suspend round-trip self-test: snapshot → perturb → resume → compare.
+ * The two "before" and "after-resume" lines should match. */
+void rogue_game_debug_suspend_test(void) {
+    rogue_game_debug_print_state("before");
+    rogue_game_save_full();
+    s_player.pos.x += 9.0f; s_player.gold += 999;   /* corrupt live state */
+    rogue_enemies_clear();
+    rogue_game_debug_print_state("perturbed");
+    try_resume();                                   /* reload from the suspend */
+    rogue_game_debug_print_state("after-resume");
 }
 
 /* Spawn a spread of floating damage numbers near the hero (FX verification). */
