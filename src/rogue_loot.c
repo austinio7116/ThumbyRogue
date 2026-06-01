@@ -78,16 +78,15 @@ void rogue_loot_update(RoguePlayer *p, float dt) {
         if (g->item.kind == ITEM_GOLD) {
             p->gold += g->item.amount;
             g->alive = false;
-        } else if (g->item.kind == ITEM_POTION) {
-            p->hp += g->item.amount;
-            if (p->hp > p->max_hp) p->hp = p->max_hp;
-            g->alive = false;
         } else if (g->item.kind == ITEM_TORCH) {
             p->torch_fuel += g->item.amount;
             if (p->torch_fuel > 90.0f) p->torch_fuel = 90.0f;
             g->alive = false;
-        } else if (rogue_item_is_equip(&g->item) || g->item.kind == ITEM_GEM) {
-            /* gear + gems auto-collect into the backpack (managed via MENU) */
+        } else if (rogue_item_is_equip(&g->item) || g->item.kind == ITEM_GEM ||
+                   g->item.kind == ITEM_POTION) {
+            /* gear + gems + potions auto-collect into the backpack; potions are
+             * carried and quaffed manually from the inventory (USE), not drunk
+             * instantly on pickup. */
             if (rogue_inventory_add(&g->item)) {
                 char msg[48]; snprintf(msg, sizeof msg, "Got %s", g->item.name);
                 rogue_game_toast(msg);

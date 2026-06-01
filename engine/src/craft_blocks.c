@@ -301,30 +301,42 @@ static void mycelium_pattern(uint16_t *dst, uint32_t seed) {
         }
 }
 
-/* Fungal wall: a DARK spore-colony rock (darker than the floor, so the floor
- * reads as the play surface) studded with clustered bioluminescent pustules —
- * cyan colonies with the odd magenta bloom. */
+/* Fungal wall: a solid, organic mat of CONNECTED VINES — winding tube-shaded
+ * tendrils (3 vertical + 2 horizontal, sinusoidal so the 16px tile loops
+ * seamlessly) covering a dark loamy base, knotted where they cross, with a
+ * few glowing pods. Reads as living overgrowth rather than glowy rock. */
 static void fungal_wall_pattern(uint16_t *dst, uint32_t seed) {
-    uint32_t s = seed;
+    const float TAU = 6.2831853f;
+    float ps = (float)(seed & 7) * 0.4f;          /* per-band phase jitter */
     for (int y = 0; y < CRAFT_TEX_SIZE; y++)
         for (int x = 0; x < CRAFT_TEX_SIZE; x++) {
-            /* Calm dark teal-rock base with large soft patches (relates to the
-             * jade floor) — no per-pixel speckle. */
-            uint32_t cm = (uint32_t)(((x >> 2) + 1) * 26597) ^ (uint32_t)(((y >> 2) + 1) * 53401) ^ seed;
-            cm ^= cm >> 13; cm *= 0x9E3779B1u; cm ^= cm >> 16;
-            int patch = ((cm & 3u) == 0u) ? -8 : ((cm & 3u) == 1u) ? 7 : 0;
-            int j = ((int)(xs32(&s) & 0x7) - 4);
-            int r = 34 + j + patch, g = 56 + j + patch, b = 60 + j + patch;  /* dark teal rock */
-            /* Bioluminescent colonies: only a few 4x4 blocks host glow, and
-             * within those just a small node glows — so the wall reads as
-             * clustered pustules, not scattered noise. */
-            uint32_t h = (uint32_t)((x+5)*83492791) ^ (uint32_t)((y+2)*19349663) ^ seed;
-            h ^= h >> 13; h *= 0x9E3779B1u; h ^= h >> 16;
-            if ((cm % 6u) == 0u && (h % 5u) == 0u) {                 /* cyan colony node */
-                r = 90; g = 220; b = 205;
-                if ((h % 25u) == 0u) { r = 150; g = 245; b = 230; }  /* bright core */
-            } else if ((cm % 17u) == 3u && (h % 7u) == 0u) {         /* rare magenta bloom */
-                r = 210; g = 95; b = 220;
+            float fx = (float)x, fy = (float)y;
+            /* nearest distance to any vine strand (with toroidal wrap) */
+            float best = 99.0f;
+            for (int i = 0; i < 3; i++) {                          /* vertical vines */
+                float cx = (2.5f + i * 5.0f) + 3.0f * sinf(fy * TAU / 16.0f + i * 2.1f + ps);
+                float d = fabsf(fx - cx); if (d > 8.0f) d = 16.0f - d;
+                if (d < best) best = d;
+            }
+            for (int i = 0; i < 2; i++) {                          /* horizontal vines */
+                float cy = (4.0f + i * 8.0f) + 2.5f * sinf(fx * TAU / 16.0f + i * 1.7f + ps);
+                float d = fabsf(fy - cy); if (d > 8.0f) d = 16.0f - d;
+                if (d < best) best = d;
+            }
+            int r, g, b;
+            if (best < 2.3f) {                                     /* on a vine — tube shade */
+                float t = best / 2.3f;                             /* 0 core .. 1 rim */
+                r = 46 - (int)(t * 22);
+                g = 168 - (int)(t * 96);                           /* bright green core → dark rim */
+                b = 74 - (int)(t * 34);
+                uint32_t h = (uint32_t)((x+5)*83492791) ^ (uint32_t)((y+2)*19349663) ^ seed;
+                h ^= h >> 13; h *= 0x9E3779B1u; h ^= h >> 16;
+                if (best < 1.0f && (h % 23u) == 0u) { r = 130; g = 245; b = 205; } /* glowing pod */
+            } else {                                               /* dark loam between vines */
+                uint32_t cm = (uint32_t)(((x >> 2) + 1) * 26597) ^ (uint32_t)(((y >> 2) + 1) * 53401) ^ seed;
+                cm ^= cm >> 13; cm *= 0x9E3779B1u; cm ^= cm >> 16;
+                int patch = ((cm & 3u) == 0u) ? -6 : ((cm & 3u) == 1u) ? 5 : 0;
+                r = 26 + patch; g = 40 + patch; b = 32 + patch;
             }
             dst[y * CRAFT_TEX_SIZE + x] = rgb565(r, g, b);
         }
