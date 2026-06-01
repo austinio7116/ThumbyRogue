@@ -121,6 +121,14 @@ int main(int argc, char **argv) {
         if (n < 1) n = 200;
         return rogue_gen_debug_sweep(n) == 0 ? 0 : 1;
     }
+    if (getenv("ROGUE_DUMP")) {    /* top-down diagnostic for one seed:depth */
+        extern void rogue_gen_debug_dump(uint32_t, int);
+        int s = atoi(getenv("ROGUE_DUMP"));
+        const char *colon = strchr(getenv("ROGUE_DUMP"), ':');
+        int depth = colon ? atoi(colon + 1) : 1;
+        rogue_gen_debug_dump((uint32_t)(s * 2654435761u + 12345u), depth);
+        return 0;
+    }
 
     if (SDL_Init(shot_path ? SDL_INIT_EVENTS
                            : (SDL_INIT_VIDEO | SDL_INIT_EVENTS)) != 0)

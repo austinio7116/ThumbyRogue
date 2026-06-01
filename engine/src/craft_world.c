@@ -358,6 +358,7 @@ static inline void light_set_max(int idx, uint8_t level) {
 static inline bool light_transparent(BlockId b) {
     if (b == BLK_AIR   || craft_is_water_id((uint8_t)b) ||
         b == BLK_GLASS || b == BLK_TORCH) return true;
+    if (b == BLK_BARRIER) return true;   /* invisible — never blocks light */
     if (b == BLK_LADDER        || b == BLK_PRESSURE_PAD) return true;
     if (b == BLK_REDSTONE_WIRE || b == BLK_REDSTONE_WIRE_ON) return true;
     if (b == BLK_DOOR_OFF      || b == BLK_DOOR_ON) return true;

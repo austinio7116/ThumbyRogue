@@ -724,6 +724,7 @@ INLINE_HOT TraceHit trace_ray(Vec3 origin, Vec3 dir, bool stop_at_water) {
          * top 2 bits, which carry the water-flow level field. */
         BlockId blk = (BlockId)craft_world_blocks[idx];
         if (blk == BLK_AIR) { PROF_INC(craft_prof_air); continue; }
+        if (blk == BLK_BARRIER) continue;   /* invisible containment wall — trace through */
         uint8_t cls = s_block_class[blk];
         /* 3D post-pass sprite (torch/ladder/door/piston/etc): smaller-
          * than-cube cuboid models drawn AFTER the world raycaster by

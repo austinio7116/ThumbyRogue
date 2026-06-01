@@ -133,15 +133,16 @@ static float vnoise(float fx, float fz, uint32_t seed) {
     return a + (b - a) * tx + (c - a) * tz + (a - b - c + d) * tx * tz;
 }
 static int bg_height(int x, int z, uint32_t seed) {
-    float n = vnoise(x / 9.0f, z / 9.0f, seed)
-            + 0.4f * vnoise(x / 4.0f, z / 4.0f, seed ^ 0x55u);
-    n /= 1.4f;
-    /* A LOW enclosing rock lip just high enough that you can't walk/jump out a
-     * ruined gap (top = FLOOR_Y+2, above the ~1.6-block jump), but not so tall
-     * it walls off the iso camera's view. An occasional +1 for a little
-     * craggy variation. */
-    int h = ROGUE_FLOOR_Y + 1;
-    if (n > 0.65f) h += 1;
+    /* Natural rolling terrain around the dungeon. Containment is handled by
+     * the invisible BLK_BARRIER cap (see rogue_gen_dungeon), so this is free
+     * to undulate — smooth two-octave hills FLOOR_Y+1 .. +4 instead of the old
+     * flat enclosing lip. Kept moderate so the near edge doesn't tower over
+     * the iso view. */
+    float n = vnoise(x / 12.0f, z / 12.0f, seed)
+            + 0.5f * vnoise(x / 5.5f, z / 5.5f, seed ^ 0x55u);
+    n /= 1.5f;                                  /* ~0..1 */
+    if (n < 0.0f) n = 0.0f; if (n > 1.0f) n = 1.0f;
+    int h = ROGUE_FLOOR_Y + 1 + (int)(n * n * 3.0f);   /* bias low; occasional hills */
     if (h >= CRAFT_WORLD_Y) h = CRAFT_WORLD_Y - 1;
     return h;
 }
@@ -382,18 +383,26 @@ void rogue_gen_dungeon(uint32_t seed, int depth, RogueLevelInfo *out) {
 
     apply_to_world(seed, depth);
 
-    /* Lava chasms: turn a couple of rooms into an ORGANIC lava lake sunk a
-     * couple of levels below the floor, spanned by a narrow 2-wide BRIDGE you
-     * cross on foot (and, via rogue_platform, a moving platform). The blobby
-     * lake edge comes from value noise, not square quadrants. Lava is
-     * non-solid + erupts you out, so the bridge is the safe route but a miss
-     * never soft-locks. Chasm centres are recorded for platform placement. */
+    /* Reserve a guaranteed on-foot route NOW, while the floor is still intact
+     * (carved corridors are connected — is_walk guarantees it). Everything
+     * that follows — lava chasms, water, scenery — refuses to disturb a
+     * reserved cell, so a continuous solid-floor path up→down always survives,
+     * even when a lake would otherwise sever a corridor the bridge misses. */
+    reserve_solution_path(s_rooms[up].cx, s_rooms[up].cz,
+                          s_rooms[down].cx, s_rooms[down].cz);
+
+    /* Lava chasms: an ORGANIC lava lake sunk below the floor that you can
+     * fall into (the abyss). RARE and only from the second band on — the
+     * Crypt (depths 1..ROGUE_BAND_FLOORS) has none, so early floors stay
+     * gentle. The reserved solution path keeps a solid land route across, so
+     * a lake never blocks progress; the bridge + moving platform reward the
+     * brave. Chasm centres are recorded for platform placement. */
     out->n_chasm = 0;
-    for (int i = 0; i < s_n_rooms && out->n_chasm < 3; i++) {
+    int chasms_allowed = (depth > ROGUE_BAND_FLOORS);   /* band 2 onward */
+    for (int i = 0; chasms_allowed && i < s_n_rooms && out->n_chasm < 2; i++) {
         if (i == up || i == down) continue;
-        bool force = (out->n_chasm == 0 && i == s_n_rooms - 1);  /* guarantee >=1 */
-        if (!force && (hash2(s_rooms[i].cx, s_rooms[i].cz, seed ^ 0x1A7Au) % 3u) != 0u)
-            continue;
+        if ((hash2(s_rooms[i].cx, s_rooms[i].cz, seed ^ 0x1A7Au) % 6u) != 0u)
+            continue;                                   /* ~1 in 6 eligible rooms — dotted about */
         int cx = s_rooms[i].cx, cz = s_rooms[i].cz;
         int isx = cx - 4, isz = cz - 4;                      /* bonus island (marooned) */
         for (int dz = -7; dz <= 7; dz++) {
@@ -410,6 +419,7 @@ void rogue_gen_dungeon(uint32_t seed, int depth, RogueLevelInfo *out) {
                 if (d > rn * rn) continue;                   /* blobby lake edge */
                 int x = cx + dx, z = cz + dz;
                 if (!is_walk(x, z)) continue;
+                if (path_reserved(x, z)) continue;           /* keep the solution route solid */
                 craft_world_set_byte(x, ROGUE_FLOOR_Y - 1, z, BLK_AIR);
                 craft_world_set_byte(x, ROGUE_FLOOR_Y - 2, z, BLK_LAVA);
                 craft_world_set_byte(x, ROGUE_FLOOR_Y - 3, z, BLK_LAVA);
@@ -490,10 +500,8 @@ void rogue_gen_dungeon(uint32_t seed, int depth, RogueLevelInfo *out) {
         out->n_torch++;
     }
 
-    /* Reserve a guaranteed on-foot route from the up-stairs to the down-
-     * stairs BEFORE placing scenery, so no set-piece can ever block it. */
-    reserve_solution_path(s_rooms[up].cx, s_rooms[up].cz,
-                          s_rooms[down].cx, s_rooms[down].cz);
+    /* (The solution path was reserved earlier, before chasms; scenery stampers
+     * honour the same reservation, so set-pieces can't block the route.) */
 
     /* Room scenery: each room gets ONE arranged set-piece (a library wall, a
      * barrel pile, a tomb of coffins, a crystal cluster, an altar) plus a
@@ -549,6 +557,23 @@ void rogue_gen_dungeon(uint32_t seed, int depth, RogueLevelInfo *out) {
             }
         }
     }
+
+    /* Invisible containment cap: above every non-walkable cell that rises to
+     * at least the floor (perimeter walls + surround hills, but NOT bare-floor
+     * breaches), drop two invisible-but-solid cells just over the surface. The
+     * hero can never stand on or vault a wall/hill — not even by climbing
+     * scenery as a step — so the level can't be escaped, while the raycaster
+     * traces straight through (nothing drawn) and the iso view is untouched. */
+    for (int z = 0; z < GD; z++)
+        for (int x = 0; x < GW; x++) {
+            if (is_walk(x, z)) continue;
+            int top = -1;
+            for (int y = ROGUE_FLOOR_Y + 6; y >= ROGUE_FLOOR_Y; y--)
+                if (craft_block_solid((BlockId)craft_world_get_byte(x, y, z))) { top = y; break; }
+            if (top < ROGUE_FLOOR_Y) continue;          /* bare-floor breach — stays walkable */
+            craft_world_set_byte(x, top + 1, z, BLK_BARRIER);
+            craft_world_set_byte(x, top + 2, z, BLK_BARRIER);
+        }
 
     craft_world_rebuild_lightmap();
 
@@ -632,6 +657,57 @@ int rogue_gen_validate(const RogueLevelInfo *lv) {
     return 0;
 }
 
+/* Top-down diagnostic map of one level: why does the validator (not) reach
+ * the down-stairs? '#'=can't stand, '.'=reachable, '?'=standable but NOT
+ * reached, 'U'/'D'=stairs, 'L'=lava, '~'=water. */
+void rogue_gen_debug_dump(uint32_t seed, int depth) {
+    static RogueLevelInfo lv;
+    rogue_gen_disable_scenery = 1;
+    rogue_gen_dungeon(seed, depth, &lv);
+    int reached = rogue_gen_validate(&lv);   /* fills s_rv_seen */
+    /* Pure carved-grid (is_walk) connectivity, ignoring floor/lava — tells us
+     * whether the BSP corridors themselves connect up→down, vs a chasm/floor
+     * issue. */
+    static uint8_t cw[GW * GD]; memset(cw, 0, sizeof cw);
+    static uint16_t cq[GW * GD]; int ch = 0, ct = 0;
+    int walk_conn = 0;
+    if (is_walk(lv.up_x, lv.up_z)) {
+        cw[lv.up_z * GW + lv.up_x] = 1; cq[ct++] = (uint16_t)(lv.up_z * GW + lv.up_x);
+        while (ch < ct) {
+            int idx = cq[ch++], x = idx % GW, z = idx / GW;
+            for (int d = 0; d < 4; d++) {
+                int nx = x + PDX[d], nz = z + PDZ[d];
+                if (!is_walk(nx, nz) || cw[nz * GW + nx]) continue;
+                cw[nz * GW + nx] = 1; cq[ct++] = (uint16_t)(nz * GW + nx);
+            }
+        }
+        walk_conn = cw[lv.down_z * GW + lv.down_x];
+    }
+    printf("seed=%u depth=%d  up=(%d,%d) down=(%d,%d)  is_walk_conn=%d gen_path=%d validator=%s\n",
+           seed, depth, lv.up_x, lv.up_z, lv.down_x, lv.down_z, walk_conn,
+           reserve_solution_path(lv.up_x, lv.up_z, lv.down_x, lv.down_z),
+           reached ? "REACHED" : "BLOCKED");
+    for (int z = 0; z < GD; z++) {
+        char line[GW + 1];
+        for (int x = 0; x < GW; x++) {
+            char c;
+            if (x == lv.up_x && z == lv.up_z)        c = 'U';
+            else if (x == lv.down_x && z == lv.down_z) c = 'D';
+            else {
+                uint8_t bel = craft_world_get_byte(x, ROGUE_FLOOR_Y - 1, z);
+                if (craft_is_lava_id(bel))           c = 'L';
+                else if (craft_is_water_id(bel))     c = '~';
+                else if (rv_stand_y(x, z) < 0)       c = '#';
+                else if (s_rv_seen[z * GW + x])      c = '.';
+                else                                  c = '?';
+            }
+            line[x] = c;
+        }
+        line[GW] = 0;
+        printf("%s\n", line);
+    }
+}
+
 /* Sweep `n` seeds × every authored depth band TWICE — scenery off then on —
  * and report. If the two BLOCKED counts match, scenery adds zero blockage. */
 int rogue_gen_debug_sweep(int n) {
@@ -649,7 +725,7 @@ int rogue_gen_debug_sweep(int n) {
             rogue_gen_dungeon(sd, depths[di], &lv);
             int deco_ok = rogue_gen_validate(&lv);
             total++;
-            if (!base_ok) base_fail++;
+            if (!base_ok) { base_fail++; if (base_fail <= 30) printf("  base-FAIL seed=%d depth=%d\n", s, depths[di]); }
             if (!deco_ok) deco_fail++;
             if (base_ok && !deco_ok) {              /* scenery BROKE a good level */
                 regress++;

@@ -202,6 +202,7 @@ const char *craft_block_name(BlockId blk) {
         case BLK_SHARDS:        return "shards";
         case BLK_FUNGI:         return "fungi";
         case BLK_COBWEB:        return "cobweb";
+        case BLK_BARRIER:       return "barrier";
         default:                return "?";
     }
 }
@@ -277,50 +278,70 @@ static void cave_rock_pattern(uint16_t *dst, uint32_t seed) {
         }
 }
 
-/* Fungal floor: calm dark purple mycelium with a FEW dim teal spore specks —
- * kept low-contrast so gameplay (enemies, drops, the hero) stays readable. */
+/* Fungal floor: a luminous JADE moss mat — bright and fairly uniform so the
+ * hero, enemies and drops read clearly (the old dark purple was muddy and
+ * unplayable). Soft lighter patches give it life; a few bright spore nodes
+ * glow without cluttering. */
 static void mycelium_pattern(uint16_t *dst, uint32_t seed) {
     uint32_t s = seed;
     for (int y = 0; y < CRAFT_TEX_SIZE; y++)
         for (int x = 0; x < CRAFT_TEX_SIZE; x++) {
+            /* Large 4x4 soft patches (block-level, not per-pixel) keep the mat
+             * calm and uniform instead of speckly. */
+            uint32_t cm = (uint32_t)(((x >> 2) + 1) * 26597) ^ (uint32_t)(((y >> 2) + 1) * 53401) ^ seed;
+            cm ^= cm >> 13; cm *= 0x9E3779B1u; cm ^= cm >> 16;
+            int patch = ((cm & 3u) == 0u) ? -10 : ((cm & 3u) == 1u) ? 8 : 0;
+            int j = ((int)(xs32(&s) & 0x7) - 4);                    /* very gentle grain */
+            int r = 44 + j + patch, g = 100 + j + patch, b = 80 + j + patch; /* calm jade */
+            /* sparse, deliberate bright spore nodes — the only high-contrast bits */
             uint32_t h = (uint32_t)((x+3)*40503) ^ (uint32_t)((y+7)*12289) ^ seed;
             h ^= h >> 13; h *= 0x9E3779B1u; h ^= h >> 16;
-            int j = ((int)(xs32(&s) & 0x7) - 4);                    /* gentle grain */
-            int r = 56 + j, g = 46 + j, b = 76 + j;                 /* dark purple base */
-            if ((h % 53u) == 0)        { r = 64; g = 150; b = 130; }    /* rare, dim spore */
-            else if ((h % 29u) == 0)   { r += 10; g += 8; b += 14; }    /* faint mottle */
+            if ((h % 73u) == 0u) { r = 150; g = 245; b = 205; }
             dst[y * CRAFT_TEX_SIZE + x] = rgb565(r, g, b);
         }
 }
 
-/* Fungal wall: dark organic growth — purple-brown with green moss
- * patches and small magenta glowing fungus. */
+/* Fungal wall: a DARK spore-colony rock (darker than the floor, so the floor
+ * reads as the play surface) studded with clustered bioluminescent pustules —
+ * cyan colonies with the odd magenta bloom. */
 static void fungal_wall_pattern(uint16_t *dst, uint32_t seed) {
     uint32_t s = seed;
     for (int y = 0; y < CRAFT_TEX_SIZE; y++)
         for (int x = 0; x < CRAFT_TEX_SIZE; x++) {
+            /* Calm dark teal-rock base with large soft patches (relates to the
+             * jade floor) — no per-pixel speckle. */
+            uint32_t cm = (uint32_t)(((x >> 2) + 1) * 26597) ^ (uint32_t)(((y >> 2) + 1) * 53401) ^ seed;
+            cm ^= cm >> 13; cm *= 0x9E3779B1u; cm ^= cm >> 16;
+            int patch = ((cm & 3u) == 0u) ? -8 : ((cm & 3u) == 1u) ? 7 : 0;
+            int j = ((int)(xs32(&s) & 0x7) - 4);
+            int r = 34 + j + patch, g = 56 + j + patch, b = 60 + j + patch;  /* dark teal rock */
+            /* Bioluminescent colonies: only a few 4x4 blocks host glow, and
+             * within those just a small node glows — so the wall reads as
+             * clustered pustules, not scattered noise. */
             uint32_t h = (uint32_t)((x+5)*83492791) ^ (uint32_t)((y+2)*19349663) ^ seed;
             h ^= h >> 13; h *= 0x9E3779B1u; h ^= h >> 16;
-            int j = ((int)(xs32(&s) & 0x1f) - 16);
-            int r = 64 + j, g = 48 + j, b = 66 + j;                 /* purple-brown */
-            int blob = (int)((h >> 3) & 0x3f);
-            if (blob < 16)        { r = 56;  g = 132; b = 74; }         /* moss patch */
-            else if (blob == 16)  { r = 200; g = 90;  b = 210; }        /* glowing fungus */
+            if ((cm % 6u) == 0u && (h % 5u) == 0u) {                 /* cyan colony node */
+                r = 90; g = 220; b = 205;
+                if ((h % 25u) == 0u) { r = 150; g = 245; b = 230; }  /* bright core */
+            } else if ((cm % 17u) == 3u && (h % 7u) == 0u) {         /* rare magenta bloom */
+                r = 210; g = 95; b = 220;
+            }
             dst[y * CRAFT_TEX_SIZE + x] = rgb565(r, g, b);
         }
 }
 
-/* Fungal pillar: pale cream giant-mushroom stalk with vertical fibres
- * + a few reddish flecks. */
+/* Fungal pillar: a pale, luminous toadstool stalk — cool blue-white with
+ * soft vertical fibres and a few glowing teal pores. Bright so the pillars
+ * stand out against the dark spore-colony walls. */
 static void mushroom_pattern(uint16_t *dst, uint32_t seed) {
     uint32_t s = seed;
     for (int y = 0; y < CRAFT_TEX_SIZE; y++)
         for (int x = 0; x < CRAFT_TEX_SIZE; x++) {
-            int fibre = ((x & 3) == 0) ? -18 : 0;                   /* vertical fibres */
+            int fibre = ((x & 3) == 0) ? -16 : 0;                   /* vertical fibres */
             int j = ((int)(xs32(&s) & 0xf) - 8);
-            int r = 226 + j + fibre, g = 214 + j + fibre, b = 180 + j + fibre;
+            int r = 198 + j + fibre, g = 220 + j + fibre, b = 222 + j + fibre; /* pale blue-white */
             uint32_t h = (uint32_t)((x+1)*40503) ^ (uint32_t)((y+1)*12289) ^ seed;
-            if ((h % 37u) == 0u) { r = 200; g = 110; b = 90; }      /* reddish fleck */
+            if ((h % 29u) == 0u) { r = 110; g = 235; b = 210; }     /* glowing teal pore */
             dst[y * CRAFT_TEX_SIZE + x] = rgb565(r, g, b);
         }
 }
