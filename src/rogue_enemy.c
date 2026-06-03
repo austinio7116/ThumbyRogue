@@ -29,6 +29,13 @@ typedef struct {
 
 static Enemy s_en[ROGUE_MAX_ENEMIES];
 
+/* Depth-scaled DAMAGE (set at spawn). HP always scaled with depth but damage
+ * never did — past the first floors enemies tickled while your weapon kept
+ * growing. Now they hit ~50% harder from depth 1 and keep climbing at the
+ * same rate as their HP, so armor and lifesteal stay relevant all the way
+ * down. */
+static float s_dmg_scale = 1.5f;
+
 /* Death-event ring: combat records where/what died so the game can drop
  * loot without the enemy module knowing about items. */
 static Vec3      s_death_pos[ROGUE_MAX_ENEMIES];
@@ -83,11 +90,11 @@ const char *rogue_enemy_name(int t){ return (t>=0&&t<EN_TYPE_COUNT)?NAMES[t]:"?"
 
 /* --- cuboid models (feet at y=0, face +Z) ------------------------ */
 static const RogueCuboid M_RAT[] = {
-    { 0.0f, 0.16f, 0.0f, 0.18f, 0.12f, 0.26f, RGB(90,80,70) },     /* body */
-    { 0.0f, 0.20f, 0.28f, 0.10f, 0.09f, 0.10f, RGB(110,98,86) },   /* head */
-    { 0.0f, 0.14f,-0.30f, 0.02f, 0.02f, 0.12f, RGB(150,130,120) }, /* tail */
-    {-0.13f,0.22f,0.30f, 0.04f,0.05f,0.02f, RGB(60,50,45) },       /* ears */
-    { 0.13f,0.22f,0.30f, 0.04f,0.05f,0.02f, RGB(60,50,45) },
+    { 0.0f, 0.16f, 0.0f, 0.18f, 0.12f, 0.26f, RGB(135,108,88) },   /* body */
+    { 0.0f, 0.20f, 0.28f, 0.10f, 0.09f, 0.10f, RGB(160,128,104) }, /* head */
+    { 0.0f, 0.14f,-0.30f, 0.02f, 0.02f, 0.12f, RGB(200,170,155) }, /* tail */
+    {-0.13f,0.22f,0.30f, 0.04f,0.05f,0.02f, RGB(90,70,60) },       /* ears */
+    { 0.13f,0.22f,0.30f, 0.04f,0.05f,0.02f, RGB(90,70,60) },
 };
 static const RogueCuboid M_SLIME[] = {
     { 0.0f, 0.22f, 0.0f, 0.38f, 0.22f, 0.38f, RGB(70,200,90) },    /* blob */
@@ -107,21 +114,21 @@ static const RogueCuboid M_SKELETON[] = {
     { 0.08f,0.32f, 0.0f, 0.05f, 0.32f, 0.05f, RGB(210,210,195) },
 };
 static const RogueCuboid M_SPIDER[] = {
-    { 0.0f, 0.20f, -0.05f,0.26f, 0.16f, 0.30f, RGB(40,30,45) },    /* abdomen */
-    { 0.0f, 0.20f, 0.32f, 0.16f, 0.13f, 0.16f, RGB(55,42,60) },    /* head */
-    {-0.10f,0.30f,0.42f, 0.04f,0.04f,0.03f, RGB(220,40,40) },      /* eyes */
-    { 0.10f,0.30f,0.42f, 0.04f,0.04f,0.03f, RGB(220,40,40) },
-    {-0.34f,0.16f,0.10f, 0.18f,0.03f,0.03f, RGB(30,22,34) },       /* legs */
-    { 0.34f,0.16f,0.10f, 0.18f,0.03f,0.03f, RGB(30,22,34) },
-    {-0.34f,0.16f,-0.20f,0.18f,0.03f,0.03f, RGB(30,22,34) },
-    { 0.34f,0.16f,-0.20f,0.18f,0.03f,0.03f, RGB(30,22,34) },
+    { 0.0f, 0.20f, -0.05f,0.26f, 0.16f, 0.30f, RGB(78,54,95) },    /* abdomen */
+    { 0.0f, 0.20f, 0.32f, 0.16f, 0.13f, 0.16f, RGB(95,68,112) },   /* head */
+    {-0.10f,0.30f,0.42f, 0.04f,0.04f,0.03f, RGB(235,50,50) },      /* eyes */
+    { 0.10f,0.30f,0.42f, 0.04f,0.04f,0.03f, RGB(235,50,50) },
+    {-0.34f,0.16f,0.10f, 0.18f,0.03f,0.03f, RGB(60,42,74) },       /* legs */
+    { 0.34f,0.16f,0.10f, 0.18f,0.03f,0.03f, RGB(60,42,74) },
+    {-0.34f,0.16f,-0.20f,0.18f,0.03f,0.03f, RGB(60,42,74) },
+    { 0.34f,0.16f,-0.20f,0.18f,0.03f,0.03f, RGB(60,42,74) },
 };
 static const RogueCuboid M_BAT[] = {
-    { 0.0f, 0.50f, 0.0f, 0.10f, 0.09f, 0.13f, RGB(50,40,55) },     /* body (hovers) */
-    {-0.26f,0.52f, 0.0f, 0.16f, 0.02f, 0.10f, RGB(35,28,40) },     /* wings */
-    { 0.26f,0.52f, 0.0f, 0.16f, 0.02f, 0.10f, RGB(35,28,40) },
-    {-0.05f,0.55f,0.11f, 0.03f,0.03f,0.02f, RGB(220,60,60) },      /* eyes */
-    { 0.05f,0.55f,0.11f, 0.03f,0.03f,0.02f, RGB(220,60,60) },
+    { 0.0f, 0.50f, 0.0f, 0.10f, 0.09f, 0.13f, RGB(96,72,118) },    /* body (hovers) */
+    {-0.26f,0.52f, 0.0f, 0.16f, 0.02f, 0.10f, RGB(70,52,92) },     /* wings */
+    { 0.26f,0.52f, 0.0f, 0.16f, 0.02f, 0.10f, RGB(70,52,92) },
+    {-0.05f,0.55f,0.11f, 0.03f,0.03f,0.02f, RGB(235,70,70) },      /* eyes */
+    { 0.05f,0.55f,0.11f, 0.03f,0.03f,0.02f, RGB(235,70,70) },
 };
 static const RogueCuboid M_KOBOLD[] = {
     { 0.0f, 0.35f, 0.0f, 0.13f, 0.18f, 0.10f, RGB(120,150,90) },   /* body */
@@ -300,6 +307,7 @@ void rogue_enemies_spawn(const int16_t *room_cx, const int16_t *room_cz,
         e->yaw = frand() * 6.28f;
         float scale = 1.0f + 0.18f * depth;
         e->hp = (int)(DEFS[t].base_hp * scale);
+        s_dmg_scale = 1.5f + 0.18f * (float)(depth - 1);
         e->state = AI_WANDER;
         e->state_t = frand() * 1.5f;
         e->wander_dx = e->wander_dz = 0.0f;
@@ -369,7 +377,7 @@ void rogue_enemies_update(RoguePlayer *p, float dt, int floor_y) {
             break;
         case AI_STRIKE:
             if (e->state_t == 0.0f || e->state_t < dt + 0.0001f) {
-                int dmg = (int)(d->base_dmg * d->dmg_mul) * (e->champion ? 2 : 1);
+                int dmg = (int)(d->base_dmg * d->dmg_mul * s_dmg_scale) * (e->champion ? 2 : 1);
                 if (s_dark) dmg = dmg * 3 / 2;     /* the dark bites harder */
                 if (d->ranged) {
                     /* loose a projectile toward the hero */
@@ -466,31 +474,30 @@ void rogue_enemies_draw(const CraftCamera *cam, uint16_t *fb) {
             float k = e->state_t / d->windup;
             flash = 0.4f + 0.5f * k;
         }
-        if (e->champion) {
-            /* Scale the model up + a permanent menacing red wash. */
-            const float sc = 1.7f;
-            RogueCuboid big[16];
-            int n = MODEL_N[e->type]; if (n > 16) n = 16;
-            for (int k = 0; k < n; k++) {
-                big[k] = MODEL[e->type][k];
-                big[k].cx *= sc; big[k].cy *= sc; big[k].cz *= sc;
-                big[k].hx *= sc; big[k].hy *= sc; big[k].hz *= sc;
-            }
-            if (flash < 0.25f) flash = 0.25f;
-            rogue_render_model(cam, fb, e->pos, e->yaw, big, n,
-                               d->radius * sc + 0.05f, d->height * sc, flash, 256);
-        } else {
-            rogue_render_model(cam, fb, e->pos, e->yaw,
-                               MODEL[e->type], MODEL_N[e->type],
-                               d->radius + 0.05f, d->height, flash, 256);
+        /* Every enemy renders 25% larger than its hitbox (readability — they
+         * were easy to lose against busy floors); champions stay the hulking
+         * outlier. A soft dark shadow slab under the feet anchors them. */
+        const float sc = e->champion ? 1.9f : 1.25f;
+        RogueCuboid big[16];
+        int n = MODEL_N[e->type]; if (n > 16) n = 16;
+        for (int k = 0; k < n; k++) {
+            big[k] = MODEL[e->type][k];
+            big[k].cx *= sc; big[k].cy *= sc; big[k].cz *= sc;
+            big[k].hx *= sc; big[k].hy *= sc; big[k].hz *= sc;
         }
+        if (e->champion && flash < 0.25f) flash = 0.25f;
+        float shr = d->radius * sc * 0.95f;
+        RogueCuboid shadow[1] = { { 0.0f, 0.02f, 0.0f, shr, 0.012f, shr, RGB(15,13,17) } };
+        rogue_render_model(cam, fb, e->pos, 0.0f, shadow, 1, shr + 0.05f, 0.06f, 0.0f, 256);
+        rogue_render_model(cam, fb, e->pos, e->yaw, big, n,
+                           d->radius * sc + 0.05f, d->height * sc, flash, 256);
     }
-    /* enemy projectiles */
+    /* enemy projectiles — bigger + hotter so incoming fire reads clearly */
     for (int i = 0; i < MAX_ESHOT; i++) {
         EShot *s = &s_eshot[i];
         if (!s->alive) continue;
-        RogueCuboid m[1] = { { 0.0f, 0.0f, 0.0f, 0.09f, 0.07f, 0.09f, s->col } };
-        rogue_render_model(cam, fb, s->pos, atan2f(s->vx, s->vz), m, 1, 0.12f, 0.1f, 0.5f, 256);
+        RogueCuboid m[1] = { { 0.0f, 0.0f, 0.0f, 0.11f, 0.09f, 0.11f, s->col } };
+        rogue_render_model(cam, fb, s->pos, atan2f(s->vx, s->vz), m, 1, 0.15f, 0.14f, 0.7f, 256);
     }
 }
 

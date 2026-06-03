@@ -459,7 +459,9 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
     craft_render_set_light_pos(s_player.pos.x, s_player.pos.y + 0.9f, s_player.pos.z);
     /* X-ray only the walls on the camera->hero sightline (a thin cylinder),
      * so just the blocks covering the hero turn translucent. */
-    craft_render_set_xray(s_player.pos.x, s_player.pos.y, s_player.pos.z, 1.15f);
+    /* Capsule = the hero's rendered body, no halo: only pixels the body
+     * actually occupies can fade, and the drawn hero covers all of them. */
+    craft_render_set_xray(s_player.pos.x, s_player.pos.y, s_player.pos.z, 0.40f);
     rogue_enemies_set_dark(s_player.torch_fuel <= 0);
 
     rogue_platform_update(dt);   /* before player: sets platform delta to ride */

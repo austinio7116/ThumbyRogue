@@ -303,8 +303,19 @@ void rogue_player_draw(const RoguePlayer *p, const CraftCamera *cam,
     /* Blink during i-frames (after a hit / while rolling). */
     if (p->invuln_t > 0 && ((int)(p->invuln_t * 30.0f) & 1)) return;
 
+    /* Render ~18% larger than the hitbox (readability — matches the enemy
+     * upscale), with a soft shadow slab anchoring the hero to the floor. */
+    const float HSC = 1.18f;
+    for (int i = 0; i < HERO_NPARTS; i++) {
+        parts[i].cx *= HSC; parts[i].cy *= HSC; parts[i].cz *= HSC;
+        parts[i].hx *= HSC; parts[i].hy *= HSC; parts[i].hz *= HSC;
+    }
+    {
+        RogueCuboid hsh[1] = { { 0.0f, 0.02f, 0.0f, 0.34f, 0.012f, 0.34f, RGB(15,13,17) } };
+        rogue_render_model(cam, fb, p->pos, 0.0f, hsh, 1, 0.40f, 0.06f, 0.0f, tint_q8);
+    }
     rogue_render_model(cam, fb, p->pos, p->yaw, parts, HERO_NPARTS,
-                       0.32f, 1.15f, flash, tint_q8);
+                       0.32f * HSC, 1.15f * HSC, flash, tint_q8);
 
     /* Readable melee swing FX, distinct per weapon type: thin quick stabs for
      * dagger/spear (a forward thrust line), a wide cyan crescent for swords, a

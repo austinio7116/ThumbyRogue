@@ -200,6 +200,7 @@ typedef enum {
      * straight through it (never drawn). Capped over the dungeon walls to
      * stop the player climbing scenery up and out of the level. */
     BLK_BARRIER         = 123,
+    BLK_RIVERBED        = 124,  /* pebbly stone bed laid under water pools */
     BLK_COUNT
 } BlockId;
 
@@ -331,7 +332,7 @@ static inline bool craft_block_opaque(BlockId blk) {
  * blocks (furnace, future chest) live above BLK_STICK in the enum so
  * they need an explicit allow-list. */
 static inline bool craft_block_solid(BlockId blk) {
-    if (blk == BLK_BARRIER) return true;                       /* invisible containment wall */
+    if (blk == BLK_BARRIER || blk == BLK_RIVERBED) return true; /* invisible wall / pool bed */
     if (blk >= BLK_RFLOOR && blk <= BLK_CRYSTAL) return true;  /* ThumbyRogue floors/walls/scenery -- solid cubes */
     if (blk == BLK_AIR || craft_is_water_id((uint8_t)blk) || blk == BLK_TORCH) return false;
     if (craft_is_lava_id((uint8_t)blk)) return false;   /* fluid — you sink into it */

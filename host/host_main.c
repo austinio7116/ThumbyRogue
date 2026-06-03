@@ -267,7 +267,16 @@ int main(int argc, char **argv) {
                     int b = craft_world_get(x,y,z);
                     if (b == 91) lava++; else if (b == 73) lamp++;
                 }
-            printf("[census] lava=%ld lamp(brazier)=%ld\n", lava, lamp);
+            long water = 0, bed = 0;
+            for (int y = 0; y < CRAFT_WORLD_Y; y++)
+              for (int z = 0; z < CRAFT_WORLD_Z; z++)
+                for (int x = 0; x < CRAFT_WORLD_X; x++) {
+                    int b = craft_world_get(x,y,z);
+                    if (b == 7 || (b >= 64 && b <= 70)) water++;
+                    else if (b == 124) bed++;
+                }
+            printf("[census] lava=%ld lamp(brazier)=%ld water=%ld riverbed=%ld\n",
+                   lava, lamp, water, bed);
         }
         if (getenv("ROGUE_WATER")) {
             extern int rogue_game_debug_goto_water(void);

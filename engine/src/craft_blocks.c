@@ -203,6 +203,7 @@ const char *craft_block_name(BlockId blk) {
         case BLK_FUNGI:         return "fungi";
         case BLK_COBWEB:        return "cobweb";
         case BLK_BARRIER:       return "barrier";
+        case BLK_RIVERBED:      return "riverbed";
         default:                return "?";
     }
 }
@@ -616,6 +617,35 @@ static void fungi_pattern(uint16_t *dst, uint32_t seed) {
     }
 }
 
+/* Riverbed: rounded pebbles for the floor of water pools — overlapping stone
+ * discs in grey / brown / slate tones on dark silt, top-lit, wrapped so the
+ * tile is seamless. Bright enough to read through the water blend. */
+static void riverbed_pattern(uint16_t *dst, int slot, uint32_t seed) {
+    (void)slot;
+    uint32_t s = seed;
+    for (int i = 0; i < CRAFT_TEX_PIXELS; i++) {           /* dark silt base */
+        int j = (int)(xs32(&s) & 0x7) - 4;
+        dst[i] = rgb565(40 + j, 36 + j, 32 + j);
+    }
+    static const int px[9] = { 2, 7, 12, 4, 10, 15, 1, 8, 13 };
+    static const int py[9] = { 2, 1, 3, 7, 6, 8, 12, 11, 13 };
+    for (int k = 0; k < 9; k++) {
+        uint32_t h = (uint32_t)((k + 1) * 2654435761u) ^ seed;
+        h ^= h >> 13; h *= 0x9E3779B1u; h ^= h >> 16;
+        int rr = 2 + (int)(h % 2u);                        /* radius 2..3 */
+        int br = 108, bg = 102, bb = 96;                   /* grey */
+        if ((h % 3u) == 1u)      { br = 116; bg = 96; bb = 74; }   /* brown */
+        else if ((h % 3u) == 2u) { br = 88;  bg = 96; bb = 106; }  /* slate */
+        for (int dy = -rr; dy <= rr; dy++)
+            for (int dx = -rr; dx <= rr; dx++) {
+                if (dx*dx + dy*dy > rr*rr) continue;
+                int x = (px[k] + dx + 16) & 15, y = (py[k] + dy + 16) & 15;
+                int lt = (dy < 0) ? 16 : (dy > 0 ? -12 : 0);   /* top-lit dome */
+                dst[y * CRAFT_TEX_SIZE + x] = rgb565(br + lt, bg + lt, bb + lt);
+            }
+    }
+}
+
 /* Corner cobweb: faint threads anchored in the top-left corner, radiating
  * down/right and braced by a couple of quarter-ring arcs. Only the corner
  * region is webbed; the rest of the cell stays transparent. */
@@ -716,17 +746,26 @@ static void water_pattern(uint16_t *dst, uint32_t seed) {
  * two visibly distinct patterns (different band offset + different
  * jitter seed) that alternate to give clear surface motion. */
 static void bake_water_frame(uint16_t *out_top, uint16_t *out_side, int variant) {
+    /* Murky teal-blue dungeon water (the old version was stripy and far too
+     * green). Two seamless diagonal ripple waves — integer wave-vectors over
+     * the 16px tile so it wraps — drift between the two animation frames,
+     * plus sparse moving glints. Reads as slow, deep water. */
     uint32_t s = 0xC0FFEEu ^ (variant ? 0x9E3779B9u : 0u);
-    int band_shift = variant ? 1 : 0;
+    const float TAU = 6.2831853f;
+    float ph = variant ? 1.6f : 0.0f;
     for (int y = 0; y < CRAFT_TEX_SIZE; y++) {
-        int phase = ((y + band_shift) / 2) & 1;
-        int band  = phase ? 16 : -8;
         for (int x = 0; x < CRAFT_TEX_SIZE; x++) {
-            int j = ((int)(xs32(&s) & 0x1f) - 16) / 2;
-            /* Dank crypt water — stagnant murky green, not clear blue.
-             * Green dominant, low blue, dark overall; the band shimmer
-             * rides the green channel for a slick, scummy surface. */
-            uint16_t c = rgb565(22 + j, 64 + band + j, 40 + j);
+            float w1 = sinf((float)(x + 2*y) * (TAU / 16.0f) + ph);
+            float w2 = sinf((float)(2*x - y) * (TAU / 16.0f) - ph * 0.7f);
+            int lift = (int)(w1 * 8.0f + w2 * 5.0f);
+            int j = ((int)(xs32(&s) & 0xf) - 8) / 2;
+            int r = 13 + lift / 3 + j;
+            int g = 46 + lift + j;
+            int b = 68 + lift + j;
+            uint32_t h = (uint32_t)((x + 1 + variant * 7) * 92821) ^ (uint32_t)((y + 3) * 68917);
+            h ^= h >> 13; h *= 0x9E3779B1u; h ^= h >> 16;
+            if ((h % 67u) == 0u) { r += 55; g += 65; b += 65; }   /* glint */
+            uint16_t c = rgb565(r, g, b);
             out_side[y * CRAFT_TEX_SIZE + x] = c;
             out_top [y * CRAFT_TEX_SIZE + x] = c;
         }
@@ -1234,6 +1273,7 @@ void craft_blocks_build_textures(void) {
         crate_pattern       (&craft_textures[(BLK_CRATE       * 3 + slot) * CRAFT_TEX_PIXELS], slot, 0xC8A7Eu);
         sarcophagus_pattern (&craft_textures[(BLK_SARCOPHAGUS * 3 + slot) * CRAFT_TEX_PIXELS], slot, 0x5A8C0u);
         crystal_pattern     (&craft_textures[(BLK_CRYSTAL     * 3 + slot) * CRAFT_TEX_PIXELS], slot, 0xC8957u);
+        riverbed_pattern    (&craft_textures[(BLK_RIVERBED    * 3 + slot) * CRAFT_TEX_PIXELS], slot, 0xB1BEDu);
     }
     /* ThumbyRogue cross-sprite scenery — same silhouette on every face. */
     for (int slot = 0; slot < 3; slot++) {

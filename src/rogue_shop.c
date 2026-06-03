@@ -16,6 +16,7 @@ static Vec3      s_pad;
 static RogueItem s_stock[N_STOCK];
 static int       s_price[N_STOCK];
 static bool      s_sold[N_STOCK];
+static bool      s_upgraded;  /* weapon upgrade is once per shop */
 static int       s_depth;
 static uint32_t  s_rng;
 static int       s_cur;       /* 0..N_STOCK-1 items, then gamble/reroll/upgrade */
@@ -36,6 +37,7 @@ void rogue_shop_place(const int16_t *room_cx, const int16_t *room_cz,
                       int n_rooms, int up_x, int up_z, int down_x, int down_z,
                       int floor_y, int depth, uint32_t seed) {
     s_has_pad = false; s_open = false; s_cur = 0; s_depth = depth;
+    s_upgraded = false;
     s_rng = seed ^ 0x5409u ^ (uint32_t)(depth * 40503u);
     if (!s_rng) s_rng = 1;
     /* pick a room that isn't the stairs */
@@ -98,11 +100,14 @@ void rogue_shop_input(RoguePlayer *p, const CraftRawButtons *btn,
             rogue_player_recompute(p);
         }
     } else if (s_cur == OPT_UPGRADE) {
-        int cost = 40 + s_depth * 8;
-        if (p->gold >= cost) {
+        /* Once per shop, and a modest bump (+5% +1). The old unlimited
+         * +12.5%+2 compounded into an exponential damage pump. */
+        int cost = 50 + s_depth * 10;
+        if (!s_upgraded && p->gold >= cost) {
             p->gold -= cost;
-            p->equip[SLOT_WEAPON].base_dmg += p->equip[SLOT_WEAPON].base_dmg / 8 + 2;
+            p->equip[SLOT_WEAPON].base_dmg += p->equip[SLOT_WEAPON].base_dmg / 20 + 1;
             rogue_player_recompute(p);
+            s_upgraded = true;
         }
     }
 }
@@ -162,12 +167,16 @@ void rogue_shop_draw(uint16_t *fb, const RoguePlayer *p) {
     struct { int id; const char *t; int cost; } opt[3] = {
         { OPT_GAMBLE,  "Gamble random", 30 + s_depth*8 },
         { OPT_REROLL,  "Reroll weapon", 25 + s_depth*5 },
-        { OPT_UPGRADE, "Upgrade weapon",40 + s_depth*8 },
+        { OPT_UPGRADE, "Upgrade weapon",50 + s_depth*10 },
     };
     for (int i = 0; i < 3; i++) {
         bool sel = (s_cur == opt[i].id);
-        bool dim = p->gold < opt[i].cost;
-        shop_row(fb, y, sel, dim, opt[i].t, RGB(200,200,210), opt[i].cost, NULL);
+        if (opt[i].id == OPT_UPGRADE && s_upgraded) {
+            shop_row(fb, y, sel, true, "Upgraded", RGB(90,90,90), -1, NULL);
+        } else {
+            bool dim = p->gold < opt[i].cost;
+            shop_row(fb, y, sel, dim, opt[i].t, RGB(200,200,210), opt[i].cost, NULL);
+        }
         y += 10;
     }
 
@@ -196,7 +205,9 @@ void rogue_shop_draw(uint16_t *fb, const RoguePlayer *p) {
     } else if (s_cur == OPT_REROLL) {
         craft_font_draw(fb, "re-roll equipped weapon affixes", 4, dy, RGB(180,180,190));
     } else if (s_cur == OPT_UPGRADE) {
-        craft_font_draw(fb, "raise equipped weapon damage", 4, dy, RGB(180,180,190));
+        craft_font_draw(fb, s_upgraded ? "already upgraded at this shop"
+                                       : "raise weapon damage (once per shop)",
+                        4, dy, RGB(180,180,190));
     }
     craft_font_draw(fb,"A buy/use    MENU leave",4,CRAFT_FB_H-9,RGB(150,150,160));
 }

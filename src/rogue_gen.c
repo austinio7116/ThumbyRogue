@@ -439,6 +439,9 @@ void rogue_gen_dungeon(uint32_t seed, int depth, RogueLevelInfo *out) {
         if (i == up || i == down) continue;
         if ((hash2(s_rooms[i].cx, s_rooms[i].cz, seed ^ 0x2233u) & 3u) != 0u) continue;
         if ((hash2(s_rooms[i].cx, s_rooms[i].cz, seed ^ 0x1A7Au) % 3u) == 0u) continue; /* not lava rooms */
+#ifdef ROGUE_VALIDATE
+        { extern int rogue_gen_dbg_pool; rogue_gen_dbg_pool++; }
+#endif
         int cx = s_rooms[i].cx, cz = s_rooms[i].cz;
         for (int dz = -5; dz <= 5; dz++)
             for (int dx = -5; dx <= 5; dx++) {
@@ -446,7 +449,12 @@ void rogue_gen_dungeon(uint32_t seed, int depth, RogueLevelInfo *out) {
                 float rn = 3.2f + 2.0f * (vnoise((cx+dx)*0.5f, (cz+dz)*0.5f, seed ^ 0x77u) - 0.5f) * 2.0f;
                 if (d > rn*rn) continue;
                 int x = cx + dx, z = cz + dz;
-                if (is_walk(x, z)) craft_world_set_byte(x, ROGUE_FLOOR_Y - 1, z, BLK_WATER);
+                if (is_walk(x, z)) {
+                    craft_world_set_byte(x, ROGUE_FLOOR_Y - 1, z, BLK_WATER);
+                    /* pebbly bed under the pool — you see rock through the
+                     * water, not the band's plank/flagstone floor */
+                    craft_world_set_byte(x, ROGUE_FLOOR_Y - 2, z, BLK_RIVERBED);
+                }
             }
     }
 
@@ -600,6 +608,7 @@ void rogue_gen_dungeon(uint32_t seed, int depth, RogueLevelInfo *out) {
 #include <stdio.h>
 
 int rogue_gen_disable_scenery = 0;   /* test toggle: skip the scenery pass */
+int rogue_gen_dbg_pool = 0;          /* rooms that qualified for a water pool */
 
 /* Stand height on a column, or -1 if you can't stand there. */
 static int rv_stand_y(int x, int z) {
@@ -683,10 +692,10 @@ void rogue_gen_debug_dump(uint32_t seed, int depth) {
         }
         walk_conn = cw[lv.down_z * GW + lv.down_x];
     }
-    printf("seed=%u depth=%d  up=(%d,%d) down=(%d,%d)  is_walk_conn=%d gen_path=%d validator=%s\n",
+    printf("seed=%u depth=%d  up=(%d,%d) down=(%d,%d)  is_walk_conn=%d gen_path=%d validator=%s pool_rooms=%d n_rooms=%d\n",
            seed, depth, lv.up_x, lv.up_z, lv.down_x, lv.down_z, walk_conn,
            reserve_solution_path(lv.up_x, lv.up_z, lv.down_x, lv.down_z),
-           reached ? "REACHED" : "BLOCKED");
+           reached ? "REACHED" : "BLOCKED", rogue_gen_dbg_pool, lv.n_rooms);
     for (int z = 0; z < GD; z++) {
         char line[GW + 1];
         for (int x = 0; x < GW; x++) {

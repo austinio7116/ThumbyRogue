@@ -184,19 +184,29 @@ void craft_render_set_light_radius(float r) {
     s_light_radius2 = r * r;
 }
 
-/* X-ray sphere: camera-side wall cells within `radius` of the hero turn
- * translucent so the hero is never lost behind a near wall. Floor cells
- * (below feet_y) and walls behind the hero are left solid. Disabled when
- * radius <= 0. */
+/* X-ray walls: a wall cell turns translucent ONLY when the screen ray that
+ * hit it would otherwise have hit the HERO'S BODY (a vertical capsule at the
+ * hero, radius `radius`, feet→head). That is the exact occlusion test — the
+ * fade is the hero's silhouette through the wall, so corridor walls beside
+ * you never trigger it. Floor cells (below feet_y) and walls behind the hero
+ * stay solid. Disabled when radius <= 0. */
 static bool  s_xray_on = false;
-static float s_xray_x = 0, s_xray_hy = 0, s_xray_z = 0;  /* hero body point */
+static float s_xray_x = 0, s_xray_z = 0;     /* hero capsule axis (XZ) */
+static float s_xray_y0 = 0, s_xray_y1 = 0;   /* hero body vertical span */
 static int   s_xray_fy = 0;          /* hero feet cell-y; cells with by >= fy are walls */
-static float s_xray_r2 = 0;          /* cylinder radius^2 around the cam->hero sightline */
+static float s_xray_r2 = 0;          /* capsule radius^2 */
 void craft_render_set_xray(float x, float feet_y, float z, float radius) {
     s_xray_on = (radius > 0.0f);
     s_xray_x = x; s_xray_z = z;
-    s_xray_hy = feet_y + 0.6f;        /* aim at the hero's body, not the floor */
-    s_xray_fy = (int)feet_y;
+    /* The capsule must match the RENDERED body exactly — any extra margin
+     * makes rays through empty space beside/above the hero darken wall cells
+     * the body never covers (a floating bar over the head when standing near
+     * a wall). Every faded pixel must end up covered by the drawn hero. */
+    s_xray_y0 = feet_y;
+    s_xray_y1 = feet_y + 1.38f;
+    /* Cells at/above the hero's standing row count as veil-able walls — so a
+     * wading hero (sunk a block in a pool) still shows through the bank. */
+    s_xray_fy = (int)ceilf(feet_y - 0.01f);
     s_xray_r2 = radius * radius;
 }
 #endif
@@ -517,6 +527,45 @@ static inline int tallgrass_slot(int wx, int wy, int wz) {
 
 INLINE_HOT TraceHit trace_ray(Vec3 origin, Vec3 dir, bool stop_at_water) {
     TraceHit h = (TraceHit){0};
+
+#ifdef ROGUE_FULLFRAME_RENDER
+    /* X-ray pre-test: does THIS ray hit the hero's body capsule? If so, any
+     * solid wall it strikes first is genuinely occluding the hero and may be
+     * faded. One quadratic per ray; rays that miss the hero (the vast
+     * majority) bail immediately and the DDA below runs untouched. */
+    bool  xr_ray = false;
+    float xr_hero_d2 = 0.0f;          /* ray-t at which this ray meets the hero capsule */
+    if (s_xray_on && !stop_at_water) {
+        float rx = origin.x - s_xray_x, rz = origin.z - s_xray_z;
+        float a  = dir.x * dir.x + dir.z * dir.z;
+        float b  = 2.0f * (rx * dir.x + rz * dir.z);
+        float cc = rx * rx + rz * rz - s_xray_r2;
+        if (a > 1e-6f) {
+            float disc = b * b - 4.0f * a * cc;
+            if (disc > 0.0f) {
+                float sq = sqrtf(disc);
+                float ta = (-b - sq) / (2.0f * a);   /* cylinder entry/exit */
+                float tb = (-b + sq) / (2.0f * a);
+                /* clip the span to the hero's vertical body range */
+                if (dir.y > 1e-6f || dir.y < -1e-6f) {
+                    float ty0 = (s_xray_y0 - origin.y) / dir.y;
+                    float ty1 = (s_xray_y1 - origin.y) / dir.y;
+                    if (ty0 > ty1) { float tt = ty0; ty0 = ty1; ty1 = tt; }
+                    if (ty0 > ta) ta = ty0;
+                    if (ty1 < tb) tb = ty1;
+                } else if (origin.y < s_xray_y0 || origin.y > s_xray_y1) {
+                    tb = ta - 1.0f;                  /* empty span */
+                }
+                if (tb >= ta && tb > 0.0f) {
+                    /* capsule entry t, in the same (un-normalised) ray units
+                     * the DDA reports hits in — exact comparison, no margin */
+                    xr_ray = true;
+                    xr_hero_d2 = (ta > 0.0f) ? ta : 0.0f;
+                }
+            }
+        }
+    }
+#endif
 
     /* Empty-space skip. Walk the coarse height grid in x/z and fast-
      * forward the ray past every tile whose terrain is entirely below the
@@ -947,26 +996,16 @@ INLINE_HOT TraceHit trace_ray(Vec3 origin, Vec3 dir, bool stop_at_water) {
         }
 
 #ifdef ROGUE_FULLFRAME_RENDER
-        /* X-ray near walls: only fade a wall cell if it actually sits on the
-         * line of sight between the camera and the hero (a thin cylinder along
-         * cam->hero), so just the blocks covering the character go translucent
-         * — not every near wall. Floor cells (by < feet) are left solid. */
-        if (s_xray_on && !stop_at_water && vy >= s_xray_fy) {
-            float sx = s_xray_x - origin.x, sy = s_xray_hy - origin.y, sz = s_xray_z - origin.z;
-            float seg2 = sx*sx + sy*sy + sz*sz;
-            float cx = (float)vx + 0.5f, cyc = (float)vy + 0.5f, cz = (float)vz + 0.5f;
-            float vox = cx - origin.x, voy = cyc - origin.y, voz = cz - origin.z;
-            float tt = vox*sx + voy*sy + voz*sz;          /* projection onto the sightline */
-            if (tt > 0.0f && tt < seg2 && seg2 > 0.0001f) {   /* between camera and hero */
-                float inv = tt / seg2;
-                float dx = cx - (origin.x + sx*inv);
-                float dy = cyc - (origin.y + sy*inv);
-                float dz = cz - (origin.z + sz*inv);
-                if (dx*dx + dy*dy + dz*dz <= s_xray_r2) {
-                    h.passed_xray = true;     /* this wall covers the hero — see through it */
-                    continue;
-                }
-            }
+        /* X-ray: this ray is aimed at the hero's body (xr_ray). Any wall cell
+         * it strikes BEFORE reaching the hero is genuinely covering the
+         * character — fade exactly those. Walls beside a corridor never fade
+         * (their rays miss the capsule); floor cells (by < feet) stay solid. */
+        if (xr_ray && vy >= s_xray_fy && t < xr_hero_d2) {
+            /* this wall hit lands strictly BEFORE the ray reaches the hero's
+             * body — it is genuinely covering the character. Walls beside or
+             * behind the hero (hit t past the capsule) stay solid. */
+            h.passed_xray = true;
+            continue;
         }
 #endif
         PROF_INC(craft_prof_hits);
@@ -1609,11 +1648,12 @@ void craft_render_strip(const CraftCamera *cam, uint16_t *fb,
                 }
 #ifdef ROGUE_FULLFRAME_RENDER
                 if (h.passed_xray) {
-                    /* Hazy grey veil over whatever lay behind the near wall —
-                     * reads as a translucent cutaway. The hero (drawn after,
-                     * z-tested against the floor distance here) shows through. */
+                    /* Dark translucent veil — what lay behind the occluding
+                     * wall, dimmed to ~30% with a slight cool bias. Reads as a
+                     * shadowed cutaway window the hero shows through, instead
+                     * of the old milky haze. */
                     int r1 = (c >> 11) & 0x1F, g1 = (c >> 5) & 0x3F, b1 = c & 0x1F;
-                    r1 = (r1 + 14) >> 1; g1 = (g1 + 28) >> 1; b1 = (b1 + 17) >> 1;
+                    r1 = (r1 * 5) >> 4; g1 = (g1 * 5) >> 4; b1 = (b1 * 6) >> 4;
                     c = (uint16_t)((r1 << 11) | (g1 << 5) | b1);
                 }
 #endif
