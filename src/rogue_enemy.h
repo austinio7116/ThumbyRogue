@@ -72,4 +72,8 @@ typedef struct {
 int  rogue_enemies_export(RogueEnemySave *out, int max);   /* count of live enemies */
 void rogue_enemies_import(const RogueEnemySave *in, int n);
 
+/* Debug: pose one enemy for animation-sheet captures. */
+void rogue_enemies_debug_showcase(int type, float x, float y, float z,
+                                  float anim, int moving);
+
 #endif /* ROGUE_ENEMY_H */

@@ -222,6 +222,26 @@ void rogue_enemies_clear(void) {
     s_death_n = 0;
 }
 
+/* Debug: clear the pool and POSE a single enemy of `type` at (x,y,z) with a
+ * given gait-clock + moving flag — used to capture animation sheets. */
+void rogue_enemies_debug_showcase(int type, float x, float y, float z,
+                                  float anim, int moving) {
+    rogue_enemies_clear();
+    Enemy *e = &s_en[0];
+    e->alive = true;
+    e->type = (EnemyType)(type % EN_TYPE_COUNT);
+    e->pos = v3(x, y, z);
+    e->yaw = 3.14159265f;            /* face the camera */
+    e->hp = 10;
+    e->state = AI_WANDER; e->state_t = 0.0f;
+    e->wander_dx = e->wander_dz = 0.0f;
+    e->hurt_flash = 0.0f; e->atk_cd = 0.0f;
+    e->champion = false;
+    e->anim = anim;
+    e->sp = 2.0f;
+    e->moving = moving != 0;
+}
+
 int rogue_enemies_export(RogueEnemySave *out, int max) {
     int n = 0;
     for (int i = 0; i < ROGUE_MAX_ENEMIES && n < max; i++) {
@@ -284,6 +304,15 @@ bool rogue_enemies_pop_death(Vec3 *pos, int *type) {
     return true;
 }
 
+/* Valid spawn cell: open at body height (floor + head), flat SOLID ground
+ * underneath — never inside walls/scenery, never over a pit/lava/water. */
+static bool spawn_ok(float fx, float fz, int floor_y) {
+    int x = (int)floorf(fx), z = (int)floorf(fz);
+    if (craft_block_solid(craft_world_get(x, floor_y,     z))) return false;
+    if (craft_block_solid(craft_world_get(x, floor_y + 1, z))) return false;
+    return craft_block_solid(craft_world_get(x, floor_y - 1, z));
+}
+
 void rogue_enemies_spawn(const int16_t *room_cx, const int16_t *room_cz,
                          int n_rooms, int up_x, int up_z,
                          int floor_y, int depth, uint32_t seed) {
@@ -299,17 +328,24 @@ void rogue_enemies_spawn(const int16_t *room_cx, const int16_t *room_cz,
     if (want > ROGUE_MAX_ENEMIES) want = ROGUE_MAX_ENEMIES;
 
     int placed = 0;
-    for (int attempt = 0; attempt < want * 6 && placed < want; attempt++) {
+    for (int attempt = 0; attempt < want * 12 && placed < want; attempt++) {
         int r = (int)(frand() * n_rooms);
         if (r >= n_rooms) r = n_rooms - 1;
         if (room_cx[r] == up_x && room_cz[r] == up_z) continue;  /* never spawn on start */
+        /* Candidate cell MUST be valid standing ground: open at body height
+         * (not inside a wall / scenery cube / pillar) with flat solid floor
+         * underneath (not a pit, lava or water). Rooms now carry set-pieces
+         * near their centres, so a blind centre-jitter could land inside a
+         * crystal cluster or sarcophagus — retry instead. */
+        float fx = room_cx[r] + 0.5f + (frand()-0.5f)*3.0f;
+        float fz = room_cz[r] + 0.5f + (frand()-0.5f)*3.0f;
+        if (!spawn_ok(fx, fz, floor_y)) continue;
         Enemy *e = &s_en[placed];
         e->alive = true;
         /* Pick from this band's roster. */
         EnemyType t = (EnemyType)band->roster[(int)(frand() * rn) % rn];
         e->type = t;
-        e->pos = v3(room_cx[r] + 0.5f + (frand()-0.5f)*2.0f, (float)floor_y,
-                    room_cz[r] + 0.5f + (frand()-0.5f)*2.0f);
+        e->pos = v3(fx, (float)floor_y, fz);
         e->yaw = frand() * 6.28f;
         float scale = 1.0f + 0.18f * depth;
         e->hp = (int)(DEFS[t].base_hp * scale);
@@ -332,11 +368,38 @@ void rogue_enemies_spawn(const int16_t *room_cx, const int16_t *room_cz,
 static bool cell_solid(int wx, int wy, int wz) {
     return craft_block_solid(craft_world_get(wx, wy, wz));
 }
+/* A cell an enemy may occupy: never inside anything solid (walls, scenery
+ * cubes, pillars), and — for walkers — only with real footing beneath
+ * (solid ground or wadeable water; never a pit or lava). Flyers skip the
+ * footing rule but still can't pass through solids. */
+static bool en_passable(int x, int floor_y, int z, bool flyer) {
+    if (cell_solid(x, floor_y, z)) return false;
+    if (flyer) return true;
+    uint8_t below = (uint8_t)craft_world_get(x, floor_y - 1, z);
+    return craft_block_solid((BlockId)below) || craft_is_water_id(below);
+}
+
 static void en_move(Enemy *e, float dx, float dz, float step, int floor_y) {
+    bool flyer = DEFS[e->type].flyer != 0;
     float nx = e->pos.x + dx * step;
-    if (!cell_solid((int)floorf(nx), floor_y, (int)floorf(e->pos.z))) e->pos.x = nx;
+    if (en_passable((int)floorf(nx), floor_y, (int)floorf(e->pos.z), flyer)) e->pos.x = nx;
     float nz = e->pos.z + dz * step;
-    if (!cell_solid((int)floorf(e->pos.x), floor_y, (int)floorf(nz))) e->pos.z = nz;
+    if (en_passable((int)floorf(e->pos.x), floor_y, (int)floorf(nz), flyer)) e->pos.z = nz;
+}
+
+/* Straight-line sight test at stand height — ~3 samples per cell. Ranged
+ * enemies may only open fire when this is clear, so nobody shoots through
+ * walls or furniture. */
+static bool en_los(Vec3 a, Vec3 b, int floor_y) {
+    float dx = b.x - a.x, dz = b.z - a.z;
+    float dist = sqrtf(dx*dx + dz*dz);
+    int steps = (int)(dist * 3.0f) + 1;
+    for (int s = 1; s < steps; s++) {
+        float t = (float)s / (float)steps;
+        if (cell_solid((int)floorf(a.x + dx * t), floor_y, (int)floorf(a.z + dz * t)))
+            return false;
+    }
+    return true;
 }
 
 void rogue_enemies_update(RoguePlayer *p, float dt, int floor_y) {
@@ -375,15 +438,17 @@ void rogue_enemies_update(RoguePlayer *p, float dt, int floor_y) {
             if (d->ranged) {
                 /* Kite: hold mid-range, back off if the hero closes — and
                  * STRAFE sideways while in the band (flipping every ~1.6s) so
-                 * archers/sprites are moving targets with a readable rhythm. */
-                if (dist < d->atk_range * 0.45f) en_move(e, -nx, -nz, d->speed * dt, floor_y);
-                else if (dist > d->atk_range)    en_move(e, nx, nz, d->speed * dt, floor_y);
+                 * archers/sprites are moving targets with a readable rhythm.
+                 * No line of sight → never fire; advance to regain it. */
+                bool los = en_los(e->pos, p->pos, floor_y);
+                if (dist < d->atk_range * 0.45f)      en_move(e, -nx, -nz, d->speed * dt, floor_y);
+                else if (dist > d->atk_range || !los) en_move(e, nx, nz, d->speed * dt, floor_y);
                 else {
                     float sgn = ((i & 1) ? 1.0f : -1.0f) *
                                 (fmodf(e->anim, 3.2f) < 1.6f ? 1.0f : -1.0f);
                     en_move(e, -nz * sgn, nx * sgn, d->speed * 0.55f * dt, floor_y);
                 }
-                if (dist <= d->atk_range && e->atk_cd <= 0) { e->state = AI_WINDUP; e->state_t = 0; }
+                if (dist <= d->atk_range && e->atk_cd <= 0 && los) { e->state = AI_WINDUP; e->state_t = 0; }
             } else {
                 if (dist <= d->atk_range && e->atk_cd <= 0) { e->state = AI_WINDUP; e->state_t = 0; }
                 else {

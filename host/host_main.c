@@ -20,6 +20,7 @@
 #include "craft_types.h"
 #include "craft_buttons.h"
 #include "craft_audio.h"
+#include "../src/rogue_enemy.h"   /* RogueEnemySave — placement sanity census */
 #include "rogue_game.h"
 
 #include <SDL2/SDL.h>
@@ -277,6 +278,20 @@ int main(int argc, char **argv) {
                 }
             printf("[census] lava=%ld lamp(brazier)=%ld water=%ld riverbed=%ld\n",
                    lava, lamp, water, bed);
+            /* enemy placement sanity: nobody inside a solid / over a hole */
+            {
+                extern int rogue_enemies_export(RogueEnemySave *, int);
+                RogueEnemySave en[ROGUE_MAX_ENEMIES];
+                int n = rogue_enemies_export(en, ROGUE_MAX_ENEMIES), bad = 0;
+                for (int k = 0; k < n; k++) {
+                    int x = (int)floorf(en[k].x), z = (int)floorf(en[k].z);
+                    int fy = (int)floorf(en[k].y);
+                    uint8_t below = (uint8_t)craft_world_get(x, fy - 1, z);
+                    if (craft_block_solid(craft_world_get(x, fy, z)) ||
+                        !(craft_block_solid((BlockId)below) || craft_is_water_id(below))) bad++;
+                }
+                printf("[census] enemies=%d badly_placed=%d\n", n, bad);
+            }
         }
         if (getenv("ROGUE_WATER")) {
             extern int rogue_game_debug_goto_water(void);
@@ -322,6 +337,12 @@ int main(int argc, char **argv) {
         if (getenv("ROGUE_LOOT")) {
             extern void rogue_game_debug_drop_loot(void);
             rogue_game_debug_drop_loot();
+        }
+        if (getenv("ROGUE_SHOWCASE")) {  /* "type:anim:moving" — pose one enemy */
+            extern void rogue_game_debug_showcase(int, float, int);
+            int ty = 0, mv = 1; float an = 0.0f;
+            sscanf(getenv("ROGUE_SHOWCASE"), "%d:%f:%d", &ty, &an, &mv);
+            rogue_game_debug_showcase(ty, an, mv);
         }
         if (getenv("ROGUE_SUSPENDTEST")) {   /* suspend save/restore round-trip */
             extern void rogue_game_debug_drop_loot(void);

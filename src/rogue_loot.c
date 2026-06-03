@@ -176,7 +176,7 @@ void rogue_loot_draw(const CraftCamera *cam, uint16_t *fb) {
                 {-0.26f,0.38f, 0.0f,  0.05f, 0.10f, 0.26f, RGB(70, 46, 22)  },  /* lid bands */
                 { 0.26f,0.38f, 0.0f,  0.05f, 0.10f, 0.26f, RGB(70, 46, 22)  },
                 { 0.0f, 0.28f, 0.25f, 0.05f, 0.05f, 0.03f, RGB(240, 205, 70) }, /* gold lock */
-                { 0.0f, 0.85f, 0.0f,  0.04f, 0.42f, 0.04f, RGB(240, 205, 70) }, /* glow column */
+                { 0.0f, 0.56f, 0.0f,  0.05f, 0.08f, 0.05f, RGB(240, 205, 70) }, /* lid twinkle */
             };
             rogue_render_model(cam, fb, s_c[i].pos, 0.0f, m, 8, 0.4f, 1.3f, 0.0f, 256);
         } else {
@@ -206,11 +206,32 @@ void rogue_loot_draw(const CraftCamera *cam, uint16_t *fb) {
             continue;
         }
         bool eq = rogue_item_is_equip(&g->item);
-        uint16_t c = eq ? rogue_rarity_color(g->item.rarity) : g->item.color;
+        if (!eq) {
+            /* Non-equipment NEVER gets a light shaft — beams are the rarity
+             * language for gear, and an orange torch / gold topaz beam reads
+             * as a legendary drop from across the room. Small ground models
+             * instead: a mini standing torch, or a bobbing spinning trinket
+             * cube (potion flask / gem) in the item's colour. */
+            if (g->item.kind == ITEM_TORCH) {
+                RogueCuboid tm[3] = {
+                    { 0.0f, 0.16f, 0.0f, 0.030f, 0.16f, 0.030f, RGB(110, 75, 40)  },
+                    { 0.0f, 0.36f, 0.0f, 0.060f, 0.05f, 0.060f, RGB(255, 150, 30) },
+                    { 0.0f, 0.43f, 0.0f, 0.042f, 0.04f, 0.042f, RGB(255, 225, 120) },
+                };
+                rogue_render_model(cam, fb, g->pos, 0.0f, tm, 3, 0.12f, 0.55f, 0.15f, 256);
+            } else {
+                float bob = 0.10f + 0.05f * sinf(g->spin * 1.7f);
+                Vec3 pos = g->pos; pos.y += bob;
+                RogueCuboid m[1] = { { 0.0f, 0.09f, 0.0f, 0.09f, 0.09f, 0.09f, g->item.color } };
+                rogue_render_model(cam, fb, pos, g->spin, m, 1, 0.15f, 0.30f, 0.25f, 256);
+            }
+            continue;
+        }
+        uint16_t c = rogue_rarity_color(g->item.rarity);
         /* Shaft of light: a tall coloured outer glow with a near-white bright
          * core rising from the drop — taller for higher rarity. Rendered in
          * two passes so the core can use a much higher emissive flash. */
-        float bh = eq ? (1.4f + 0.45f * g->item.rarity) : 1.1f;
+        float bh = 1.4f + 0.45f * g->item.rarity;
         RogueCuboid outer[1] = { { 0.0f, bh, 0.0f, 0.07f, bh, 0.07f, c } };
         rogue_render_model(cam, fb, g->pos, g->spin * 0.25f, outer, 1, 0.12f, bh * 2.0f, 0.40f, 256);
         RogueCuboid core[1]  = { { 0.0f, bh, 0.0f, 0.025f, bh, 0.025f, c } };

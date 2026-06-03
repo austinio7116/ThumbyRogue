@@ -106,7 +106,7 @@ static const RogueCuboid up_stair[] = {
     { 0.0f, 0.16f, -0.04f, 0.40f, 0.06f, 0.09f, RGB(152,152,162) },
     { 0.0f, 0.26f,  0.12f, 0.40f, 0.06f, 0.09f, RGB(164,164,174) },
     { 0.0f, 0.36f,  0.28f, 0.40f, 0.06f, 0.09f, RGB(176,176,186) }, /* high step (back) */
-    { 0.0f, 1.25f,  0.0f,  0.05f, 1.20f, 0.05f, RGB(245,180, 60) }, /* amber beacon */
+    { 0.0f, 1.25f,  0.0f,  0.05f, 1.20f, 0.05f, RGB(190, 90,230) }, /* violet beacon */
 };
 /* Minecraft-style floor torch: a thin wooden stick topped with a flame. */
 static const RogueCuboid torch_model[] = {
@@ -881,6 +881,13 @@ int rogue_game_debug_goto_prop(int kind) {
     return 0;
 }
 
+/* Pose a single enemy 2.4 cells in front of the hero, facing the camera, at
+ * a chosen gait phase — for capturing the animation sheet. */
+void rogue_game_debug_showcase(int type, float anim, int moving) {
+    rogue_enemies_debug_showcase(type, s_player.pos.x, (float)s_level.floor_y,
+                                 s_player.pos.z - 2.4f, anim, moving);
+}
+
 /* Drop a gold pile + a rare weapon next to the hero (loot-render check:
  * gold should be a ground coin, gear a rarity beam). */
 void rogue_game_debug_drop_loot(void) {
@@ -889,6 +896,10 @@ void rogue_game_debug_drop_loot(void) {
     rogue_loot_drop(&it, v3(s_player.pos.x - 1.0f, s_player.pos.y, s_player.pos.z + 0.4f));
     rogue_item_roll_weapon(&it, 8, loot_rng()); it.rarity = RAR_RARE;
     rogue_loot_drop(&it, v3(s_player.pos.x + 1.0f, s_player.pos.y, s_player.pos.z + 0.4f));
+    rogue_item_make_torch(&it, 30);
+    rogue_loot_drop(&it, v3(s_player.pos.x - 1.8f, s_player.pos.y, s_player.pos.z - 0.6f));
+    rogue_item_make_gem(&it, GEM_TOPAZ);
+    rogue_loot_drop(&it, v3(s_player.pos.x + 1.8f, s_player.pos.y, s_player.pos.z - 0.6f));
 }
 
 /* Print the live run state (suspend round-trip verification). */
