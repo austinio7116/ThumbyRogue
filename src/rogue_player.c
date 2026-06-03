@@ -290,13 +290,25 @@ void rogue_player_draw(const RoguePlayer *p, const CraftCamera *cam,
         for (int i = 2; i < HERO_NPARTS; i++) parts[i].cy += bob;
     }
 
-    /* Pose the sword: swing forward+down through the strike. */
+    /* Pose the weapon through the strike: a real SWEEP across the body for
+     * swinging weapons (right→left arc, dipping at the middle), a straight
+     * lunge for stabbing ones. */
     if (p->atk_t > 0) {
         float ph = 1.0f - (p->atk_t / p->wpn_dur);   /* 0..1 */
         float s = sinf(ph * (float)M_PI);             /* 0..1..0 */
-        parts[P_SWORD].cz = 0.06f + 0.42f * s;        /* thrust forward */
-        parts[P_SWORD].cy = 0.55f - 0.18f * s;        /* chop down */
-        parts[P_SWORD].hz = 0.02f + 0.18f * s;        /* lengthen toward target */
+        bool stab = (p->wpn_type == WT_DAGGER || p->wpn_type == WT_SPEAR);
+        if (stab) {
+            parts[P_SWORD].cz = 0.06f + 0.46f * s;    /* lunge forward */
+            parts[P_SWORD].cy = 0.55f - 0.10f * s;
+            parts[P_SWORD].hz = 0.02f + 0.20f * s;    /* lengthen toward target */
+        } else {
+            float ang = -1.0f + 2.0f * ph;            /* sweep right → left */
+            parts[P_SWORD].cx = sinf(ang) * 0.36f;
+            parts[P_SWORD].cz = 0.08f + cosf(ang) * 0.34f * s;
+            parts[P_SWORD].cy = 0.62f - 0.14f * s;    /* dip through the middle */
+            parts[P_SWORD].hy = 0.30f - 0.10f * s;    /* blade flattens into the cut */
+            parts[P_SWORD].hz = 0.02f + 0.16f * s;
+        }
     }
 
     float flash = (p->hurt_flash > 0) ? (p->hurt_flash / 0.30f) * 0.7f : 0.0f;
@@ -340,22 +352,47 @@ void rogue_player_draw(const RoguePlayer *p, const CraftCamera *cam,
             default: break;
             }
             float r = p->wpn_range * 0.7f * rmul;
-            RogueCuboid slash[7];
+            RogueCuboid slash[26];
+            int ns = 0;
             if (thrust) {
-                float reach = r * sinf(ph * (float)M_PI);   /* stab out and recover */
-                for (int k = 0; k < n; k++) {
-                    float d = reach * (k + 1) / n;
-                    slash[k] = (RogueCuboid){ 0.0f, 0.55f, 0.10f + d, seg, seg, seg + 0.03f, col };
+                /* Thrust: a solid lance of overlapping segments that stabs out
+                 * and recovers, with a bright tip. */
+                float reach = r * sinf(ph * (float)M_PI);
+                int tn = n + 3;
+                for (int k = 0; k < tn && ns < 24; k++) {
+                    float d = reach * (k + 1) / tn;
+                    float s2 = seg * (0.7f + 0.5f * k / tn);
+                    slash[ns++] = (RogueCuboid){ 0.0f, 0.58f, 0.10f + d, s2, s2, s2 + 0.05f, col };
                 }
+                if (ns < 24)   /* white-hot tip */
+                    slash[ns++] = (RogueCuboid){ 0.0f, 0.58f, 0.10f + reach, seg*1.2f, seg*1.2f, seg*1.2f, RGB(255,255,255) };
             } else {
-                float sweep = (ph - 0.4f);                  /* the fan rotates as it swings */
-                for (int k = 0; k < n; k++) {
-                    float a = -spread + (2.0f * spread) * k / (n - 1) + sweep;
-                    slash[k] = (RogueCuboid){ sinf(a) * r, 0.55f, cosf(a) * r, seg, seg, seg, col };
+                /* Sweeping crescent: a bright leading EDGE travels across the
+                 * arc with a comet trail shrinking behind it — a solid slash
+                 * ribbon, not dots. Two layers: coloured rim + white core. */
+                float phN = ph / 0.8f;                       /* 0..1 over the visible swing */
+                float lead = -spread + 2.2f * spread * phN;  /* leading edge angle */
+                int   fan = 14;                              /* dense, overlapping */
+                for (int k = 0; k < fan && ns < 24; k++) {
+                    float a = -spread + (2.0f * spread) * k / (fan - 1);
+                    if (a > lead) break;                     /* not swept yet */
+                    float behind = (lead - a) / (spread * 1.6f);   /* 0 fresh .. 1 old */
+                    if (behind > 1.0f) continue;             /* trail fully faded */
+                    float s2 = seg * (2.8f - 1.5f * behind); /* fat edge, tapering tail */
+                    float rr = r * (1.0f - 0.08f * behind);
+                    slash[ns++] = (RogueCuboid){ sinf(a) * rr, 0.60f - 0.08f * behind,
+                                                 cosf(a) * rr, s2, s2 * 0.6f, s2, col };
+                    if (behind < 0.35f && ns < 24) {         /* white-hot core on the edge */
+                        slash[ns++] = (RogueCuboid){ sinf(a) * rr * 0.84f, 0.62f,
+                                                     cosf(a) * rr * 0.84f,
+                                                     s2 * 0.65f, s2 * 0.4f, s2 * 0.65f,
+                                                     RGB(255,255,255) };
+                    }
                 }
             }
-            rogue_render_model(cam, fb, p->pos, p->yaw, slash, n,
-                               r + 0.3f, 1.0f, 0.0f, 256);
+            if (ns > 0)
+                rogue_render_model(cam, fb, p->pos, p->yaw, slash, ns,
+                                   r + 0.45f, 1.2f, 0.35f, 256);
         }
     }
 }

@@ -33,6 +33,7 @@ static uint32_t s_seed;
 static int   s_depth;
 static float s_dead_t;     /* >0 while the death banner shows */
 static float s_band_banner_t;  /* >0 while the band-name banner shows */
+static float s_hitstop;        /* >0 → world runs in slow-mo (melee impact) */
 static int   s_last_band = -1;
 static int   s_kills;
 static int   s_best_depth;
@@ -330,6 +331,14 @@ void rogue_game_init(uint32_t seed) {
 static bool edge(bool now, bool prev) { return now && !prev; }
 
 void rogue_game_tick(const CraftRawButtons *btn, float dt) {
+    /* Hit-stop: a few frames of heavy slow-motion when a melee blow lands —
+     * the classic impact "crunch". Everything (enemies, physics, animation)
+     * crawls; rendering continues at full rate. */
+    if (s_hitstop > 0.0f) {
+        s_hitstop -= dt;
+        dt *= 0.12f;
+    }
+
     /* Advance the animated-tile clock every frame (water 4Hz, lava 2Hz,
      * portal 3Hz). The renderer already blends water see-through; this is
      * what makes the dank-green surface actually ripple. Runs in every
@@ -536,11 +545,18 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
             rogue_enemies_hit_radius(s_player.pos.x, s_player.pos.z, 2.2f, outdmg / 2);
         if (hits > 0) {
             rogue_sfx_hit();
+            s_hitstop = 0.045f;     /* a heartbeat of slow-mo sells the impact */
             /* spark burst at the swing point */
             Vec3 hp = v3(s_player.pos.x + sinf(s_player.yaw) * s_player.wpn_range * 0.7f,
                          s_player.pos.y + 0.6f,
                          s_player.pos.z + cosf(s_player.yaw) * s_player.wpn_range * 0.7f);
             melee_hit_fx(hp, s_player.wpn_type);
+            /* blunt weapons slam a dusty shockwave ring along the ground */
+            if (s_player.wpn_type == WT_MACE || s_player.wpn_type == WT_WARHAMMER ||
+                s_player.wpn_type == WT_AXE) {
+                Vec3 gp = hp; gp.y = s_player.pos.y + 0.08f;
+                rogue_particle_burst(gp, 14, 5.5f, 0.30f, RGB(190,176,150), 0.07f);
+            }
             int heal = s_player.stats.life_on_hit * hits;
             if (asp & (1u << ASP_LIFESTEAL)) heal += outdmg / 8;  /* Vampiric */
             if (heal) {

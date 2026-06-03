@@ -25,6 +25,9 @@ typedef struct {
     float     hurt_flash;
     float     atk_cd;
     bool      champion;     /* band-end mini-boss: bigger + tougher */
+    float     anim;         /* steady per-enemy clock — gait cycles + limb swing */
+    float     sp;           /* per-type special timer (demon charge, strafe flips) */
+    bool      moving;       /* displaced this tick → drive the walk animation */
 } Enemy;
 
 static Enemy s_en[ROGUE_MAX_ENEMIES];
@@ -247,6 +250,9 @@ void rogue_enemies_import(const RogueEnemySave *in, int n) {
         e->state = AI_WANDER; e->state_t = 0.0f;
         e->wander_dx = 0.0f; e->wander_dz = 0.0f;
         e->hurt_flash = 0.0f; e->atk_cd = 0.0f;
+        e->anim = (float)i * 0.41f;        /* desync the gaits */
+        e->sp = 2.0f;
+        e->moving = false;
     }
 }
 
@@ -313,6 +319,9 @@ void rogue_enemies_spawn(const int16_t *room_cx, const int16_t *room_cz,
         e->wander_dx = e->wander_dz = 0.0f;
         e->hurt_flash = 0.0f;
         e->atk_cd = 0.0f;
+        e->anim = frand() * 3.0f;          /* desync the gaits */
+        e->sp = 1.5f + frand() * 2.0f;
+        e->moving = false;
         /* The first enemy on a band-end floor is a champion (mini-boss). */
         e->champion = (boss_floor && placed == 0);
         if (e->champion) e->hp *= 3;
@@ -343,6 +352,8 @@ void rogue_enemies_update(RoguePlayer *p, float dt, int floor_y) {
         float dist = sqrtf(dx*dx + dz*dz);
         float nx = dist > 0.001f ? dx/dist : 0, nz = dist > 0.001f ? dz/dist : 0;
         float aggro = d->aggro * (s_dark ? 1.7f : 1.0f);   /* sense you in the dark */
+        float pre_x = e->pos.x, pre_z = e->pos.z;          /* movement → animation */
+        e->anim += dt;                                     /* steady gait clock */
 
         switch (e->state) {
         case AI_WANDER:
@@ -362,13 +373,68 @@ void rogue_enemies_update(RoguePlayer *p, float dt, int floor_y) {
             if (!p->alive || dist > aggro * 1.4f) { e->state = AI_WANDER; e->state_t = 0; break; }
             e->yaw = atan2f(nx, nz);
             if (d->ranged) {
-                /* Kite: hold mid-range, back off if the hero closes, shoot. */
+                /* Kite: hold mid-range, back off if the hero closes — and
+                 * STRAFE sideways while in the band (flipping every ~1.6s) so
+                 * archers/sprites are moving targets with a readable rhythm. */
                 if (dist < d->atk_range * 0.45f) en_move(e, -nx, -nz, d->speed * dt, floor_y);
                 else if (dist > d->atk_range)    en_move(e, nx, nz, d->speed * dt, floor_y);
+                else {
+                    float sgn = ((i & 1) ? 1.0f : -1.0f) *
+                                (fmodf(e->anim, 3.2f) < 1.6f ? 1.0f : -1.0f);
+                    en_move(e, -nz * sgn, nx * sgn, d->speed * 0.55f * dt, floor_y);
+                }
                 if (dist <= d->atk_range && e->atk_cd <= 0) { e->state = AI_WINDUP; e->state_t = 0; }
             } else {
                 if (dist <= d->atk_range && e->atk_cd <= 0) { e->state = AI_WINDUP; e->state_t = 0; }
-                else en_move(e, nx, nz, d->speed * dt, floor_y);
+                else {
+                    /* Per-type locomotion — each creature closes in with its
+                     * own DISTINCT, PREDICTABLE pattern. */
+                    float mx = nx, mz = nz, spd = d->speed;
+                    float px = -nz, pz = nx;            /* strafe axis */
+                    switch (e->type) {
+                    case EN_RAT: {                      /* dart — pause — dart */
+                        float c = fmodf(e->anim, 0.75f);
+                        if (c < 0.45f) spd *= 1.9f; else spd = 0.0f;
+                        break; }
+                    case EN_SLIME: {                    /* discrete hops */
+                        float c = fmodf(e->anim, 0.95f);
+                        spd = (c >= 0.40f && c < 0.85f) ? spd * 2.4f : 0.0f;
+                        break; }
+                    case EN_BAT: {                      /* swooping weave */
+                        float w = sinf(e->anim * 3.4f);
+                        mx = nx + px * 0.8f * w; mz = nz + pz * 0.8f * w;
+                        float l = sqrtf(mx*mx + mz*mz);
+                        if (l > 0.01f) { mx /= l; mz /= l; }
+                        e->yaw = atan2f(mx, mz);
+                        break; }
+                    case EN_SPIDER:                     /* circle close, then lunge */
+                        if (dist < 3.4f) {
+                            float sgn = (i & 1) ? 1.0f : -1.0f;
+                            mx = px * sgn + nx * 0.25f; mz = pz * sgn + nz * 0.25f;
+                            float l = sqrtf(mx*mx + mz*mz);
+                            if (l > 0.01f) { mx /= l; mz /= l; }
+                        }
+                        break;
+                    case EN_KOBOLD: case EN_GOBLIN: {   /* weaving zigzag */
+                        float w = sinf(e->anim * 2.6f) * 0.7f;
+                        mx = nx + px * w; mz = nz + pz * w;
+                        float l = sqrtf(mx*mx + mz*mz);
+                        if (l > 0.01f) { mx /= l; mz /= l; }
+                        e->yaw = atan2f(mx, mz);
+                        break; }
+                    case EN_ZOMBIE:                     /* relentless lurch */
+                        spd *= 0.55f + 0.75f * fmaxf(0.0f, sinf(e->anim * 2.4f));
+                        break;
+                    case EN_DEMON:                      /* paw the ground, then CHARGE */
+                        e->sp -= dt;
+                        if (e->sp <= -0.55f) e->sp = 3.0f;     /* charge spent */
+                        if (e->sp <= 0.0f)      spd *= 2.6f;   /* charging! */
+                        else if (e->sp < 0.45f) spd = 0.0f;    /* the tell */
+                        break;
+                    default: break;
+                    }
+                    en_move(e, mx, mz, spd * dt, floor_y);
+                }
             }
             break;
         case AI_WINDUP:
@@ -395,6 +461,7 @@ void rogue_enemies_update(RoguePlayer *p, float dt, int floor_y) {
             }
             break;
         }
+        e->moving = (fabsf(e->pos.x - pre_x) + fabsf(e->pos.z - pre_z)) > 0.0008f;
     }
 
     /* Advance enemy projectiles → hit the player / walls / expire. */
@@ -485,12 +552,65 @@ void rogue_enemies_draw(const CraftCamera *cam, uint16_t *fb) {
             big[k].cx *= sc; big[k].cy *= sc; big[k].cz *= sc;
             big[k].hx *= sc; big[k].hy *= sc; big[k].hz *= sc;
         }
+
+        /* --- body animation --------------------------------------------- *
+         * Slimes squash-and-stretch through their hop; bats flap and bob;
+         * fire sprites flicker; everything with legs strides them (and
+         * counter-swings arms) while moving. Part indices per model. */
+        float a = e->anim;
+        float hop = 0.0f;
+        if (e->type == EN_SLIME) {
+            float c = fmodf(a, 0.95f), sy, sxz;
+            if (c < 0.40f) {              /* squat before the hop */
+                float k = sinf((c / 0.40f) * (float)M_PI);
+                sy = 1.0f - 0.28f * k; sxz = 1.0f + 0.20f * k;
+            } else if (c < 0.85f) {       /* airborne — stretched */
+                float k = (c - 0.40f) / 0.45f;
+                hop = 0.50f * sinf(k * (float)M_PI);
+                sy = 1.18f; sxz = 0.88f;
+            } else { sy = 0.86f; sxz = 1.10f; }   /* landing splat */
+            for (int k = 0; k < n; k++) {
+                big[k].cy *= sy;  big[k].hy *= sy;
+                big[k].cx *= sxz; big[k].hx *= sxz;
+                big[k].cz *= sxz; big[k].hz *= sxz;
+            }
+        } else if (e->type == EN_BAT) {
+            hop = 0.10f * sinf(a * 6.0f);                 /* hover bob */
+            float flap = 0.08f * sinf(a * 14.0f) * sc;
+            big[1].cy += flap; big[2].cy += flap;         /* wings */
+        } else if (e->type == EN_FIRESPRITE) {
+            hop = 0.06f * sinf(a * 9.0f);                 /* flame flicker */
+            big[4].cy += 0.05f * sinf(a * 11.0f) * sc;    /* wisps lick upward */
+            big[5].cy += 0.05f * sinf(a * 11.0f + 2.1f) * sc;
+        } else if (e->moving) {
+            /* leg stride (+ arm counter-swing) — part indices per model */
+            static const int8_t LEGA[EN_TYPE_COUNT] = { -1,-1, 7, 4,-1, 5, 8, 6, 6,-1, 8 };
+            static const int8_t LEGB[EN_TYPE_COUNT] = { -1,-1, 8, 5,-1, 6, 9, 7, 7,-1, 9 };
+            static const int8_t ARMA[EN_TYPE_COUNT] = { -1,-1, 5, 6,-1,-1, 6, 4, 4,-1, 6 };
+            static const int8_t ARMB[EN_TYPE_COUNT] = { -1,-1, 6, 7,-1,-1, 7, 5, 5,-1, 7 };
+            float rate = 7.0f + d->speed * 3.0f;
+            float sw = sinf(a * rate) * 0.085f * sc;
+            int la = LEGA[e->type], lb = LEGB[e->type];
+            int aa = ARMA[e->type], ab = ARMB[e->type];
+            if (la >= 0 && la < n) big[la].cz += sw;
+            if (lb >= 0 && lb < n) big[lb].cz -= sw;
+            if (aa >= 0 && aa < n) big[aa].cz -= sw;      /* arms counter-swing */
+            if (ab >= 0 && ab < n) big[ab].cz += sw;
+            /* gentle whole-body bob at double stride frequency */
+            float bob = 0.025f * sc * (0.5f - 0.5f * cosf(a * rate * 2.0f));
+            for (int k = 0; k < n; k++) big[k].cy += bob;
+            /* archer legs double as spider mid-legs: skeleton-family already
+             * covered above by the tables. Rats wiggle the tail instead. */
+            if (e->type == EN_RAT && n > 2) big[2].cx += sinf(a * 10.0f) * 0.05f * sc;
+        }
+
         if (e->champion && flash < 0.25f) flash = 0.25f;
+        Vec3 dp = e->pos; dp.y += hop;
         float shr = d->radius * sc * 0.95f;
         RogueCuboid shadow[1] = { { 0.0f, 0.02f, 0.0f, shr, 0.012f, shr, RGB(15,13,17) } };
         rogue_render_model(cam, fb, e->pos, 0.0f, shadow, 1, shr + 0.05f, 0.06f, 0.0f, 256);
-        rogue_render_model(cam, fb, e->pos, e->yaw, big, n,
-                           d->radius * sc + 0.05f, d->height * sc, flash, 256);
+        rogue_render_model(cam, fb, dp, e->yaw, big, n,
+                           d->radius * sc + 0.05f, d->height * sc + 0.6f, flash, 256);
     }
     /* enemy projectiles — bigger + hotter so incoming fire reads clearly */
     for (int i = 0; i < MAX_ESHOT; i++) {
