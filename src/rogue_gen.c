@@ -160,6 +160,8 @@ static bool is_walk(int x, int z) {
  * walkable corridor from entrance to exit, no matter what clutter lands
  * elsewhere. `s_path` low 3 bits hold the BFS came-from direction; bit 7 is
  * the reserved flag. */
+static int16_t s_stairwall_x[7], s_stairwall_z[7];
+static int     s_stairwall_n;
 static uint8_t  s_path[GW * GD];
 static uint16_t s_pq[GW * GD];
 static const int PDX[4] = { 1, -1, 0, 0 }, PDZ[4] = { 0, 0, 1, -1 };
@@ -383,13 +385,102 @@ void rogue_gen_dungeon(uint32_t seed, int depth, RogueLevelInfo *out) {
 
     apply_to_world(seed, depth);
 
+    /* --- real staircases ---------------------------------------------------
+     * No beacons, no floating step models. The UP-stairs is a walled stone
+     * stairwell rising out of the room (the way you came down); the DOWN-
+     * stairs is a stone-lined trench of steps descending UNDER the floor into
+     * darkness — you walk down it to descend. Steps are ±1 climbs and the
+     * shaft lining is a material swap inside solid ground, so the reserved
+     * route always survives; the 2-tall+ pieces avoid reserved cells. */
+    {
+        const RogueBand *sb = rogue_band_get(depth);
+        uint8_t W = sb->wall;
+        int ux = s_rooms[up].cx,   uz = s_rooms[up].cz;
+        int dx0 = s_rooms[down].cx, dz0 = s_rooms[down].cz;
+        int udx = 1, udz = 0, ddx2 = 1, ddz2 = 0;
+        for (int d = 0; d < 4; d++) {
+            bool ok = true;
+            for (int s = 1; s <= 3 && ok; s++)
+                if (!is_walk(ux + PDX[d]*s, uz + PDZ[d]*s)) ok = false;
+            if (ok) { udx = PDX[d]; udz = PDZ[d]; break; }
+        }
+        for (int d = 0; d < 4; d++) {
+            bool ok = true;
+            for (int s = 1; s <= 3 && ok; s++)
+                if (!is_walk(dx0 + PDX[d]*s, dz0 + PDZ[d]*s)) ok = false;
+            if (ok) { ddx2 = PDX[d]; ddz2 = PDZ[d]; break; }
+        }
+        out->up_dx = (int8_t)udx;   out->up_dz = (int8_t)udz;
+        out->down_dx = (int8_t)ddx2; out->down_dz = (int8_t)ddz2;
+
+        /* UP: two rising stone steps, walled on both sides + the far end. */
+        int upx = udz, upz = udx;                        /* perpendicular */
+        craft_world_set_byte(ux + udx, ROGUE_FLOOR_Y, uz + udz, W);        /* step +1 */
+        craft_world_set_byte(ux + 2*udx, ROGUE_FLOOR_Y,     uz + 2*udz, W); /* step +2 */
+        craft_world_set_byte(ux + 2*udx, ROGUE_FLOOR_Y + 1, uz + 2*udz, W);
+        s_stairwall_n = 0;                               /* for the fallback strip */
+        for (int s = 1; s <= 2; s++)                     /* stairwell side walls */
+            for (int side = -1; side <= 1; side += 2) {
+                int wx = ux + udx*s + upx*side, wz = uz + udz*s + upz*side;
+                if (!is_walk(wx, wz)) continue;          /* already a wall */
+                for (int y = 0; y < 3; y++)
+                    craft_world_set_byte(wx, ROGUE_FLOOR_Y + y, wz, W);
+                s_stairwall_x[s_stairwall_n] = (int16_t)wx;
+                s_stairwall_z[s_stairwall_n] = (int16_t)wz;
+                s_stairwall_n++;
+            }
+        {   /* back wall the stairs vanish behind */
+            int wx = ux + 3*udx, wz = uz + 3*udz;
+            if (is_walk(wx, wz)) {
+                for (int y = 0; y < 3; y++)
+                    craft_world_set_byte(wx, ROGUE_FLOOR_Y + y, wz, W);
+                s_stairwall_x[s_stairwall_n] = (int16_t)wx;
+                s_stairwall_z[s_stairwall_n] = (int16_t)wz;
+                s_stairwall_n++;
+            }
+        }
+
+        /* DOWN: two steps cut into the floor, stone-lined shaft, dead-ending
+         * under the untouched far column — the stairs disappear below. */
+        int dpx = ddz2, dpz = ddx2;
+        int t1x = dx0 + ddx2,   t1z = dz0 + ddz2;
+        int t2x = dx0 + 2*ddx2, t2z = dz0 + 2*ddz2;
+        craft_world_set_byte(t1x, ROGUE_FLOOR_Y-1, t1z, BLK_AIR);          /* step -1 */
+        craft_world_set_byte(t1x, ROGUE_FLOOR_Y-2, t1z, W);                /* stone tread */
+        craft_world_set_byte(t2x, ROGUE_FLOOR_Y-1, t2z, BLK_AIR);          /* step -2 */
+        craft_world_set_byte(t2x, ROGUE_FLOOR_Y-2, t2z, BLK_AIR);
+        craft_world_set_byte(t2x, ROGUE_FLOOR_Y-3, t2z, W);                /* stone tread */
+        for (int s = 1; s <= 2; s++)                     /* stone-line the shaft sides */
+            for (int side = -1; side <= 1; side += 2) {
+                int wx = dx0 + ddx2*s + dpx*side, wz = dz0 + ddz2*s + dpz*side;
+                craft_world_set_byte(wx, ROGUE_FLOOR_Y-1, wz, W);
+                craft_world_set_byte(wx, ROGUE_FLOOR_Y-2, wz, W);
+            }
+        {   /* the far face the steps vanish under */
+            int wx = dx0 + 3*ddx2, wz = dz0 + 3*ddz2;
+            craft_world_set_byte(wx, ROGUE_FLOOR_Y-1, wz, W);
+            craft_world_set_byte(wx, ROGUE_FLOOR_Y-2, wz, W);
+            craft_world_set_byte(wx, ROGUE_FLOOR_Y-3, wz, W);
+        }
+    }
+
+
     /* Reserve a guaranteed on-foot route NOW, while the floor is still intact
      * (carved corridors are connected — is_walk guarantees it). Everything
      * that follows — lava chasms, water, scenery — refuses to disturb a
      * reserved cell, so a continuous solid-floor path up→down always survives,
      * even when a lake would otherwise sever a corridor the bridge misses. */
-    reserve_solution_path(s_rooms[up].cx, s_rooms[up].cz,
-                          s_rooms[down].cx, s_rooms[down].cz);
+    if (!reserve_solution_path(s_rooms[up].cx, s_rooms[up].cz,
+                               s_rooms[down].cx, s_rooms[down].cz)) {
+        /* The stairwell walls pinched off the only route (rare, tiny rooms):
+         * strip them back to open floor and reserve again. */
+        for (int i = 0; i < s_stairwall_n; i++)
+            for (int y = 0; y < 3; y++)
+                craft_world_set_byte(s_stairwall_x[i], ROGUE_FLOOR_Y + y,
+                                     s_stairwall_z[i], BLK_AIR);
+        reserve_solution_path(s_rooms[up].cx, s_rooms[up].cz,
+                              s_rooms[down].cx, s_rooms[down].cz);
+    }
 
     /* Lava chasms: an ORGANIC lava lake sunk below the floor that you can
      * fall into (the abyss). RARE and only from the second band on — the
@@ -574,11 +665,18 @@ void rogue_gen_dungeon(uint32_t seed, int depth, RogueLevelInfo *out) {
      * traces straight through (nothing drawn) and the iso view is untouched. */
     for (int z = 0; z < GD; z++)
         for (int x = 0; x < GW; x++) {
-            if (is_walk(x, z)) continue;
+            bool walk = is_walk(x, z);
             int top = -1;
             for (int y = ROGUE_FLOOR_Y + 6; y >= ROGUE_FLOOR_Y; y--)
                 if (craft_block_solid((BlockId)craft_world_get_byte(x, y, z))) { top = y; break; }
-            if (top < ROGUE_FLOOR_Y) continue;          /* bare-floor breach — stays walkable */
+            if (walk) {
+                /* In-room structures (stairwell steps/walls, bookcases,
+                 * stacked crates): cap anything 2-tall or higher so it can't
+                 * be climbed; 1-tall stays jumpable by design. */
+                if (top < ROGUE_FLOOR_Y + 1) continue;
+            } else {
+                if (top < ROGUE_FLOOR_Y) continue;      /* bare-floor breach — stays walkable */
+            }
             craft_world_set_byte(x, top + 1, z, BLK_BARRIER);
             craft_world_set_byte(x, top + 2, z, BLK_BARRIER);
         }

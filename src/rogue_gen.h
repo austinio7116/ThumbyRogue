@@ -21,8 +21,10 @@ typedef enum {
 
 typedef struct {
     Vec3 spawn;            /* hero feet, on the up-stairs */
-    int  up_x, up_z;       /* up-stairs cell (XZ) */
-    int  down_x, down_z;   /* down-stairs cell (XZ) */
+    int  up_x, up_z;       /* up-stairs entry cell (XZ) */
+    int  down_x, down_z;   /* down-stairs entry cell (XZ) */
+    int8_t up_dx, up_dz;   /* direction the up staircase rises */
+    int8_t down_dx, down_dz; /* direction the down trench descends */
     int  floor_y;          /* walkable surface Y */
     int  n_rooms;
     int16_t room_cx[ROGUE_MAX_LEVEL_ROOMS];

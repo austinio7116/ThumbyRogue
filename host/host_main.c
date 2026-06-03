@@ -305,6 +305,19 @@ int main(int argc, char **argv) {
             extern int rogue_game_debug_goto_deco(void);
             printf("[deco] found scenery: %d\n", rogue_game_debug_goto_deco());
         }
+        if (getenv("ROGUE_DOWN")) {      /* stand at the down-stairs trench */
+            extern void rogue_game_debug_goto_down(void);
+            rogue_game_debug_goto_down();
+        }
+        if (getenv("ROGUE_DESCTEST")) {  /* step into the trench -> must descend */
+            extern void rogue_game_debug_step_into_trench(void);
+            int d0 = rogue_game_depth();
+            rogue_game_debug_step_into_trench();
+            CraftRawButtons n0 = {0};
+            for (int i = 0; i < 30; i++) rogue_game_tick(&n0, 1.0f/30.0f);
+            printf("[desctest] depth %d -> %d (%s)\n", d0, rogue_game_depth(),
+                   rogue_game_depth() == d0 + 1 ? "OK" : "FAIL");
+        }
         if (getenv("ROGUE_PROP")) {
             extern int rogue_game_debug_goto_prop(int);
             printf("[prop] found: %d\n", rogue_game_debug_goto_prop(atoi(getenv("ROGUE_PROP"))));

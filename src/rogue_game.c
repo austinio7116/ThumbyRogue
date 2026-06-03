@@ -91,23 +91,9 @@ static int   s_n_trap;
 static float s_trap_cd[MAX_TRAPS];
 static uint32_t loot_rng(void){ s_loot_rng^=s_loot_rng<<13; s_loot_rng^=s_loot_rng>>17; s_loot_rng^=s_loot_rng<<5; return s_loot_rng; }
 
-/* Stairs are drawn as four offset steps (descending into a dark pit for the
- * down-stairs, rising for the up-stairs) plus the tall locator beacon — teal
- * for down, amber for up (colours unchanged). */
-static const RogueCuboid down_stair[] = {
-    { 0.0f, 0.20f, -0.20f, 0.40f, 0.04f, 0.09f, RGB(74, 74, 86)  },  /* rim step (front, high) */
-    { 0.0f, 0.14f, -0.04f, 0.40f, 0.04f, 0.09f, RGB(52, 52, 62)  },
-    { 0.0f, 0.08f,  0.12f, 0.40f, 0.04f, 0.09f, RGB(36, 36, 44)  },
-    { 0.0f, 0.02f,  0.28f, 0.40f, 0.04f, 0.09f, RGB(22, 22, 30)  },  /* deepest (back, low) */
-    { 0.0f, 1.25f,  0.0f,  0.05f, 1.20f, 0.05f, RGB(40, 230, 210) }, /* teal beacon */
-};
-static const RogueCuboid up_stair[] = {
-    { 0.0f, 0.06f, -0.20f, 0.40f, 0.06f, 0.09f, RGB(140,140,150) }, /* low step (front) */
-    { 0.0f, 0.16f, -0.04f, 0.40f, 0.06f, 0.09f, RGB(152,152,162) },
-    { 0.0f, 0.26f,  0.12f, 0.40f, 0.06f, 0.09f, RGB(164,164,174) },
-    { 0.0f, 0.36f,  0.28f, 0.40f, 0.06f, 0.09f, RGB(176,176,186) }, /* high step (back) */
-    { 0.0f, 1.25f,  0.0f,  0.05f, 1.20f, 0.05f, RGB(190, 90,230) }, /* violet beacon */
-};
+/* (The stairs are now REAL world-block staircases carved by the generator —
+ * a walled stairwell rising at the up-stairs, a stone-lined trench
+ * descending under the floor at the down-stairs. No beacons, no models.) */
 /* Minecraft-style floor torch: a thin wooden stick topped with a flame. */
 static const RogueCuboid torch_model[] = {
     { 0.0f, 0.24f, 0.0f, 0.035f, 0.24f, 0.035f, RGB(110, 75, 40)  },  /* stick */
@@ -640,10 +626,13 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
     if (s_player.hp < hp0)   rogue_sfx_hurt();
     if (s_player.gold > gold0) rogue_sfx_pickup();
 
-    /* Descend when the hero reaches the down-stairs (keep gear + gold). */
-    float ddx = s_player.pos.x - (s_level.down_x + 0.5f);
-    float ddz = s_player.pos.z - (s_level.down_z + 0.5f);
-    if (ddx*ddx + ddz*ddz < 0.7f*0.7f) {
+    /* Descend by WALKING DOWN the stair trench: trigger once the hero stands
+     * in one of the descending step cells, below floor level. */
+    int pcx = (int)floorf(s_player.pos.x), pcz = (int)floorf(s_player.pos.z);
+    bool on_step =
+        (pcx == s_level.down_x +     s_level.down_dx && pcz == s_level.down_z +     s_level.down_dz) ||
+        (pcx == s_level.down_x + 2 * s_level.down_dx && pcz == s_level.down_z + 2 * s_level.down_dz);
+    if (on_step && s_player.pos.y < (float)s_level.floor_y - 0.4f) {
         rogue_sfx_descend();
         for (int i = 0; i < SLOT_COUNT; i++) s_keep_equip[i] = s_player.equip[i];
         s_keep_gold = s_player.gold;
@@ -881,6 +870,21 @@ int rogue_game_debug_goto_prop(int kind) {
     return 0;
 }
 
+/* Teleport ONTO the first descending step (descend-trigger test). */
+void rogue_game_debug_step_into_trench(void) {
+    s_player.pos = v3(s_level.down_x + s_level.down_dx + 0.5f,
+                      (float)s_level.floor_y,
+                      s_level.down_z + s_level.down_dz + 0.5f);
+}
+
+/* Stand just outside the down-stairs trench, looking at it (stair visuals). */
+void rogue_game_debug_goto_down(void) {
+    s_player.pos = v3(s_level.down_x + 0.5f - s_level.down_dx * 1.2f,
+                      (float)s_level.floor_y,
+                      s_level.down_z + 0.5f - s_level.down_dz * 1.2f);
+    rogue_camera_init(s_player.pos);
+}
+
 /* Pose a single enemy 2.4 cells in front of the hero, facing the camera, at
  * a chosen gait phase — for capturing the animation sheet. */
 void rogue_game_debug_showcase(int type, float anim, int moving) {
@@ -1020,11 +1024,6 @@ void rogue_game_demo_step(float dt, int frame) {
 }
 
 void rogue_game_draw_overlay(uint16_t *fb) {
-    Vec3 dpos = v3(s_level.down_x + 0.5f, (float)s_level.floor_y, s_level.down_z + 0.5f);
-    Vec3 upos = v3(s_level.up_x + 0.5f,   (float)s_level.floor_y, s_level.up_z + 0.5f);
-    rogue_render_model(&s_cam, fb, upos, 0.0f, up_stair, 5, 0.5f, 2.5f, 0.0f, 256);
-    rogue_render_model(&s_cam, fb, dpos, 0.0f, down_stair, 5, 0.5f, 2.5f, 0.0f, 256);
-
     /* Wall/floor torches (the room light sources). */
     for (int i = 0; i < s_level.n_torch; i++) {
         Vec3 tp = v3(s_level.torch_x[i] + 0.5f, (float)s_level.floor_y, s_level.torch_z[i] + 0.5f);
