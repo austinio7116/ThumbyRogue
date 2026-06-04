@@ -811,8 +811,14 @@ void rogue_game_debug_weapon_sheet(void) {
     rogue_inventory_open();
 }
 
-/* Stand the hero a few tiles in front of the first lava cell (screenshot). */
-int rogue_game_debug_goto_lava(void) {
+/* Stand the hero a few tiles in front of the first lava cell (screenshot).
+ * mode 2: stand on the chasm's bonus island instead (lava on all sides). */
+int rogue_game_debug_goto_lava(int mode) {
+    if (mode == 2 && s_level.n_chasm > 0) {
+        s_player.pos = v3(s_level.island_x[0] + 0.5f, (float)s_level.floor_y,
+                          s_level.island_z[0] + 0.5f);
+        return 2;
+    }
     for (int z = 0; z < CRAFT_WORLD_Z; z++)
         for (int x = 0; x < CRAFT_WORLD_X; x++)
             for (int y = s_level.floor_y - 3; y <= s_level.floor_y; y++)

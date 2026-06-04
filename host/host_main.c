@@ -298,8 +298,13 @@ int main(int argc, char **argv) {
             printf("[water] found pool: %d\n", rogue_game_debug_goto_water());
         }
         if (getenv("ROGUE_LAVA")) {
-            extern int rogue_game_debug_goto_lava(void);
-            printf("[lava] found: %d\n", rogue_game_debug_goto_lava());
+            extern int rogue_game_debug_goto_lava(int);
+            printf("[lava] found: %d\n",
+                   rogue_game_debug_goto_lava(atoi(getenv("ROGUE_LAVA"))));
+        }
+        if (getenv("ROGUE_GEAR")) {   /* gear every slot — deep-band screenshot survivability */
+            extern void rogue_game_debug_gear_up(void);
+            rogue_game_debug_gear_up();
         }
         if (getenv("ROGUE_DECO")) {
             extern int rogue_game_debug_goto_deco(void);
