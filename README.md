@@ -30,6 +30,65 @@ screen, light/torch tension, traps, and procedural audio. See the
 **[illustrated user guide](https://austinio7116.github.io/ThumbyRogue/)** for
 the full loot & level-gen breakdown.
 
+## Changelog
+
+### 1.1
+
+The post-release playtest round plus three feature drops. Suspend saves from
+1.0 use an older layout and are cleanly ignored (fresh title on first boot).
+
+**Shops are real now**
+* A built **merchant stall** on every floor — gold-trimmed counter, a robed
+  shopkeeper on his gold-tiled alcove, and a wares-packed shelf wall (two new
+  block textures). Walk up to the counter to trade; placement provably avoids
+  the guaranteed solution path.
+* **Provoke him at your peril** — any hit turns the shopkeeper into a
+  blink-casting battle wizard (fans of three arcane bolts, teleports when
+  cornered). Kill him and his unsold stock spills as free pickups, but every
+  later shopkeeper this run attacks on sight and trading is over.
+
+**Elements & explosive magic**
+* **Magic detonates**: every wand/scepter/staff impact fires a circular
+  shockwave and splashes half damage around the hit; piercing staves detonate
+  on every enemy they pass through.
+* **Eight weapon elements** — fire (burn), frost (45% chill), poison (DoT),
+  lightning (arcs to a second enemy), holy (double vs the undead), shadow
+  (life drain), void (implosion pull) and arcane force (1.2-cell launch) —
+  rolled as weapon affixes or socketed via **eight new elemental gems**
+  (Fire Opal → Aetherite). The classic four gems keep their stat identity.
+  Elements tint projectiles, trails, impacts, shockwaves and melee sparks.
+* **Lava burns enemies** — anything knocked into (or out over) a lava lake
+  cooks fast; fire sprites and demons are immune, flyers stay above it.
+  Force weapons turn chasm rooms into environmental kill zones.
+
+**Real staircases**
+* The up-stairs is a walled stone stairwell; the way down is a **2-wide
+  staircase cut into the floor** — three treads descending under a stone
+  hood, lit from inside, flanked by glowing crystal shards with teal motes
+  rising over the steps. Beacons removed. A carve that would sever a level's
+  only route rolls back and retries (verified over 24,000 generated floors).
+
+**Playtest round (visibility, combat feel, fairness)**
+* X-ray occlusion fade is dark and **per-pixel exact** — only pixels that
+  actually hide the hero fade, never neighbours or blocks behind.
+* Hero and enemies render larger with brighter palettes; per-type locomotion
+  patterns (rat darts, slime hops, bat weaves, spider circles, kobold zigzag,
+  zombie lurch, demon charge) make every foe readable and predictable.
+* Enemies hit ~50% harder from depth 1 and keep scaling; shop weapon upgrade
+  is once per shop and gentler.
+* Weapon swings are proper **slash crescents** with per-weapon impact FX and
+  a hit-stop heartbeat; blunt weapons slam dust shock-rings.
+* Enemies spawn only on open flat ground, never path or shoot through
+  objects (per-cell movement + line-of-sight checks).
+* Teal-blue animated water over a pebbled riverbed; loot beams now mean
+  equipment rarity only (gold is a coin, torches and trinkets are models).
+
+### 1.0
+
+Initial release (shipped inside ThumbyOne 1.18): the full game — iso camera,
+BSP dungeons with a guaranteed path, real-time combat, Diablo-4-lite loot,
+five depth bands, light/torch tension, suspend save, procedural audio.
+
 ## Layout
 
 ```

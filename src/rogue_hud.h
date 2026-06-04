@@ -8,6 +8,9 @@
 #include <stdint.h>
 #include "rogue_player.h"
 
+/* Game version — shown on the title screen, bumped per release. */
+#define ROGUE_VERSION "1.1"
+
 void rogue_hud_draw(uint16_t *fb, const RoguePlayer *p, int depth, int enemies);
 void rogue_hud_banner(uint16_t *fb, const char *msg, uint16_t color);
 void rogue_hud_prompt(uint16_t *fb, const char *msg);

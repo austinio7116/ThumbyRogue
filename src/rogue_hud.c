@@ -107,6 +107,7 @@ void rogue_hud_title(uint16_t *fb, int best) {
     const char *go = "Press A to begin";
     w = craft_font_width(go);
     craft_font_draw(fb, go, (CRAFT_FB_W - w) / 2, 96, RGB(245, 245, 200));
+    craft_font_draw(fb, "v" ROGUE_VERSION, 2, CRAFT_FB_H - 8, RGB(110, 105, 125));
 }
 
 void rogue_hud_prompt(uint16_t *fb, const char *msg) {
