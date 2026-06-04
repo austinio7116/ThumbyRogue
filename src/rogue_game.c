@@ -634,10 +634,12 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
         s_stair_mote_t -= dt;
         if (s_stair_mote_t <= 0.0f) {
             s_stair_mote_t = 0.11f;
-            float along = 1.0f + (float)(loot_rng() % 100) / 100.0f;   /* over the two steps */
-            float side  = ((float)(loot_rng() % 100) / 100.0f - 0.5f) * 0.6f;
-            float mx = s_level.down_x + 0.5f + s_level.down_dx * along + s_level.down_dz * side;
-            float mz = s_level.down_z + 0.5f + s_level.down_dz * along + s_level.down_dx * side;
+            float along = 1.0f + (float)(loot_rng() % 100) / 100.0f;   /* over the steps */
+            /* spread across the trench's full width (1 or 2 columns) */
+            float side  = ((float)(loot_rng() % 100) / 100.0f) *
+                          (s_level.down_wide ? 1.6f : 0.6f) - 0.3f;
+            float mx = s_level.down_x + 0.5f + s_level.down_dx * along + s_level.down_px * side;
+            float mz = s_level.down_z + 0.5f + s_level.down_dz * along + s_level.down_pz * side;
             rogue_particle_spawn(v3(mx, (float)s_level.floor_y - 0.3f, mz),
                                  0.0f, 1.2f, 0.0f, 1.5f, RGB(90, 245, 225), 0.12f, 0.0f);
         }
@@ -646,9 +648,11 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
     /* Descend by WALKING DOWN the stair trench: trigger once the hero stands
      * in one of the descending step cells, below floor level. */
     int pcx = (int)floorf(s_player.pos.x), pcz = (int)floorf(s_player.pos.z);
-    bool on_step =
-        (pcx == s_level.down_x +     s_level.down_dx && pcz == s_level.down_z +     s_level.down_dz) ||
-        (pcx == s_level.down_x + 2 * s_level.down_dx && pcz == s_level.down_z + 2 * s_level.down_dz);
+    bool on_step = false;
+    for (int s = 1; s <= 2 && !on_step; s++)
+        for (int w = 0; w <= s_level.down_wide && !on_step; w++)
+            on_step = (pcx == s_level.down_x + s * s_level.down_dx + w * s_level.down_px &&
+                       pcz == s_level.down_z + s * s_level.down_dz + w * s_level.down_pz);
     if (on_step && s_player.pos.y < (float)s_level.floor_y - 0.4f) {
         rogue_sfx_descend();
         for (int i = 0; i < SLOT_COUNT; i++) s_keep_equip[i] = s_player.equip[i];
@@ -900,12 +904,18 @@ void rogue_game_debug_step_into_trench(void) {
                       s_level.down_z + s_level.down_dz + 0.5f);
 }
 
-/* Stand just outside the down-stairs trench, looking at it (stair visuals). */
-void rogue_game_debug_goto_down(void) {
-    s_player.pos = v3(s_level.down_x + 0.5f - s_level.down_dx * 1.2f,
+/* Stand just outside the down-stairs trench, looking at it (stair visuals).
+ * Spins the camera so the view runs straight down the descending steps;
+ * mode 2 instead faces the mouth from the room side (tread risers in view). */
+void rogue_game_debug_goto_down(int mode) {
+    s_player.pos = v3(s_level.down_x + 0.5f - s_level.down_dx * 1.2f - s_level.down_px * 1.1f,
                       (float)s_level.floor_y,
-                      s_level.down_z + 0.5f - s_level.down_dz * 1.2f);
+                      s_level.down_z + 0.5f - s_level.down_dz * 1.2f - s_level.down_pz * 1.1f);
     rogue_camera_init(s_player.pos);
+    int n = (s_level.down_dx == 1) ? 1 : (s_level.down_dz == -1) ? 2 :
+            (s_level.down_dx == -1) ? 3 : 0;
+    if (mode == 2) n = (n + 2) & 3;
+    for (int i = 0; i < n; i++) rogue_camera_rotate(+1);
 }
 
 /* Pose a single enemy 2.4 cells in front of the hero, facing the camera, at

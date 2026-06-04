@@ -366,6 +366,112 @@ static void apply_to_world(uint32_t seed, int depth) {
     }
 }
 
+/* --- down-staircase carving ----------------------------------------------
+ * Writes are tracked so a carve that severs the level's only route (small
+ * room: trench cut straight across the corridor mouth) can be rolled back
+ * and retried in another direction. */
+static int16_t s_carve_x[128], s_carve_z[128];
+static int8_t  s_carve_y[128];
+static uint8_t s_carve_b[128];
+static int     s_carve_n;
+static void carve_set(int x, int y, int z, uint8_t b) {
+    if (s_carve_n < 128) {
+        s_carve_x[s_carve_n] = (int16_t)x; s_carve_z[s_carve_n] = (int16_t)z;
+        s_carve_y[s_carve_n] = (int8_t)y;
+        s_carve_b[s_carve_n] = craft_world_get_byte(x, y, z);
+        s_carve_n++;
+    }
+    craft_world_set_byte(x, y, z, b);
+}
+static void carve_undo(void) {
+    for (int i = s_carve_n - 1; i >= 0; i--)
+        craft_world_set_byte(s_carve_x[i], s_carve_y[i], s_carve_z[i], s_carve_b[i]);
+    s_carve_n = 0;
+}
+
+/* The full stairwell: TWO cells wide where the room allows (so the
+ * descending interior is actually visible at 128px), three floor-material
+ * treads cut ever deeper, stone lining, an internal glow, a stone hood over
+ * the last step, and the far face the stairs vanish under. */
+static void carve_down_deep(int dx0, int dz0, int ddx, int ddz,
+                            uint8_t W, uint8_t F, RogueLevelInfo *out) {
+    int dpx = ddz, dpz = ddx;
+    int wide = 1;
+    {   /* second width column: prefer +perp, else -perp, else carve narrow
+         * (never cut the shaft under standing wall mass) */
+        bool okp = true, okm = true;
+        for (int s = 1; s <= 3; s++) {
+            if (!is_walk(dx0 + ddx*s + dpx, dz0 + ddz*s + dpz)) okp = false;
+            if (!is_walk(dx0 + ddx*s - dpx, dz0 + ddz*s - dpz)) okm = false;
+        }
+        if (!okp && okm)      { dpx = -dpx; dpz = -dpz; }
+        else if (!okp)        wide = 0;
+    }
+    out->down_dx = (int8_t)ddx; out->down_dz = (int8_t)ddz;
+    out->down_px = (int8_t)dpx; out->down_pz = (int8_t)dpz;
+    out->down_wide = (int8_t)wide;
+    for (int s = 1; s <= 3; s++)                     /* treads: feet at FLOOR_Y-s */
+        for (int w = 0; w <= wide; w++) {
+            int tx = dx0 + ddx*s + dpx*w, tz = dz0 + ddz*s + dpz*w;
+            for (int y = ROGUE_FLOOR_Y - 1; y >= ROGUE_FLOOR_Y - s; y--)
+                carve_set(tx, y, tz, BLK_AIR);
+            carve_set(tx, ROGUE_FLOOR_Y - 1 - s, tz, F);
+        }
+    /* Invisible light cell over the middle tread: the stairwell glows from
+     * below so the descending steps are visible, not a black pit. */
+    carve_set(dx0 + 2*ddx, ROGUE_FLOOR_Y - 2, dz0 + 2*ddz, BLK_TORCH);
+    for (int s = 1; s <= 3; s++)                     /* stone-line the shaft sides */
+        for (int side = 0; side <= 1; side++) {
+            int sd = side ? wide + 1 : -1;
+            int wx = dx0 + ddx*s + dpx*sd, wz = dz0 + ddz*s + dpz*sd;
+            for (int y = ROGUE_FLOOR_Y - 1; y >= ROGUE_FLOOR_Y - 1 - s; y--)
+                carve_set(wx, y, wz, W);
+        }
+    {   /* stone hood over the last step — the dark mouth the stairs
+         * disappear under (mirrors the up-stairwell's architecture) */
+        int hx = dx0 + 3*ddx, hz = dz0 + 3*ddz;
+        for (int w = 0; w <= wide; w++) {
+            carve_set(hx + dpx*w, ROGUE_FLOOR_Y,     hz + dpz*w, W);
+            carve_set(hx + dpx*w, ROGUE_FLOOR_Y + 1, hz + dpz*w, W);
+        }
+        carve_set(hx - dpx, ROGUE_FLOOR_Y, hz - dpz, W);
+        carve_set(hx + (wide+1)*dpx, ROGUE_FLOOR_Y, hz + (wide+1)*dpz, W);
+    }
+    for (int w = 0; w <= wide; w++) {   /* the far face the steps vanish under */
+        int wx = dx0 + 4*ddx + dpx*w, wz = dz0 + 4*ddz + dpz*w;
+        for (int y = ROGUE_FLOOR_Y - 1; y >= ROGUE_FLOOR_Y - 5; y--)
+            carve_set(wx, y, wz, W);
+    }
+}
+
+/* Fallback when every deep-carve direction severs the route: the old
+ * shallow narrow trench (crossable by a hop, so it can never wall off a
+ * room), still lit and still descended the same way. */
+static void carve_down_shallow(int dx0, int dz0, int ddx, int ddz,
+                               uint8_t W, uint8_t F, RogueLevelInfo *out) {
+    int dpx = ddz, dpz = ddx;
+    out->down_dx = (int8_t)ddx; out->down_dz = (int8_t)ddz;
+    out->down_px = (int8_t)dpx; out->down_pz = (int8_t)dpz;
+    out->down_wide = 0;
+    int t1x = dx0 + ddx,   t1z = dz0 + ddz;
+    int t2x = dx0 + 2*ddx, t2z = dz0 + 2*ddz;
+    craft_world_set_byte(t1x, ROGUE_FLOOR_Y-1, t1z, BLK_AIR);
+    craft_world_set_byte(t1x, ROGUE_FLOOR_Y-2, t1z, F);
+    craft_world_set_byte(t2x, ROGUE_FLOOR_Y-1, t2z, BLK_AIR);
+    craft_world_set_byte(t2x, ROGUE_FLOOR_Y-2, t2z, BLK_TORCH);  /* glow */
+    craft_world_set_byte(t2x, ROGUE_FLOOR_Y-3, t2z, F);
+    for (int s = 1; s <= 2; s++)
+        for (int side = -1; side <= 1; side += 2) {
+            int wx = dx0 + ddx*s + dpx*side, wz = dz0 + ddz*s + dpz*side;
+            craft_world_set_byte(wx, ROGUE_FLOOR_Y-1, wz, W);
+            craft_world_set_byte(wx, ROGUE_FLOOR_Y-2, wz, W);
+        }
+    int fx = dx0 + 3*ddx, fz = dz0 + 3*ddz;
+    craft_world_set_byte(fx, ROGUE_FLOOR_Y-1, fz, W);
+    craft_world_set_byte(fx, ROGUE_FLOOR_Y-2, fz, W);
+    craft_world_set_byte(fx, ROGUE_FLOOR_Y-3, fz, W);
+}
+
 void rogue_gen_dungeon(uint32_t seed, int depth, RogueLevelInfo *out) {
     s_rng = (seed ^ (0x9E3779B9u * (uint32_t)(depth + 1)));
     if (s_rng == 0) s_rng = 0xDEADBEEFu;
@@ -397,21 +503,14 @@ void rogue_gen_dungeon(uint32_t seed, int depth, RogueLevelInfo *out) {
         uint8_t W = sb->wall;
         int ux = s_rooms[up].cx,   uz = s_rooms[up].cz;
         int dx0 = s_rooms[down].cx, dz0 = s_rooms[down].cz;
-        int udx = 1, udz = 0, ddx2 = 1, ddz2 = 0;
+        int udx = 1, udz = 0;
         for (int d = 0; d < 4; d++) {
             bool ok = true;
             for (int s = 1; s <= 3 && ok; s++)
                 if (!is_walk(ux + PDX[d]*s, uz + PDZ[d]*s)) ok = false;
             if (ok) { udx = PDX[d]; udz = PDZ[d]; break; }
         }
-        for (int d = 0; d < 4; d++) {
-            bool ok = true;
-            for (int s = 1; s <= 3 && ok; s++)
-                if (!is_walk(dx0 + PDX[d]*s, dz0 + PDZ[d]*s)) ok = false;
-            if (ok) { ddx2 = PDX[d]; ddz2 = PDZ[d]; break; }
-        }
         out->up_dx = (int8_t)udx;   out->up_dz = (int8_t)udz;
-        out->down_dx = (int8_t)ddx2; out->down_dz = (int8_t)ddz2;
 
         /* UP: two rising stone steps, walled on both sides + the far end. */
         int upx = udz, upz = udx;                        /* perpendicular */
@@ -440,35 +539,42 @@ void rogue_gen_dungeon(uint32_t seed, int depth, RogueLevelInfo *out) {
             }
         }
 
-        /* DOWN: two steps cut into the floor, stone-lined shaft, dead-ending
-         * under the untouched far column — the stairs disappear below. */
-        int dpx = ddz2, dpz = ddx2;
-        int t1x = dx0 + ddx2,   t1z = dz0 + ddz2;
-        int t2x = dx0 + 2*ddx2, t2z = dz0 + 2*ddz2;
-        craft_world_set_byte(t1x, ROGUE_FLOOR_Y-1, t1z, BLK_AIR);          /* step -1 */
-        craft_world_set_byte(t1x, ROGUE_FLOOR_Y-2, t1z, W);                /* stone tread */
-        craft_world_set_byte(t2x, ROGUE_FLOOR_Y-1, t2z, BLK_AIR);          /* step -2 */
-        craft_world_set_byte(t2x, ROGUE_FLOOR_Y-2, t2z, BLK_AIR);
-        craft_world_set_byte(t2x, ROGUE_FLOOR_Y-3, t2z, W);                /* stone tread */
-        for (int s = 1; s <= 2; s++)                     /* stone-line the shaft sides */
-            for (int side = -1; side <= 1; side += 2) {
-                int wx = dx0 + ddx2*s + dpx*side, wz = dz0 + ddz2*s + dpz*side;
-                craft_world_set_byte(wx, ROGUE_FLOOR_Y-1, wz, W);
-                craft_world_set_byte(wx, ROGUE_FLOOR_Y-2, wz, W);
+        /* DOWN: a real descending stairwell. Try each direction; a carve
+         * that severs the level's only route (small room: trench cut across
+         * the corridor mouth) is rolled back and the next direction tried.
+         * If every direction severs, fall back to the old shallow crossable
+         * trench, which can never wall a room off. */
+        {
+            int got = 0;
+            for (int d = 0; d < 4 && !got; d++) {
+                bool okc = true;
+                for (int s = 1; s <= 3 && okc; s++)
+                    if (!is_walk(dx0 + PDX[d]*s, dz0 + PDZ[d]*s)) okc = false;
+                if (!okc) continue;
+                s_carve_n = 0;
+                carve_down_deep(dx0, dz0, PDX[d], PDZ[d], W, sb->floor, out);
+                if (reserve_solution_path(ux, uz, dx0, dz0)) got = 1;
+                else carve_undo();
             }
-        {   /* the far face the steps vanish under */
-            int wx = dx0 + 3*ddx2, wz = dz0 + 3*ddz2;
-            craft_world_set_byte(wx, ROGUE_FLOOR_Y-1, wz, W);
-            craft_world_set_byte(wx, ROGUE_FLOOR_Y-2, wz, W);
-            craft_world_set_byte(wx, ROGUE_FLOOR_Y-3, wz, W);
+            if (!got) {
+                int ddx = 1, ddz = 0;
+                for (int d = 0; d < 4; d++) {
+                    bool okc = true;
+                    for (int s = 1; s <= 3 && okc; s++)
+                        if (!is_walk(dx0 + PDX[d]*s, dz0 + PDZ[d]*s)) okc = false;
+                    if (okc) { ddx = PDX[d]; ddz = PDZ[d]; break; }
+                }
+                carve_down_shallow(dx0, dz0, ddx, ddz, W, sb->floor, out);
+            }
+            /* Glowing teal crystal shards flank the trench mouth — a clear,
+             * persistent landmark for the way down (the rising teal motes
+             * add the motion cue at runtime). */
+            int dpx = out->down_px, dpz = out->down_pz, wd = out->down_wide;
+            if (deco_open(dx0 + (wd+1)*dpx, dz0 + (wd+1)*dpz))
+                craft_world_set_byte(dx0 + (wd+1)*dpx, ROGUE_FLOOR_Y, dz0 + (wd+1)*dpz, BLK_SHARDS);
+            if (deco_open(dx0 - dpx, dz0 - dpz))
+                craft_world_set_byte(dx0 - dpx, ROGUE_FLOOR_Y, dz0 - dpz, BLK_SHARDS);
         }
-        /* Glowing teal crystal shards flank the trench entry — a clear,
-         * persistent landmark for the way down (the rising teal motes add
-         * the motion cue at runtime). */
-        if (deco_open(dx0 + dpx, dz0 + dpz))
-            craft_world_set_byte(dx0 + dpx, ROGUE_FLOOR_Y, dz0 + dpz, BLK_SHARDS);
-        if (deco_open(dx0 - dpx, dz0 - dpz))
-            craft_world_set_byte(dx0 - dpx, ROGUE_FLOOR_Y, dz0 - dpz, BLK_SHARDS);
     }
 
 

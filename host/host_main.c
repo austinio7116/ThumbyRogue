@@ -310,9 +310,10 @@ int main(int argc, char **argv) {
             extern int rogue_game_debug_goto_deco(void);
             printf("[deco] found scenery: %d\n", rogue_game_debug_goto_deco());
         }
-        if (getenv("ROGUE_DOWN")) {      /* stand at the down-stairs trench */
-            extern void rogue_game_debug_goto_down(void);
-            rogue_game_debug_goto_down();
+        if (getenv("ROGUE_DOWN")) {      /* stand at the down-stairs trench;
+                                          * mode 2 = view the mouth from the room side */
+            extern void rogue_game_debug_goto_down(int);
+            rogue_game_debug_goto_down(atoi(getenv("ROGUE_DOWN")));
         }
         if (getenv("ROGUE_DESCTEST")) {  /* step into the trench -> must descend */
             extern void rogue_game_debug_step_into_trench(void);

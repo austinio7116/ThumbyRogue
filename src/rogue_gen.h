@@ -25,6 +25,8 @@ typedef struct {
     int  down_x, down_z;   /* down-stairs entry cell (XZ) */
     int8_t up_dx, up_dz;   /* direction the up staircase rises */
     int8_t down_dx, down_dz; /* direction the down trench descends */
+    int8_t down_px, down_pz; /* perpendicular toward the 2nd width column */
+    int8_t down_wide;        /* 1 = trench is two cells wide */
     int  floor_y;          /* walkable surface Y */
     int  n_rooms;
     int16_t room_cx[ROGUE_MAX_LEVEL_ROOMS];
