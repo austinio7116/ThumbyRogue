@@ -24,8 +24,9 @@ level-gen, every band & icon).
 summary. Implemented: iso camera (90° rotate), BSP dungeons with guaranteed
 paths, real-time combat (melee/ranged/caster + dodge→jump), jump/platforming
 (lava pits & bridges, pedestals, moving platforms), 5 depth bands + champions,
-the **Diablo-4-lite loot system** (6 equip slots, rarity + affixes, legendary
-aspects, sockets/gems, salvage, merchant shop) with a paperdoll inventory
+the **Diablo-4-lite loot system** (6 equip slots, rarity + affixes incl. 8
+weapon elements, legendary aspects, sockets/gems, salvage, a merchant stall
+with a shopkeeper who fights back) with a paperdoll inventory
 screen, light/torch tension, traps, and procedural audio. See the
 **[illustrated user guide](https://austinio7116.github.io/ThumbyRogue/)** for
 the full loot & level-gen breakdown.
