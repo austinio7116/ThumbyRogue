@@ -637,11 +637,11 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
         int r = loot_rng() % 100;
         switch (lk) {
         case LOOT_GEAR:   if (r < 45) { rogue_item_roll_drop(&it, s_depth, loot_rng()); rogue_loot_drop(&it, dpos); } break;
-        case LOOT_GEM:    if (r < 50) { rogue_item_make_gem(&it, (GemType)(1 + loot_rng()%4)); rogue_loot_drop(&it, dpos); } break;
+        case LOOT_GEM:    if (r < 50) { rogue_item_make_gem(&it, (GemType)(1 + loot_rng() % (GEM_COUNT - 1))); rogue_loot_drop(&it, dpos); } break;
         case LOOT_POTION: if (r < 45) { rogue_item_make_potion(&it, 30); rogue_loot_drop(&it, dpos); } break;
         case LOOT_RARE:   /* demons always cough up good gear */
             rogue_item_roll_drop(&it, s_depth + 3, loot_rng()); rogue_loot_drop(&it, dpos);
-            if (r < 50) { rogue_item_make_gem(&it, (GemType)(1 + loot_rng()%4)); rogue_loot_drop(&it, dpos); }
+            if (r < 50) { rogue_item_make_gem(&it, (GemType)(1 + loot_rng() % (GEM_COUNT - 1))); rogue_loot_drop(&it, dpos); }
             break;
         default:          if (r < 10) { rogue_item_roll_drop(&it, s_depth, loot_rng()); rogue_loot_drop(&it, dpos); } break;
         }
@@ -1014,6 +1014,14 @@ void rogue_game_debug_elemtest(void) {
     }
     printf("[elemtest] chill: moved %.2f normally vs %.2f chilled\n",
            moved[0], moved[1]);
+    /* an elemental gem socketed in the weapon must imbue it */
+    RogueItem *w = &s_player.equip[SLOT_WEAPON];
+    w->sockets = 1; w->gem[0] = GEM_GLACITE;
+    for (int a = 0; a < w->n_affix; a++)
+        if (w->affix[a].type >= AFX_FIRE) w->affix[a].type = AFX_DMG;
+    rogue_player_recompute(&s_player);
+    printf("[elemtest] glacite-socketed weapon: elem=%d pow=%d (2=frost)\n",
+           s_player.stats.elem, s_player.stats.elem_pow);
 }
 
 /* Force an element onto the equipped weapon (impact/projectile tints). */

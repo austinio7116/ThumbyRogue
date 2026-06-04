@@ -52,7 +52,14 @@ typedef enum {
 } AspectId;
 
 /* Socket gems. */
-typedef enum { GEM_NONE, GEM_RUBY, GEM_SAPPHIRE, GEM_EMERALD, GEM_TOPAZ, GEM_COUNT } GemType;
+/* Socket gems. The classic four grant stats anywhere; the elemental trio
+ * imbues a WEAPON with its element (and grants a little elemental warding
+ * when socketed into armor instead). */
+typedef enum {
+    GEM_NONE, GEM_RUBY, GEM_SAPPHIRE, GEM_EMERALD, GEM_TOPAZ,
+    GEM_FIREOPAL, GEM_GLACITE, GEM_VENOMSTONE,
+    GEM_COUNT
+} GemType;
 
 typedef struct {
     uint8_t  kind;        /* ItemKind */

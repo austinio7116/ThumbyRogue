@@ -84,6 +84,9 @@ const char *rogue_gem_name(GemType g) {
         case GEM_SAPPHIRE: return "Sapphire";
         case GEM_EMERALD:  return "Emerald";
         case GEM_TOPAZ:    return "Topaz";
+        case GEM_FIREOPAL:   return "Fire Opal";
+        case GEM_GLACITE:    return "Glacite";
+        case GEM_VENOMSTONE: return "Venomstone";
         default:           return "-";
     }
 }
@@ -141,6 +144,9 @@ uint16_t rogue_gem_color(GemType g) {
         case GEM_SAPPHIRE: return RGB(60,110,230);
         case GEM_EMERALD:  return RGB(40,210,110);
         case GEM_TOPAZ:    return RGB(240,210,60);
+        case GEM_FIREOPAL:   return RGB(255,120,40);
+        case GEM_GLACITE:    return RGB(150,215,255);
+        case GEM_VENOMSTONE: return RGB(120,235,90);
         default:           return RGB(200,200,200);
     }
 }

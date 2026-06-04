@@ -6,6 +6,8 @@ static void add_gem(RogueStats *o, GemType g) {
         case GEM_SAPPHIRE: o->resist   += 8;  break;
         case GEM_EMERALD:  o->crit     += 4;  break;
         case GEM_TOPAZ:    o->armor    += 10; break;
+        case GEM_FIREOPAL: case GEM_GLACITE: case GEM_VENOMSTONE:
+            o->resist += 4; break;   /* elemental warding in armor sockets */
         default: break;
     }
 }
@@ -44,14 +46,14 @@ void rogue_stats_compute(RogueStats *o, const RogueItem equip[SLOT_COUNT]) {
         }
         for (int g = 0; g < it->sockets && g < 2; g++)
             add_gem(o, (GemType)it->gem[g]);
-        /* a gem socketed in the WEAPON imbues it with an element too
-         * (ruby = fire, sapphire = frost, emerald = poison) */
+        /* an ELEMENTAL gem socketed in the WEAPON imbues it (the classic
+         * stat gems keep their stat identity everywhere) */
         if (s == SLOT_WEAPON && o->elem == ELEM_NONE)
             for (int g = 0; g < it->sockets && g < 2; g++) {
                 GemType gt = (GemType)it->gem[g];
-                if (gt == GEM_RUBY)     { o->elem = ELEM_FIRE;   o->elem_pow = 3 + it->base_dmg / 6; }
-                if (gt == GEM_SAPPHIRE) { o->elem = ELEM_FROST;  o->elem_pow = 3 + it->base_dmg / 6; }
-                if (gt == GEM_EMERALD)  { o->elem = ELEM_POISON; o->elem_pow = 3 + it->base_dmg / 6; }
+                if (gt == GEM_FIREOPAL)   { o->elem = ELEM_FIRE;   o->elem_pow = 3 + it->base_dmg / 6; }
+                if (gt == GEM_GLACITE)    { o->elem = ELEM_FROST;  o->elem_pow = 3 + it->base_dmg / 6; }
+                if (gt == GEM_VENOMSTONE) { o->elem = ELEM_POISON; o->elem_pow = 3 + it->base_dmg / 6; }
                 if (o->elem != ELEM_NONE) break;
             }
     }
