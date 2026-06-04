@@ -124,14 +124,14 @@ static const RogueCuboid brazier_model[] = {
  * Maroon robe with a gold-trimmed apron, tan head under a flat cap, and
  * stubby arms resting toward the counter. Drawn facing the customer. */
 static const RogueCuboid merchant_model[] = {
-    { 0.0f,  0.42f,  0.0f,  0.26f, 0.42f, 0.20f, RGB(122, 40, 46) },   /* robe body */
-    { 0.0f,  0.52f,  0.08f, 0.20f, 0.26f, 0.05f, RGB(214, 178, 84) },  /* gold apron */
-    { 0.0f,  1.02f,  0.0f,  0.13f, 0.13f, 0.12f, RGB(224, 178, 138) }, /* head */
-    { 0.0f,  1.17f,  0.0f,  0.15f, 0.035f,0.14f, RGB(70, 28, 32) },    /* flat cap */
-    { -0.30f,0.58f,  0.10f, 0.06f, 0.20f, 0.06f, RGB(122, 40, 46) },   /* arms forward */
-    {  0.30f,0.58f,  0.10f, 0.06f, 0.20f, 0.06f, RGB(122, 40, 46) },
-    { -0.30f,0.40f,  0.17f, 0.055f,0.05f, 0.055f, RGB(224, 178, 138) },/* hands */
-    {  0.30f,0.40f,  0.17f, 0.055f,0.05f, 0.055f, RGB(224, 178, 138) },
+    { 0.0f,  0.50f,  0.0f,  0.26f, 0.50f, 0.20f, RGB(122, 40, 46) },   /* robe body */
+    { 0.0f,  0.60f,  0.08f, 0.20f, 0.30f, 0.05f, RGB(214, 178, 84) },  /* gold apron */
+    { 0.0f,  1.18f,  0.0f,  0.14f, 0.15f, 0.13f, RGB(224, 178, 138) }, /* head */
+    { 0.0f,  1.36f,  0.0f,  0.16f, 0.04f, 0.15f, RGB(70, 28, 32) },    /* flat cap */
+    { -0.30f,0.66f,  0.10f, 0.06f, 0.22f, 0.06f, RGB(122, 40, 46) },   /* arms forward */
+    {  0.30f,0.66f,  0.10f, 0.06f, 0.22f, 0.06f, RGB(122, 40, 46) },
+    { -0.30f,0.46f,  0.17f, 0.055f,0.05f, 0.055f, RGB(224, 178, 138) },/* hands */
+    {  0.30f,0.46f,  0.17f, 0.055f,0.05f, 0.055f, RGB(224, 178, 138) },
 };
 
 /* Carry the full paperdoll + gold across floors; only rebuild on death. */
@@ -1131,7 +1131,7 @@ void rogue_game_draw_overlay(uint16_t *fb) {
                      s_level.shop_z + 0.5f - s_level.shop_dz);
         float yaw = atan2f((float)s_level.shop_dx, (float)s_level.shop_dz);
         rogue_render_model(&s_cam, fb, mp, yaw, merchant_model, 8,
-                           0.42f, 1.25f, 0.0f, 256);
+                           0.42f, 1.45f, 0.0f, 256);
     }
 
     /* Spike traps — dark pad + steel spikes (telegraphed; pulses when armed). */
