@@ -46,6 +46,17 @@ void rogue_particle_burst(Vec3 pos, int n, float speed, float life,
     }
 }
 
+int rogue_particle_debug_count(float *ymin, float *ymax) {
+    int n = 0; *ymin = 1e9f; *ymax = -1e9f;
+    for (int i = 0; i < MAX_PART; i++) {
+        if (!s_p[i].alive) continue;
+        n++;
+        if (s_p[i].pos.y < *ymin) *ymin = s_p[i].pos.y;
+        if (s_p[i].pos.y > *ymax) *ymax = s_p[i].pos.y;
+    }
+    return n;
+}
+
 void rogue_particle_update(float dt) {
     for (int i = 0; i < MAX_PART; i++) {
         Particle *p = &s_p[i];

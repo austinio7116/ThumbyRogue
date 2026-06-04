@@ -626,6 +626,23 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
     if (s_player.hp < hp0)   rogue_sfx_hurt();
     if (s_player.gold > gold0) rogue_sfx_pickup();
 
+    /* Mark the down-stairs: a steady drift of teal motes rising out of the
+     * trench mouth — visible across the room (and in the dark) without
+     * bringing back a solid beam. Teal = down, matching the minimap. */
+    {
+        static float s_stair_mote_t;
+        s_stair_mote_t -= dt;
+        if (s_stair_mote_t <= 0.0f) {
+            s_stair_mote_t = 0.11f;
+            float along = 1.0f + (float)(loot_rng() % 100) / 100.0f;   /* over the two steps */
+            float side  = ((float)(loot_rng() % 100) / 100.0f - 0.5f) * 0.6f;
+            float mx = s_level.down_x + 0.5f + s_level.down_dx * along + s_level.down_dz * side;
+            float mz = s_level.down_z + 0.5f + s_level.down_dz * along + s_level.down_dx * side;
+            rogue_particle_spawn(v3(mx, (float)s_level.floor_y - 0.3f, mz),
+                                 0.0f, 1.2f, 0.0f, 1.5f, RGB(90, 245, 225), 0.12f, 0.0f);
+        }
+    }
+
     /* Descend by WALKING DOWN the stair trench: trigger once the hero stands
      * in one of the descending step cells, below floor level. */
     int pcx = (int)floorf(s_player.pos.x), pcz = (int)floorf(s_player.pos.z);

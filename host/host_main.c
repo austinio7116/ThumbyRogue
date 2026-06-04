@@ -343,6 +343,12 @@ int main(int argc, char **argv) {
                 rogue_game_debug_set_yaw((float)atof(getenv("ROGUE_FXYAW")) * 3.14159265f / 180.0f);
             for (int i = 0; i < settle; i++) rogue_game_tick(&none, 1.0f / 30.0f);
         }
+        if (getenv("ROGUE_PCOUNT")) {
+            extern int rogue_particle_debug_count(float *, float *);
+            float y0, y1;
+            int n = rogue_particle_debug_count(&y0, &y1);
+            printf("[pcount] alive=%d ymin=%.2f ymax=%.2f\n", n, y0, y1);
+        }
         if (getenv("ROGUE_DMGNUM")) {
             extern void rogue_game_debug_dmgnum(void);
             rogue_game_debug_dmgnum();

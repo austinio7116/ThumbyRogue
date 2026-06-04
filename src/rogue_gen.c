@@ -462,6 +462,13 @@ void rogue_gen_dungeon(uint32_t seed, int depth, RogueLevelInfo *out) {
             craft_world_set_byte(wx, ROGUE_FLOOR_Y-2, wz, W);
             craft_world_set_byte(wx, ROGUE_FLOOR_Y-3, wz, W);
         }
+        /* Glowing teal crystal shards flank the trench entry — a clear,
+         * persistent landmark for the way down (the rising teal motes add
+         * the motion cue at runtime). */
+        if (deco_open(dx0 + dpx, dz0 + dpz))
+            craft_world_set_byte(dx0 + dpx, ROGUE_FLOOR_Y, dz0 + dpz, BLK_SHARDS);
+        if (deco_open(dx0 - dpx, dz0 - dpz))
+            craft_world_set_byte(dx0 - dpx, ROGUE_FLOOR_Y, dz0 - dpz, BLK_SHARDS);
     }
 
 
