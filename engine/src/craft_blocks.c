@@ -204,6 +204,8 @@ const char *craft_block_name(BlockId blk) {
         case BLK_COBWEB:        return "cobweb";
         case BLK_BARRIER:       return "barrier";
         case BLK_RIVERBED:      return "riverbed";
+        case BLK_SHOPCOUNTER:   return "shop counter";
+        case BLK_SHOPSHELF:     return "shop shelf";
         default:                return "?";
     }
 }
@@ -405,6 +407,135 @@ static void bookcase_pattern(uint16_t *dst, int slot, uint32_t seed) {
                 default:r = sh*3/4;    g = sh*3/4;     b = sh*3/4;     break; /* tan */
             }
             if (x == S - 2) { r = r*3/4; g = g*3/4; b = b*3/4; }   /* edge shade */
+            dst[y * S + x] = rgb565(r, g, b);
+        }
+    }
+}
+
+/* Shop counter: rich polished planks on top with a gold inlay rim (the
+ * trading surface), panelled dark-wood front with a brass stud line. */
+static void shop_counter_pattern(uint16_t *dst, int slot, uint32_t seed) {
+    if (slot == 0) {                       /* top -- polished planks, gold rim */
+        for (int y = 0; y < S; y++)
+            for (int x = 0; x < S; x++) {
+                if (x == 0 || x == S-1 || y == 0 || y == S-1) {     /* dark edge */
+                    dst[y * S + x] = rgb565(58, 38, 20);
+                    continue;
+                }
+                if (x == 1 || x == S-2 || y == 1 || y == S-2) {     /* gold inlay */
+                    int g = ((x + y) & 1) ? 0 : 14;                 /* subtle sparkle */
+                    dst[y * S + x] = rgb565(208 + g, 168 + g, 56);
+                    continue;
+                }
+                int band = (y >> 2) & 1;                            /* plank bands */
+                int cb = band ? 132 : 116;
+                uint32_t h = (uint32_t)((x+1)*92821) ^ (uint32_t)((y+1)*68917) ^ seed;
+                cb += (int)(h % 9u) - 4;
+                if ((y & 3) == 0) cb -= 18;                         /* plank seam */
+                if (((x * 7 + y * 3) % 29) == 0) cb += 26;          /* polish glint */
+                dst[y * S + x] = rgb565(cb + 28, (cb * 10) >> 4, (cb * 4) >> 4);
+            }
+        return;
+    }
+    if (slot == 2) {                       /* bottom -- plain dark wood */
+        for (int y = 0; y < S; y++)
+            for (int x = 0; x < S; x++) {
+                int cb = 64 + (((x ^ y) & 3) ? 0 : 8);
+                dst[y * S + x] = rgb565(cb, (cb * 10) >> 4, (cb * 5) >> 4);
+            }
+        return;
+    }
+    /* side -- counter lip on top, raised door-style panels below */
+    for (int y = 0; y < S; y++)
+        for (int x = 0; x < S; x++) {
+            if (y < 3) {                                            /* lip matches top */
+                int cb = 124 + ((y == 2) ? -20 : 0);
+                dst[y * S + x] = rgb565(cb + 28, (cb * 10) >> 4, (cb * 4) >> 4);
+                continue;
+            }
+            if (y == 3) {                                           /* brass stud line */
+                dst[y * S + x] = ((x & 3) == 1) ? rgb565(212, 172, 64)
+                                                : rgb565(70, 46, 24);
+                continue;
+            }
+            /* two raised panels per face */
+            int px = (x < 8) ? x : x - 8;                           /* panel-local 0..7 */
+            int border = (px == 0 || px == 7 || y == 4 || y == S-1);
+            int cb = border ? 58 : 92;
+            if (!border && (px == 1 || y == 5)) cb = 104;           /* bevel highlight */
+            if (!border && (px == 6 || y == S-2)) cb = 76;          /* bevel shadow */
+            uint32_t h = (uint32_t)((x+3)*92821) ^ (uint32_t)((y+5)*68917) ^ seed;
+            cb += (int)(h % 7u) - 3;
+            dst[y * S + x] = rgb565(cb + 14, (cb * 10) >> 4, (cb * 5) >> 4);
+        }
+}
+
+/* Shop shelf: dark wood frame packed with wares -- potion bottles with
+ * bright caps, coin pouches and small boxes -- so the wall behind the
+ * merchant reads instantly as a stocked store. Top/bottom are planks. */
+static void shop_shelf_pattern(uint16_t *dst, int slot, uint32_t seed) {
+    if (slot != 1) {                       /* top / bottom -- plank grain */
+        for (int y = 0; y < S; y++)
+            for (int x = 0; x < S; x++) {
+                int band = (y >> 2) & 1;
+                int cb = band ? 92 : 80;
+                uint32_t h = (uint32_t)((x+1)*92821) ^ (uint32_t)((y+1)*68917) ^ seed;
+                cb += (int)(h % 11u) - 5;
+                if ((y & 3) == 0) cb -= 20;
+                dst[y * S + x] = rgb565(cb, (cb * 11) >> 4, (cb * 6) >> 4);
+            }
+        return;
+    }
+    for (int y = 0; y < S; y++) {
+        int shelf = (y % 5 == 0) || y == S - 1;        /* shelf plank rows */
+        for (int x = 0; x < S; x++) {
+            int frame = (x == 0 || x == S - 1);
+            if (shelf || frame) {                       /* dark wood frame */
+                int cb = 64 - ((y & 1) ? 0 : 6);
+                dst[y * S + x] = rgb565(cb, (cb * 10) >> 4, (cb * 5) >> 4);
+                continue;
+            }
+            /* ware slots: 3 shelves x ~4 wares; each ware keyed to its
+             * (slot, shelf) so the stock varies cube to cube */
+            int sy = y / 5;                             /* shelf index 0..2 */
+            int ly = y % 5;                             /* row inside shelf 1..4 */
+            int wx = (x - 1) / 4;                       /* ware slot 0..3 */
+            int lx = (x - 1) % 4;                       /* col inside slot 0..3 */
+            uint32_t wk = (uint32_t)((wx + 1) * 2654435761u) ^
+                          (uint32_t)((sy + 1) * 40503u) ^ seed;
+            wk ^= wk >> 13; wk *= 0x9E3779B1u; wk ^= wk >> 16;
+            int kind = (int)(wk % 5u);
+            int r = 24, g = 18, b = 14;                 /* dark alcove behind wares */
+            if (kind <= 1) {
+                /* potion bottle: 2px-wide body rows 2..4, bright cap row 1 */
+                int hue = (int)((wk >> 8) % 4u);
+                int body = (lx == 1 || lx == 2);
+                if (body && ly >= 2) {
+                    int sh = 150 + (int)((wk >> 16) % 50u);
+                    switch (hue) {
+                        case 0:  r = sh;      g = sh/4;    b = sh/4;   break; /* red */
+                        case 1:  r = sh/4;    g = sh/2;    b = sh;     break; /* blue */
+                        case 2:  r = sh/4;    g = sh;      b = sh/3;   break; /* green */
+                        default: r = sh*3/4;  g = sh/4;    b = sh;     break; /* purple */
+                    }
+                    if (lx == 1 && ly == 2) { r += 60; g += 60; b += 60; } /* glint */
+                } else if (body && ly == 1) {
+                    r = 200; g = 196; b = 188;          /* stopper cap */
+                }
+            } else if (kind == 2) {
+                /* coin pouch: tan mound rows 2..4, gold tie row 1 */
+                int mound = (ly >= 2) && (lx >= (ly == 2 ? 1 : 0)) && (lx <= (ly == 2 ? 2 : 3));
+                if (mound) { r = 168; g = 124; b = 62; }
+                if (ly == 1 && (lx == 1 || lx == 2)) { r = 224; g = 184; b = 60; }
+            } else if (kind == 3) {
+                /* small box with a strap */
+                if (ly >= 1) {
+                    r = 120; g = 84; b = 44;
+                    if (lx == 1 || lx == 2) { r = 88; g = 60; b = 30; }   /* strap */
+                    if (ly == 1) { r += 22; g += 16; b += 8; }            /* lid */
+                }
+            }
+            /* kind 4: empty slot -- bare alcove */
             dst[y * S + x] = rgb565(r, g, b);
         }
     }
@@ -1274,6 +1405,8 @@ void craft_blocks_build_textures(void) {
         sarcophagus_pattern (&craft_textures[(BLK_SARCOPHAGUS * 3 + slot) * CRAFT_TEX_PIXELS], slot, 0x5A8C0u);
         crystal_pattern     (&craft_textures[(BLK_CRYSTAL     * 3 + slot) * CRAFT_TEX_PIXELS], slot, 0xC8957u);
         riverbed_pattern    (&craft_textures[(BLK_RIVERBED    * 3 + slot) * CRAFT_TEX_PIXELS], slot, 0xB1BEDu);
+        shop_counter_pattern(&craft_textures[(BLK_SHOPCOUNTER * 3 + slot) * CRAFT_TEX_PIXELS], slot, 0x5C047u);
+        shop_shelf_pattern  (&craft_textures[(BLK_SHOPSHELF   * 3 + slot) * CRAFT_TEX_PIXELS], slot, 0x5E1F5u);
     }
     /* ThumbyRogue cross-sprite scenery — same silhouette on every face. */
     for (int slot = 0; slot < 3; slot++) {

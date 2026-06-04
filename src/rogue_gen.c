@@ -595,6 +595,61 @@ void rogue_gen_dungeon(uint32_t seed, int depth, RogueLevelInfo *out) {
                               s_rooms[down].cx, s_rooms[down].cz);
     }
 
+    /* Merchant stall: a REAL shop, not a pad — a 3-wide polished counter
+     * the player trades across, the shopkeeper's alcove behind it (gold
+     * floor, lit by its own light cell, which also keeps scenery and
+     * spawns out), and a 2-high wares shelf wall at the back. Built right
+     * after path reservation so every solid cell provably avoids the
+     * reserved route, and chasms/water are excluded from its room. */
+    int shop_room = -1;
+    out->has_shop = 0;
+    {
+        uint32_t sr = seed ^ 0x5409u ^ (uint32_t)(depth * 40503u);
+        if (!sr) sr = 1;
+        for (int a = 0; a < s_n_rooms * 3 && !out->has_shop; a++) {
+            sr ^= sr << 13; sr ^= sr >> 17; sr ^= sr << 5;
+            int r = (int)(sr % (uint32_t)(s_n_rooms > 0 ? s_n_rooms : 1));
+            if (r == up || r == down) continue;
+            /* room centres usually carry the reserved route (corridors
+             * anchor there), so scan anchor offsets around the centre */
+            for (int oz = -3; oz <= 3 && !out->has_shop; oz++)
+                for (int ox = -3; ox <= 3 && !out->has_shop; ox++) {
+                    int cx = s_rooms[r].cx + ox, cz = s_rooms[r].cz + oz;
+                    for (int d = 0; d < 4 && !out->has_shop; d++) {
+                        int fdx = PDX[d], fdz = PDZ[d];   /* counter -> customer */
+                        int px = fdz, pz = fdx;           /* perpendicular */
+                        bool ok = true;
+                        for (int row = 0; row <= 2 && ok; row++)   /* counter/merchant/shelves */
+                            for (int w = -1; w <= 1 && ok; w++) {
+                                int x = cx - fdx*row + px*w, z = cz - fdz*row + pz*w;
+                                if (!deco_open(x, z) || path_reserved(x, z)) ok = false;
+                            }
+                        for (int w = -1; w <= 1 && ok; w++)        /* customer side stays open */
+                            if (!deco_open(cx + fdx + px*w, cz + fdz + pz*w)) ok = false;
+                        if (!ok) continue;
+                        for (int w = -1; w <= 1; w++) {
+                            craft_world_set_byte(cx + px*w, ROGUE_FLOOR_Y, cz + pz*w,
+                                                 BLK_SHOPCOUNTER);
+                            int sx = cx - 2*fdx + px*w, sz2 = cz - 2*fdz + pz*w;
+                            craft_world_set_byte(sx, ROGUE_FLOOR_Y,     sz2, BLK_SHOPSHELF);
+                            craft_world_set_byte(sx, ROGUE_FLOOR_Y + 1, sz2, BLK_SHOPSHELF);
+                            /* keep the customer row clear of later clutter */
+                            int fx2 = cx + fdx + px*w, fz2 = cz + fdz + pz*w;
+                            s_path[fz2 * GW + fx2] |= 0x80;
+                        }
+                        /* the shopkeeper's alcove: gold underfoot, lit */
+                        craft_world_set_byte(cx - fdx, ROGUE_FLOOR_Y - 1, cz - fdz,
+                                             BLK_GOLD_BLOCK);
+                        craft_world_set_byte(cx - fdx, ROGUE_FLOOR_Y, cz - fdz, BLK_TORCH);
+                        out->has_shop = 1;
+                        out->shop_x = (int16_t)cx; out->shop_z = (int16_t)cz;
+                        out->shop_dx = (int8_t)fdx; out->shop_dz = (int8_t)fdz;
+                        shop_room = r;
+                    }
+                }
+        }
+    }
+
     /* Lava chasms: an ORGANIC lava lake sunk below the floor that you can
      * fall into (the abyss). RARE and only from the second band on — the
      * Crypt (depths 1..ROGUE_BAND_FLOORS) has none, so early floors stay
@@ -604,7 +659,7 @@ void rogue_gen_dungeon(uint32_t seed, int depth, RogueLevelInfo *out) {
     out->n_chasm = 0;
     int chasms_allowed = (depth > ROGUE_BAND_FLOORS);   /* band 2 onward */
     for (int i = 0; chasms_allowed && i < s_n_rooms && out->n_chasm < 2; i++) {
-        if (i == up || i == down) continue;
+        if (i == up || i == down || i == shop_room) continue;
         if ((hash2(s_rooms[i].cx, s_rooms[i].cz, seed ^ 0x1A7Au) % 6u) != 0u)
             continue;                                   /* ~1 in 6 eligible rooms — dotted about */
         int cx = s_rooms[i].cx, cz = s_rooms[i].cz;
@@ -640,7 +695,7 @@ void rogue_gen_dungeon(uint32_t seed, int depth, RogueLevelInfo *out) {
      * chasm or stairs rooms) for variety. Water is non-solid, so you step down
      * a block and wade through (slowed); the engine animates the surface. */
     for (int i = 0; i < s_n_rooms; i++) {
-        if (i == up || i == down) continue;
+        if (i == up || i == down || i == shop_room) continue;
         if ((hash2(s_rooms[i].cx, s_rooms[i].cz, seed ^ 0x2233u) & 3u) != 0u) continue;
         if ((hash2(s_rooms[i].cx, s_rooms[i].cz, seed ^ 0x1A7Au) % 3u) == 0u) continue; /* not lava rooms */
 #ifdef ROGUE_VALIDATE

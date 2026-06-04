@@ -201,6 +201,11 @@ typedef enum {
      * stop the player climbing scenery up and out of the level. */
     BLK_BARRIER         = 123,
     BLK_RIVERBED        = 124,  /* pebbly stone bed laid under water pools */
+    /* --- ThumbyRogue shop structure ------------------------------------ *
+     * A real merchant stall: a polished counter row the player trades
+     * across and a wares-packed shelf wall behind the shopkeeper. */
+    BLK_SHOPCOUNTER     = 125,  /* 1-high counter — polished top, panelled front */
+    BLK_SHOPSHELF       = 126,  /* shelf wall — potions, pouches and boxes */
     BLK_COUNT
 } BlockId;
 
@@ -333,6 +338,7 @@ static inline bool craft_block_opaque(BlockId blk) {
  * they need an explicit allow-list. */
 static inline bool craft_block_solid(BlockId blk) {
     if (blk == BLK_BARRIER || blk == BLK_RIVERBED) return true; /* invisible wall / pool bed */
+    if (blk == BLK_SHOPCOUNTER || blk == BLK_SHOPSHELF) return true; /* shop structure */
     if (blk >= BLK_RFLOOR && blk <= BLK_CRYSTAL) return true;  /* ThumbyRogue floors/walls/scenery -- solid cubes */
     if (blk == BLK_AIR || craft_is_water_id((uint8_t)blk) || blk == BLK_TORCH) return false;
     if (craft_is_lava_id((uint8_t)blk)) return false;   /* fluid — you sink into it */

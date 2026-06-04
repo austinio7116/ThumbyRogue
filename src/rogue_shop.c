@@ -1,5 +1,6 @@
 #include "rogue_shop.h"
 #include "rogue_inventory.h"
+#include "rogue_gen.h"
 #include "craft_world.h"
 #include "craft_blocks.h"
 #include "craft_font.h"
@@ -12,7 +13,9 @@
 #define N_STOCK 4
 
 static bool      s_has_pad, s_open;
-static Vec3      s_pad;
+static Vec3      s_pad;       /* centre of the counter's customer side */
+static float     s_fdx, s_fdz; /* counter front direction (toward customer) */
+static float     s_px, s_pz;   /* counter axis (perpendicular) */
 static RogueItem s_stock[N_STOCK];
 static int       s_price[N_STOCK];
 static bool      s_sold[N_STOCK];
@@ -33,22 +36,20 @@ static int price_of(const RogueItem *it, int depth) {
     return base[it->rarity] + depth * (8 + it->rarity * 6);
 }
 
-void rogue_shop_place(const int16_t *room_cx, const int16_t *room_cz,
-                      int n_rooms, int up_x, int up_z, int down_x, int down_z,
-                      int floor_y, int depth, uint32_t seed) {
+/* The generator builds the physical stall (counter / shopkeeper alcove /
+ * shelf wall); this just rolls the stock and remembers where the counter's
+ * customer side is so walking up to it opens the trade screen. */
+void rogue_shop_place(const RogueLevelInfo *lv, int depth, uint32_t seed) {
     s_has_pad = false; s_open = false; s_cur = 0; s_depth = depth;
     s_upgraded = false;
     s_rng = seed ^ 0x5409u ^ (uint32_t)(depth * 40503u);
     if (!s_rng) s_rng = 1;
-    /* pick a room that isn't the stairs */
-    for (int a = 0; a < n_rooms * 3; a++) {
-        int r = (int)(xs() % (uint32_t)(n_rooms > 0 ? n_rooms : 1));
-        if ((room_cx[r]==up_x && room_cz[r]==up_z) ||
-            (room_cx[r]==down_x && room_cz[r]==down_z)) continue;
-        s_pad = v3(room_cx[r] + 0.5f, (float)floor_y, room_cz[r] + 0.5f);
-        craft_world_set_byte(room_cx[r], floor_y - 1, room_cz[r], BLK_GOLD_BLOCK);
+    if (lv->has_shop) {
+        s_fdx = (float)lv->shop_dx; s_fdz = (float)lv->shop_dz;
+        s_px  = (float)lv->shop_dz; s_pz  = (float)lv->shop_dx;
+        s_pad = v3(lv->shop_x + 0.5f + s_fdx, (float)lv->floor_y,
+                   lv->shop_z + 0.5f + s_fdz);
         s_has_pad = true;
-        break;
     }
     for (int i = 0; i < N_STOCK; i++) {
         rogue_item_roll_drop(&s_stock[i], depth + 1, xs());
@@ -57,10 +58,15 @@ void rogue_shop_place(const int16_t *room_cx, const int16_t *room_cz,
     }
 }
 
+/* True while the hero stands at the counter's customer side — anywhere
+ * along the 3-cell front, hugging the counter. */
 bool rogue_shop_pad_near(float x, float y, float z) {
     if (!s_has_pad) return false;
     float dx = x - s_pad.x, dz = z - s_pad.z;
-    return (dx*dx + dz*dz < 0.8f*0.8f) && (fabsf(y - s_pad.y) < 1.2f);
+    float along = dx * s_px + dz * s_pz;      /* down the counter's length */
+    float out   = dx * s_fdx + dz * s_fdz;    /* away from the counter face */
+    return fabsf(along) < 1.5f && out > -0.5f && out < 0.65f &&
+           fabsf(y - s_pad.y) < 1.2f;
 }
 bool rogue_shop_is_open(void){ return s_open; }
 void rogue_shop_open(void){ s_open = true; s_cur = 0; }

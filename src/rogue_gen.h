@@ -27,6 +27,9 @@ typedef struct {
     int8_t down_dx, down_dz; /* direction the down trench descends */
     int8_t down_px, down_pz; /* perpendicular toward the 2nd width column */
     int8_t down_wide;        /* 1 = trench is two cells wide */
+    uint8_t has_shop;        /* a merchant stall was built this floor */
+    int16_t shop_x, shop_z;  /* counter centre cell */
+    int8_t shop_dx, shop_dz; /* counter front: direction toward the customer */
     int  floor_y;          /* walkable surface Y */
     int  n_rooms;
     int16_t room_cx[ROGUE_MAX_LEVEL_ROOMS];

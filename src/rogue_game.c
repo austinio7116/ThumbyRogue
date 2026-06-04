@@ -120,6 +120,20 @@ static const RogueCuboid brazier_model[] = {
     { 0.0f,  0.62f,  0.0f,  0.09f, 0.07f, 0.09f, RGB(255, 225, 120) },/* flame */
 };
 
+/* The shopkeeper: a portly robed merchant who stands behind the counter.
+ * Maroon robe with a gold-trimmed apron, tan head under a flat cap, and
+ * stubby arms resting toward the counter. Drawn facing the customer. */
+static const RogueCuboid merchant_model[] = {
+    { 0.0f,  0.42f,  0.0f,  0.26f, 0.42f, 0.20f, RGB(122, 40, 46) },   /* robe body */
+    { 0.0f,  0.52f,  0.08f, 0.20f, 0.26f, 0.05f, RGB(214, 178, 84) },  /* gold apron */
+    { 0.0f,  1.02f,  0.0f,  0.13f, 0.13f, 0.12f, RGB(224, 178, 138) }, /* head */
+    { 0.0f,  1.17f,  0.0f,  0.15f, 0.035f,0.14f, RGB(70, 28, 32) },    /* flat cap */
+    { -0.30f,0.58f,  0.10f, 0.06f, 0.20f, 0.06f, RGB(122, 40, 46) },   /* arms forward */
+    {  0.30f,0.58f,  0.10f, 0.06f, 0.20f, 0.06f, RGB(122, 40, 46) },
+    { -0.30f,0.40f,  0.17f, 0.055f,0.05f, 0.055f, RGB(224, 178, 138) },/* hands */
+    {  0.30f,0.40f,  0.17f, 0.055f,0.05f, 0.055f, RGB(224, 178, 138) },
+};
+
 /* Carry the full paperdoll + gold across floors; only rebuild on death. */
 static RogueItem s_keep_equip[SLOT_COUNT];
 static int s_keep_gold;
@@ -254,9 +268,7 @@ static void load_level(void) {
                          s_level.up_x, s_level.up_z, s_level.floor_y,
                          s_depth, s_seed,
                          s_level.chasm_x, s_level.chasm_z, s_level.n_chasm);
-    rogue_shop_place(s_level.room_cx, s_level.room_cz, s_level.n_rooms,
-                     s_level.up_x, s_level.up_z, s_level.down_x, s_level.down_z,
-                     s_level.floor_y, s_depth, s_seed);
+    rogue_shop_place(&s_level, s_depth, s_seed);
     /* Bonus chest on each lava island — only reachable by riding the platform. */
     for (int c = 0; c < s_level.n_chasm; c++)
         rogue_loot_add_chest_at(s_level.island_x[c] + 0.5f, (float)s_level.floor_y,
@@ -929,6 +941,20 @@ void rogue_game_debug_step_into_trench(void) {
                       s_level.down_z + s_level.down_dz + 0.5f);
 }
 
+/* Stand at the shop counter's customer side, camera facing the stall. */
+int rogue_game_debug_goto_shop(void) {
+    if (!s_level.has_shop) return 0;
+    s_player.pos = v3(s_level.shop_x + 0.5f + s_level.shop_dx * 2.6f + s_level.shop_dz * 0.8f,
+                      (float)s_level.floor_y,
+                      s_level.shop_z + 0.5f + s_level.shop_dz * 2.6f + s_level.shop_dx * 0.8f);
+    rogue_camera_init(s_player.pos);
+    /* camera view dir should be -shop_d (looking AT the counter) */
+    int vx = -s_level.shop_dx, vz = -s_level.shop_dz;
+    int n = (vx == 1) ? 1 : (vz == -1) ? 2 : (vx == -1) ? 3 : 0;
+    for (int i = 0; i < n; i++) rogue_camera_rotate(+1);
+    return 1;
+}
+
 /* Stand just outside the down-stairs trench, looking at it (stair visuals).
  * Spins the camera so the view runs straight down the descending steps;
  * mode 2 instead faces the mouth from the room side (tread risers in view). */
@@ -1095,6 +1121,17 @@ void rogue_game_draw_overlay(uint16_t *fb) {
             rogue_render_model(&s_cam, fb, pp, 0.0f, table_model, 5, 0.45f, 0.55f, 0.0f, 256);
         else /* PROP_BRAZIER */
             rogue_render_model(&s_cam, fb, pp, 0.0f, brazier_model, 6, 0.30f, 0.72f, 0.0f, 256);
+    }
+
+    /* The shopkeeper, behind the counter, facing the customer side. A slow
+     * idle bob keeps the stall feeling alive. */
+    if (s_level.has_shop) {
+        Vec3 mp = v3(s_level.shop_x + 0.5f - s_level.shop_dx,
+                     (float)s_level.floor_y + 0.02f * sinf(s_anim_t * 1.7f),
+                     s_level.shop_z + 0.5f - s_level.shop_dz);
+        float yaw = atan2f((float)s_level.shop_dx, (float)s_level.shop_dz);
+        rogue_render_model(&s_cam, fb, mp, yaw, merchant_model, 8,
+                           0.42f, 1.25f, 0.0f, 256);
     }
 
     /* Spike traps — dark pad + steel spikes (telegraphed; pulses when armed). */
