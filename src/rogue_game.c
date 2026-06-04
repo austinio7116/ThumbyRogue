@@ -815,6 +815,8 @@ void rogue_game_debug_weapon_sheet(void) {
     rogue_inventory_open();
 }
 
+static bool dbg_standable(int x, int z);
+
 /* Stand the hero a few tiles in front of the first lava cell (screenshot).
  * mode 2: stand on the chasm's bonus island instead (lava on all sides). */
 int rogue_game_debug_goto_lava(int mode) {
@@ -823,12 +825,35 @@ int rogue_game_debug_goto_lava(int mode) {
                           s_level.island_z[0] + 0.5f);
         return 2;
     }
+    if (mode == 3 && s_level.n_chasm > 0) {
+        /* Stand ON the cross-bridge at the chasm centre — lava both sides.
+         * Spiral out to the nearest standable cell. */
+        int cx = s_level.chasm_x[0], cz = s_level.chasm_z[0];
+        for (int r = 0; r <= 4; r++)
+            for (int dz = -r; dz <= r; dz++)
+                for (int dx = -r; dx <= r; dx++) {
+                    int ax = dx < 0 ? -dx : dx, az = dz < 0 ? -dz : dz;
+                    if (ax != r && az != r) continue;     /* ring cells only */
+                    if (dbg_standable(cx + dx, cz + dz)) {
+                        s_player.pos = v3(cx + dx + 0.5f, (float)s_level.floor_y,
+                                          cz + dz + 0.5f);
+                        return 3;
+                    }
+                }
+    }
+    /* Default: the chasm's north rim, camera looking south into the pit —
+     * but ONLY on a genuinely standable cell (never inside the bank). */
     for (int z = 0; z < CRAFT_WORLD_Z; z++)
         for (int x = 0; x < CRAFT_WORLD_X; x++)
             for (int y = s_level.floor_y - 3; y <= s_level.floor_y; y++)
                 if (craft_is_lava_id((uint8_t)craft_world_get(x, y, z))) {
-                    s_player.pos = v3(x + 0.5f, (float)s_level.floor_y, z - 4.5f);
-                    return 1;
+                    for (int back = 2; back <= 6; back++)
+                        if (dbg_standable(x, z - back)) {
+                            s_player.pos = v3(x + 0.5f, (float)s_level.floor_y,
+                                              z - back + 0.5f);
+                            return 1;
+                        }
+                    /* this lava cell has no standable rim — keep scanning */
                 }
     return 0;
 }
