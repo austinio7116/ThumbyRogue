@@ -79,8 +79,9 @@
     <span class="pill"><b>B</b> jump</span>
     <span class="pill"><b>LB / RB</b> rotate view ±90°</span>
     <span class="pill"><b>MENU</b> inventory</span>
-    <p style="margin:8px 0 0">Reach the <span style="color:var(--teal)">teal down-stairs beacon</span> to descend. Step on the
-    <span style="color:var(--gold)">gold merchant pad</span> to shop. Walk onto chests to open them. The
+    <p style="margin:8px 0 0">Walk down the <span style="color:var(--teal)">down staircase</span> to descend — crystal
+    shards and rising teal motes mark its mouth. Walk up to the <span style="color:var(--gold)">merchant's counter</span>
+    to shop. Walk onto chests to open them. The
     <b>fog-of-war minimap</b> lives on the <code>MENU</code> screen (it was too big to leave up during play).</p>
     <p style="margin:8px 0 0"><b>Floating damage numbers</b> rise from every hit — <span style="color:#5ef05e">green</span>
     for damage you deal, <span style="color:#ff5046">red</span> for damage you take.</p>
@@ -234,6 +235,10 @@
     <tr><td>Scepter</td><td>golden <b>holy mote</b> with a sparkle trail</td></tr>
     <tr><td>Staff</td><td>big <b>purple arcane orb</b>, glowing trail, larger impact</td></tr>
   </table>
+  <p><b>Magic detonates.</b> Every wand / scepter / staff impact — wall, scenery or creature — fires a
+  <b>circular shockwave</b> around a hot core burst and deals <b>half-damage splash</b> to everything
+  within ~1.5 cells (staff blasts biggest). Piercing staves detonate on <i>every</i> enemy they punch
+  through.</p>
 
   <h3>Rarity</h3>
   <div class="grid">
@@ -258,9 +263,31 @@
     <div class="card">+% Move Speed</div>
     <div class="card">+Life on Hit</div>
     <div class="card">+% Resist</div>
+    <div class="card" style="border-color:#c8642d">+Fire / +Frost / +Poison <span class="c">element</span></div>
+    <div class="card" style="border-color:#c8642d">+Lightning / +Holy <span class="c">element</span></div>
+    <div class="card" style="border-color:#c8642d">+Shadow / +Void / +Force <span class="c">element</span></div>
   </div>
   <p class="c">All equipped affixes aggregate into your character: max life, armor (a diminishing-returns
   damage-reduction curve), crit (base 5% / 150%), attack &amp; move speed, life-on-hit and resist.</p>
+
+  <h3>Elements</h3>
+  <p>An elemental affix (or an elemental gem socketed into your weapon) gives the weapon an <b>element</b> —
+  a gameplay effect on every hit, and a full colour identity: projectile body, trail, impact bursts, the
+  magic shockwave and melee sparks all take the element's palette.</p>
+  <table>
+    <tr><th>Element</th><th>Effect on hit</th></tr>
+    <tr><td style="color:#ff7828">Fire</td><td>bonus burn damage</td></tr>
+    <tr><td style="color:#82d2ff">Frost</td><td>chills the victim — <b>45% movement</b> for 1.4s, icy motes shimmer off them</td></tr>
+    <tr><td style="color:#78eb5a">Poison</td><td><b>damage over time</b> — venom ticks every half-second for 3s, green bubbles</td></tr>
+    <tr><td style="color:#fffa8c">Lightning</td><td>the bolt <b>arcs to the nearest other enemy</b> for full element power — a jagged spark line joins the victims</td></tr>
+    <tr><td style="color:#ffe164">Holy</td><td><b>smites the unholy</b> — double power vs skeletons, zombies, archers &amp; demons, with a golden flare</td></tr>
+    <tr><td style="color:#9646d2">Shadow</td><td><b>drains life</b> — a slice of element power returns to you as healing</td></tr>
+    <tr><td style="color:#695ff0">Void</td><td><b>implodes</b> — drags the victim toward the impact instead of knocking it away</td></tr>
+    <tr><td style="color:#ff5feb">Arcane Force</td><td>a massive <b>1.2-cell launch</b> — shove enemies off bridges, into chasms, into the lava</td></tr>
+  </table>
+  <div class="shotrow">
+    <figure><img class="shot" src="img/blast.png" alt="fire staff blast"><figcaption>A fire-staff bolt detonates against the wall</figcaption></figure>
+  </div>
 
   <h3 class="legend-aspect">Legendary Aspects</h3>
   <p>The build-defining powers — gameplay modifiers, not just numbers:</p>
@@ -293,17 +320,34 @@
     <div class="card"><b><span class="sw" style="background:#3c6ee6"></span>Sapphire</b><br><span class="c">+8% Resist</span></div>
     <div class="card"><b><span class="sw" style="background:#28d26e"></span>Emerald</b><br><span class="c">+4% Crit</span></div>
     <div class="card"><b><span class="sw" style="background:#f0d23c"></span>Topaz</b><br><span class="c">+10 Armor</span></div>
+    <div class="card"><b><span class="sw" style="background:#ff7828"></span>Fire Opal</b><br><span class="c">Fire</span></div>
+    <div class="card"><b><span class="sw" style="background:#96d7ff"></span>Glacite</b><br><span class="c">Frost</span></div>
+    <div class="card"><b><span class="sw" style="background:#78eb5a"></span>Venomstone</b><br><span class="c">Poison</span></div>
+    <div class="card"><b><span class="sw" style="background:#faf582"></span>Stormcrystal</b><br><span class="c">Lightning</span></div>
+    <div class="card"><b><span class="sw" style="background:#ffd750"></span>Sunstone</b><br><span class="c">Holy</span></div>
+    <div class="card"><b><span class="sw" style="background:#9646d2"></span>Nightstone</b><br><span class="c">Shadow</span></div>
+    <div class="card"><b><span class="sw" style="background:#695ff0"></span>Voidpearl</b><br><span class="c">Void</span></div>
+    <div class="card"><b><span class="sw" style="background:#ff5feb"></span>Aetherite</b><br><span class="c">Arcane Force</span></div>
   </div>
+  <p class="c">The classic four grant their stats in any socket. The elemental eight <b>imbue a weapon</b>
+  with their element when socketed there; in armor sockets they grant +4% elemental warding (resist)
+  instead.</p>
 
   <h3>Economy — salvage &amp; the merchant</h3>
-  <p>Salvage unwanted gear into gold from its detail page (<code>B</code> → Salvage → confirm). The
-  <b>merchant pad</b> (one per floor) opens a shop:</p>
+  <p>Salvage unwanted gear into gold from its detail page (<code>B</code> → Salvage → confirm). Each floor
+  has a real <b>merchant's stall</b> — a gold-trimmed counter, the shopkeeper behind it on his gold-tiled
+  alcove, and a wares-packed shelf wall at his back. Walk up to the counter to trade:</p>
   <ul>
     <li><b>Buy</b> — four rolled items at prices scaled by rarity &amp; depth</li>
     <li><b>Gamble</b> — pay gold for a random item</li>
     <li><b>Reroll</b> — re-roll your equipped weapon's affixes</li>
-    <li><b>Upgrade</b> — raise your equipped weapon's base damage</li>
+    <li><b>Upgrade</b> — raise your equipped weapon's base damage (once per shop)</li>
   </ul>
+  <p><span class="pill" style="border-color:#dc4040;color:#ff8080">Provoke him at your peril</span>
+  Hit the shopkeeper — even by accident — and he turns into a <b>blink-casting battle wizard</b>: huge HP,
+  fans of three arcane bolts, and a teleport whenever you corner him. Kill him and his unsold stock spills
+  onto the floor as free pickups… but <b>the guild remembers</b>: every shopkeeper for the rest of the run
+  attacks on sight, and trading is over. The grudge only dies with you.</p>
 
   <!-- ============ LEVEL GEN ============ -->
   <h2>Level Generation</h2>
@@ -345,15 +389,15 @@
     <div class="card"><b>Rooms &amp; corridors</b><br><span class="c">BSP partition; thin 1-block ruined walls with ~18% gaps, not solid mazes</span></div>
     <div class="card"><b>Flagstone floors</b><br><span class="c">4 scattered flagstone variants for texture variety; brick (cobble) walls</span></div>
     <div class="card"><b>Background terrain</b><br><span class="c">a low <span style="color:#6ec86e">green grass lip</span> rings the dungeon — a colour contrast, kept short so it never occludes the iso camera</span></div>
-    <div class="card"><b>Organic lava chasms</b><br><span class="c"><b>instant death</b> on contact — no longer just square pits; carved as organic chasms spanned by a safe cross-bridge</span></div>
+    <div class="card"><b>Organic lava chasms</b><br><span class="c"><b>instant death</b> for you, a fast burn for <b>enemies knocked in</b> (fire creatures are immune) — organic lakes spanned by a safe cross-bridge</span></div>
     <div class="card"><b>Dank water</b><br><span class="c">shallow murky-green pools you wade through (slowed) — <b>translucent</b> (the floor shows through) and a <b>rippling animated surface</b>, crypt water, not clear blue</span></div>
     <div class="card"><b>Moving platforms</b><br><span class="c">oscillating slabs — the <b>only</b> crossing to a marooned bonus-chest island over lava, not an optional shortcut</span></div>
     <div class="card"><b>Elevated pedestals</b><br><span class="c">chests you must jump onto (height-gated to open)</span></div>
     <div class="card"><b>Torches</b><br><span class="c">Minecraft-style wall/floor torches are the room light sources (lightmap BFS)</span></div>
     <div class="card"><b>Spike traps</b><br><span class="c">telegraphed floor spikes, contact damage scaling with depth</span></div>
-    <div class="card"><b>Chests &amp; merchant</b><br><span class="c">more loot containers per floor + one shop pad</span></div>
+    <div class="card"><b>Chests &amp; merchant stall</b><br><span class="c">more loot containers per floor + a built shop: counter, shopkeeper and shelf wall</span></div>
     <div class="card"><b>Loot beams</b><br><span class="c">dropped gear projects a vertical light beacon coloured by rarity (Diablo-style)</span></div>
-    <div class="card"><b>Up / down stairs</b><br><span class="c">glowing beacons visible across the room for navigation</span></div>
+    <div class="card"><b>Real staircases</b><br><span class="c">a walled stone stairwell rises at the entrance; the way down is a 2-wide staircase cut into the floor, vanishing under a stone hood — flanked by glowing shards and rising teal motes</span></div>
   </div>
 
   <h3>Enemies</h3>
@@ -374,14 +418,18 @@
     <tr><td>Skeleton Archer</td><td><b>Ranged</b> — fires arrows &amp; kites</td><td class="c">gear</td></tr>
     <tr><td>Fire Sprite</td><td><b>Ranged flyer</b> — lobs fire</td><td class="c">gem</td></tr>
     <tr><td style="color:#ff8080">Demon</td><td>Big, hard-hitting elite</td><td class="c">rare gear</td></tr>
+    <tr><td style="color:#e6b454">Shopkeeper</td><td>Peaceful trader — until hit. Then: <b>blink-casting battle wizard</b></td><td class="c">his stock!</td></tr>
   </table>
+  <p class="c">Enemies respect the terrain too: anything knocked into <b>lava</b> burns down fast
+  (fire sprites and demons shrug it off; flyers stay above it) — force-element weapons turn chasm rooms
+  into kill zones.</p>
   <p><span class="pill" style="border-color:#dc4040;color:#ff8080">Champion — 3× HP, 1.7× size, boss floors</span>
   Rosters vary per depth band, so deeper floors mix in the deadlier foes.</p>
 
   <h3>Tension systems</h3>
   <div class="grid">
     <div class="card"><b>Light as a resource</b><br><span class="c">a smooth torch glow that <b>dims &amp; shrinks as fuel drains</b>, with wall-blocked shadows for real depth; out of fuel, foes sense you farther &amp; hit harder</span></div>
-    <div class="card"><b>Lava = instant death</b><br><span class="c">touching lava kills outright — chasms are crossed only by the bridge or a moving platform; falls still bruise</span></div>
+    <div class="card"><b>Lava = lethal terrain</b><br><span class="c">touching lava kills you outright — and burns enemies knocked into it; chasms are crossed only by the bridge or a moving platform</span></div>
     <div class="card"><b>Permadeath</b><br><span class="c">one life — gear &amp; gold lost on death; depth is your score</span></div>
     <div class="card"><b>Suspend &amp; resume</b><br><span class="c">an in-progress run auto-saves on descent (host file / device flash) and resumes on launch; <b>wiped on death</b></span></div>
   </div>
