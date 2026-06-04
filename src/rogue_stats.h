@@ -19,6 +19,8 @@ typedef struct {
     int life_on_hit;
     int resist;      /* +% damage resist (sapphire + affixes) */
     uint32_t aspects;/* bitmask of (1<<AspectId) from equipped legendaries */
+    uint8_t elem;    /* ElementId — the weapon's element (affix or weapon gem) */
+    int16_t elem_pow;/* element magnitude (burn dmg / chill / poison total) */
 } RogueStats;
 
 void  rogue_stats_compute(RogueStats *out, const RogueItem equip[SLOT_COUNT]);

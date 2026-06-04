@@ -350,10 +350,22 @@ int main(int argc, char **argv) {
             CraftRawButtons d = {0}; d.down = true;
             for (int i = 0; i < 50; i++) rogue_game_tick(&d, 1.0f / 30.0f);
         }
+        if (getenv("ROGUE_ELEMTEST")) {   /* poison dot + frost slow checks */
+            extern void rogue_game_debug_elemtest(void);
+            rogue_game_debug_elemtest();
+        }
+        if (getenv("ROGUE_ELEM")) {   /* 1=fire 2=frost 3=poison on the weapon */
+            extern void rogue_game_debug_force_element(int, int);
+            rogue_game_debug_force_element(atoi(getenv("ROGUE_ELEM")), 8);
+        }
         if (getenv("ROGUE_FXWPN")) {   /* equip a weapon, swing/fire, catch the FX mid-action */
             extern void rogue_game_debug_force_weapon(int);
             extern void rogue_game_debug_set_yaw(float);
             rogue_game_debug_force_weapon(atoi(getenv("ROGUE_FXWPN")));
+            if (getenv("ROGUE_ELEM")) {   /* re-apply: force_weapon replaced it */
+                extern void rogue_game_debug_force_element(int, int);
+                rogue_game_debug_force_element(atoi(getenv("ROGUE_ELEM")), 8);
+            }
             int settle = getenv("ROGUE_FXT") ? atoi(getenv("ROGUE_FXT")) : 3;
             CraftRawButtons a = {0}; a.a = true;
             rogue_game_tick(&a, 1.0f / 30.0f);   /* start the swing (auto-face runs here) */

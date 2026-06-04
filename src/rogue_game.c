@@ -58,7 +58,19 @@ void rogue_game_toast(const char *msg) {
 /* Per-weapon-type melee impact FX so each weapon's hit reads differently:
  * light/quick for daggers, heavy blue for greatswords, fiery for axes, and a
  * grey dust shock-ring for the blunt mace/warhammer. */
-static void melee_hit_fx(Vec3 hp, uint8_t wt) {
+static void melee_hit_fx(Vec3 hp, uint8_t wt, int elem) {
+    if (elem != ELEM_NONE) {
+        /* elemental weapons stamp their colour on every impact */
+        uint16_t c = (elem == ELEM_FIRE)  ? RGB(255,130,40)
+                   : (elem == ELEM_FROST) ? RGB(150,215,255) : RGB(130,235,90);
+        rogue_particle_burst(hp, 12, 5.2f, 0.40f, c, 0.08f);
+        if (elem == ELEM_FIRE) {            /* embers float up from a burn */
+            for (int k = 0; k < 4; k++)
+                rogue_particle_spawn(hp, (k - 1.5f) * 0.8f, 2.6f, 0.4f,
+                                     0.45f, RGB(255,200,80), 0.05f, -2.0f);
+        }
+        return;
+    }
     switch (wt) {
     case WT_DAGGER:     rogue_particle_burst(hp, 5,  5.5f, 0.25f, RGB(230,235,255), 0.05f); break;
     case WT_GREATSWORD: rogue_particle_burst(hp, 16, 5.5f, 0.45f, RGB(170,210,255), 0.10f); break;
@@ -534,11 +546,13 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
     /* Melee strike frame → damage every enemy in the swing arc. */
     if (s_player.atk_hit_pending) {
         s_player.atk_hit_pending = false;
+        rogue_enemies_set_strike_element(s_player.stats.elem, s_player.stats.elem_pow);
         int hits = rogue_enemies_hit_arc(s_player.pos, s_player.yaw,
                               s_player.wpn_range, s_player.wpn_arc_cos, outdmg);
         /* Chaining aspect: a cleave around the hero on top of the arc. */
         if ((asp & (1u << ASP_CHAIN)) && hits > 0)
             rogue_enemies_hit_radius(s_player.pos.x, s_player.pos.z, 2.2f, outdmg / 2);
+        rogue_enemies_set_strike_element(ELEM_NONE, 0);
         if (hits > 0) {
             rogue_sfx_hit();
             s_hitstop = 0.045f;     /* a heartbeat of slow-mo sells the impact */
@@ -546,7 +560,7 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
             Vec3 hp = v3(s_player.pos.x + sinf(s_player.yaw) * s_player.wpn_range * 0.7f,
                          s_player.pos.y + 0.6f,
                          s_player.pos.z + cosf(s_player.yaw) * s_player.wpn_range * 0.7f);
-            melee_hit_fx(hp, s_player.wpn_type);
+            melee_hit_fx(hp, s_player.wpn_type, s_player.stats.elem);
             /* blunt weapons slam a dusty shockwave ring along the ground */
             if (s_player.wpn_type == WT_MACE || s_player.wpn_type == WT_WARHAMMER ||
                 s_player.wpn_type == WT_AXE) {
@@ -577,7 +591,8 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
                :                                      PROJ_ARROW;
         rogue_proj_fire(s_player.pos, aim, s_player.wpn_proj_speed,
                         outdmg, pk,
-                        s_player.wpn_range, (asp & (1u << ASP_PIERCE)) ? 1 : 0);
+                        s_player.wpn_range, (asp & (1u << ASP_PIERCE)) ? 1 : 0,
+                        s_player.stats.elem, s_player.stats.elem_pow);
     }
 
     rogue_enemies_update(&s_player, dt, s_level.floor_y);
@@ -960,6 +975,55 @@ void rogue_game_debug_step_into_trench(void) {
 }
 
 int rogue_game_debug_goto_shop(void);
+void rogue_game_debug_set_depth(int depth);
+
+/* Elemental status check: poison a zombie, chill a second one — print HP
+ * over time (DoT must tick) and displacement (chill must halve speed). */
+void rogue_game_debug_elemtest(void) {
+    float zx = s_player.pos.x, zz = s_player.pos.z - 2.4f;
+    rogue_enemies_debug_showcase(EN_ZOMBIE, zx, (float)s_level.floor_y, zz, 0, 0);
+    RogueEnemySave es[ROGUE_MAX_ENEMIES];
+    int n = rogue_enemies_export(es, ROGUE_MAX_ENEMIES);
+    int hp0 = -1;
+    for (int k = 0; k < n; k++) if (es[k].type == EN_ZOMBIE) hp0 = es[k].hp;
+    rogue_enemies_set_strike_element(ELEM_POISON, 6);
+    rogue_enemies_hit_point(zx, zz, 0.8f, 1);
+    rogue_enemies_set_strike_element(ELEM_NONE, 0);
+    n = rogue_enemies_export(es, ROGUE_MAX_ENEMIES);
+    int hp1 = -1;
+    for (int k = 0; k < n; k++) if (es[k].type == EN_ZOMBIE) hp1 = es[k].hp;
+    CraftRawButtons none = {0};
+    for (int i = 0; i < 105; i++) rogue_game_tick(&none, 1.0f / 30.0f);  /* 3.5s */
+    n = rogue_enemies_export(es, ROGUE_MAX_ENEMIES);
+    int hp2 = -1;
+    for (int k = 0; k < n; k++) if (es[k].type == EN_ZOMBIE) hp2 = es[k].hp;
+    printf("[elemtest] poison: hp %d -> %d (direct) -> %d (after 3.5s dot)\n",
+           hp0, hp1, hp2);
+    /* chill: identical zombies, one frosted one not — compare 1.2s lurch */
+    float moved[2];
+    for (int pass = 0; pass < 2; pass++) {
+        rogue_enemies_debug_showcase(EN_ZOMBIE, zx, (float)s_level.floor_y, zz, 0, 0);
+        rogue_enemies_set_strike_element(pass == 0 ? ELEM_NONE : ELEM_FROST, 12);
+        rogue_enemies_hit_point(zx, zz, 0.8f, 1);
+        rogue_enemies_set_strike_element(ELEM_NONE, 0);
+        for (int i = 0; i < 36; i++) rogue_game_tick(&none, 1.0f / 30.0f);
+        n = rogue_enemies_export(es, ROGUE_MAX_ENEMIES);
+        moved[pass] = 0;
+        for (int k = 0; k < n; k++) if (es[k].type == EN_ZOMBIE)
+            moved[pass] = fabsf(es[k].x - zx) + fabsf(es[k].z - zz);
+    }
+    printf("[elemtest] chill: moved %.2f normally vs %.2f chilled\n",
+           moved[0], moved[1]);
+}
+
+/* Force an element onto the equipped weapon (impact/projectile tints). */
+void rogue_game_debug_force_element(int elem, int pow) {
+    RogueItem *w = &s_player.equip[SLOT_WEAPON];
+    w->affix[0].type = (elem == 1) ? AFX_FIRE : (elem == 2) ? AFX_FROST : AFX_POISON;
+    w->affix[0].val = (int16_t)pow;
+    if (w->n_affix < 1) w->n_affix = 1;
+    rogue_player_recompute(&s_player);
+}
 
 /* Provoke the shopkeeper and leave him alive (combat screenshots). */
 void rogue_game_debug_shoppoke(void) {

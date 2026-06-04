@@ -21,7 +21,8 @@ typedef enum {
 
 void rogue_proj_clear(void);
 void rogue_proj_fire(Vec3 pos, float yaw, float speed, int dmg,
-                     int kind, float max_range, int pierce);
+                     int kind, float max_range, int pierce,
+                     int elem, int elem_pow);   /* ElementId tint + on-hit effect */
 void rogue_proj_update(float dt, int floor_y);
 void rogue_proj_draw(const CraftCamera *cam, uint16_t *fb);
 

@@ -29,11 +29,19 @@ typedef enum {
 typedef enum { ITEM_NONE, ITEM_WEAPON, ITEM_GEAR, ITEM_GOLD, ITEM_POTION, ITEM_TORCH, ITEM_GEM } ItemKind;
 typedef enum { RAR_COMMON, RAR_MAGIC, RAR_RARE, RAR_LEGENDARY, RAR_COUNT } Rarity;
 
-/* Affixes — type + rolled magnitude. */
+/* Affixes — type + rolled magnitude. The elemental trio rolls on weapons
+ * only and gives the weapon an element: extra burn damage (fire), a chilling
+ * slow (frost) or a damage-over-time (poison) — and tints every impact and
+ * projectile. (Appended at the end: affix ids live in saved items.) */
 typedef enum {
     AFX_NONE, AFX_DMG, AFX_DMG_PCT, AFX_LIFE, AFX_ARMOR, AFX_CRIT,
-    AFX_CRITDMG, AFX_ATKSPD, AFX_MOVESPD, AFX_LIFEONHIT, AFX_RESIST, AFX_COUNT
+    AFX_CRITDMG, AFX_ATKSPD, AFX_MOVESPD, AFX_LIFEONHIT, AFX_RESIST,
+    AFX_FIRE, AFX_FROST, AFX_POISON, AFX_COUNT
 } AffixType;
+
+/* Weapon element (from an elemental affix, or a gem socketed in the weapon:
+ * ruby = fire, sapphire = frost, emerald = poison). */
+typedef enum { ELEM_NONE, ELEM_FIRE, ELEM_FROST, ELEM_POISON } ElementId;
 typedef struct { uint8_t type; int16_t val; } Affix;
 #define MAX_AFFIX 3
 

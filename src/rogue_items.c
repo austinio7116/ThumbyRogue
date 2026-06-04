@@ -98,6 +98,9 @@ static const char *afx_noun(AffixType t) {
         case AFX_ATKSPD:      return "Haste";
         case AFX_MOVESPD:     return "the Wind";
         case AFX_LIFEONHIT:   return "Leeching";
+        case AFX_FIRE:        return "Flames";
+        case AFX_FROST:       return "the Frost";
+        case AFX_POISON:      return "Venom";
         default:              return "Power";
     }
 }
@@ -113,6 +116,9 @@ void rogue_affix_label(char *buf, int n, const Affix *a) {
         case AFX_MOVESPD:   snprintf(buf,n,"+%d%% Move", a->val); break;
         case AFX_LIFEONHIT: snprintf(buf,n,"+%d Life/Hit", a->val); break;
         case AFX_RESIST:    snprintf(buf,n,"+%d%% Resist", a->val); break;
+        case AFX_FIRE:      snprintf(buf,n,"+%d Fire", a->val); break;
+        case AFX_FROST:     snprintf(buf,n,"+%d Frost", a->val); break;
+        case AFX_POISON:    snprintf(buf,n,"+%d Poison", a->val); break;
         default:            snprintf(buf,n,"-"); break;
     }
 }
@@ -145,7 +151,8 @@ void rogue_item_make_gem(RogueItem *it, GemType g) {
 
 /* Roll one affix appropriate to the slot. */
 static Affix roll_affix(uint32_t *s, EquipSlot slot, int depth, Rarity rar) {
-    static const uint8_t WPOOL[] = { AFX_DMG, AFX_DMG_PCT, AFX_CRIT, AFX_CRITDMG, AFX_ATKSPD, AFX_LIFEONHIT };
+    static const uint8_t WPOOL[] = { AFX_DMG, AFX_DMG_PCT, AFX_CRIT, AFX_CRITDMG, AFX_ATKSPD, AFX_LIFEONHIT,
+                                     AFX_FIRE, AFX_FROST, AFX_POISON };
     static const uint8_t APOOL[] = { AFX_LIFE, AFX_ARMOR, AFX_RESIST, AFX_LIFE, AFX_MOVESPD };
     static const uint8_t JPOOL[] = { AFX_DMG_PCT, AFX_CRIT, AFX_CRITDMG, AFX_RESIST, AFX_LIFE, AFX_MOVESPD };
     const uint8_t *pool; int pn;
@@ -166,10 +173,12 @@ static Affix roll_affix(uint32_t *s, EquipSlot slot, int depth, Rarity rar) {
         case AFX_MOVESPD:   v = rr(s,3,7); break;
         case AFX_LIFEONHIT: v = rr(s,1,4); break;
         case AFX_RESIST:    v = rr(s,4,10); break;
+        case AFX_FIRE: case AFX_FROST: case AFX_POISON: v = rr(s,3,7); break;
         default:            v = 1; break;
     }
     /* % stats scale gently with rarity; flats scale with depth too. */
-    if (a.type==AFX_DMG || a.type==AFX_LIFE || a.type==AFX_ARMOR || a.type==AFX_LIFEONHIT)
+    if (a.type==AFX_DMG || a.type==AFX_LIFE || a.type==AFX_ARMOR || a.type==AFX_LIFEONHIT ||
+        a.type==AFX_FIRE || a.type==AFX_FROST || a.type==AFX_POISON)
         v = (int)(v * sc);
     else
         v = (int)(v * (1.0f + 0.18f * (int)rar));

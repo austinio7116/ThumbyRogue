@@ -31,6 +31,9 @@ typedef struct {
     float     sp;           /* per-type special timer (demon charge, strafe flips) */
     bool      moving;       /* displaced this tick → drive the walk animation */
     bool      calm;         /* shopkeeper at his post — no AI until provoked */
+    float     slow_t;       /* frost chill — movement at 45% while > 0 */
+    float     dot_t, dot_tick;  /* poison — ticking damage while dot_t > 0 */
+    int       dot_pow;      /* total poison damage left to deal */
 } Enemy;
 
 static Enemy s_en[ROGUE_MAX_ENEMIES];
@@ -41,6 +44,12 @@ static Enemy s_en[ROGUE_MAX_ENEMIES];
  * same rate as their HP, so armor and lifesteal stay relevant all the way
  * down. */
 static float s_dmg_scale = 1.5f;
+
+/* Element on the player's current strike (see header). */
+static int s_strike_elem, s_strike_pow;
+void rogue_enemies_set_strike_element(int elem, int power) {
+    s_strike_elem = elem; s_strike_pow = power;
+}
 
 /* Death-event ring: combat records where/what died so the game can drop
  * loot without the enemy module knowing about items. */
@@ -258,6 +267,8 @@ void rogue_enemies_debug_showcase(int type, float x, float y, float z,
     e->anim = anim;
     e->sp = 2.0f;
     e->moving = moving != 0;
+    e->calm = false;
+    e->slow_t = 0; e->dot_t = 0; e->dot_tick = 0; e->dot_pow = 0;
 }
 
 int rogue_enemies_export(RogueEnemySave *out, int max) {
@@ -293,12 +304,20 @@ void rogue_enemies_import(const RogueEnemySave *in, int n) {
         e->sp = 2.0f;
         e->moving = false;
         e->calm = in[i].calm != 0;
+        e->slow_t = 0; e->dot_t = 0; e->dot_tick = 0; e->dot_pow = 0;
     }
 }
 
 /* Apply damage + knockback to one enemy; record a death event if it dies. */
 static void en_apply_damage(Enemy *e, int dmg, float fromx, float fromz) {
     if (e->calm) { e->calm = false; e->state = AI_CHASE; e->state_t = 0; }
+    switch (s_strike_elem) {
+    case ELEM_FIRE:   dmg += s_strike_pow; break;            /* burn bonus */
+    case ELEM_FROST:  dmg += s_strike_pow / 2;               /* chill + slow */
+                      e->slow_t = 1.4f; break;
+    case ELEM_POISON: e->dot_t = 3.0f; e->dot_tick = 0.5f;   /* venom over time */
+                      e->dot_pow = s_strike_pow; break;
+    }
     e->hp -= dmg;
     e->hurt_flash = 0.22f;
     rogue_dmgnum_spawn(e->pos, dmg, false);   /* green — damage you dealt */
@@ -380,6 +399,7 @@ void rogue_enemies_spawn(const int16_t *room_cx, const int16_t *room_cz,
         e->sp = 1.5f + frand() * 2.0f;
         e->moving = false;
         e->calm = false;
+        e->slow_t = 0; e->dot_t = 0; e->dot_tick = 0; e->dot_pow = 0;
         /* The first enemy on a band-end floor is a champion (mini-boss). */
         e->champion = (boss_floor && placed == 0);
         if (e->champion) e->hp *= 3;
@@ -425,6 +445,7 @@ static bool en_los(Vec3 a, Vec3 b, int floor_y) {
 }
 
 void rogue_enemies_update(RoguePlayer *p, float dt, int floor_y) {
+    s_strike_elem = ELEM_NONE; s_strike_pow = 0;   /* strike elements never linger */
     for (int i = 0; i < ROGUE_MAX_ENEMIES; i++) {
         Enemy *e = &s_en[i];
         if (!e->alive) continue;
@@ -432,6 +453,36 @@ void rogue_enemies_update(RoguePlayer *p, float dt, int floor_y) {
         if (e->hurt_flash > 0) e->hurt_flash -= dt;
         if (e->atk_cd > 0) e->atk_cd -= dt;
         e->state_t += dt;
+
+        /* --- elemental status -------------------------------------- */
+        if (e->slow_t > 0) {
+            e->slow_t -= dt;
+            if (((int)(e->anim * 5.0f) & 1) == 0) {       /* icy motes drift up */
+                Vec3 fp = e->pos; fp.y += 0.3f + 0.4f * frand();
+                fp.x += (frand() - 0.5f) * 0.5f; fp.z += (frand() - 0.5f) * 0.5f;
+                rogue_particle_spawn(fp, 0, 0.5f, 0, 0.30f, RGB(170,225,255), 0.04f, 0.0f);
+            }
+        }
+        if (e->dot_t > 0) {
+            e->dot_t -= dt; e->dot_tick -= dt;
+            if (e->dot_tick <= 0.0f) {                    /* venom tick */
+                e->dot_tick = 0.5f;
+                int tick = e->dot_pow / 6; if (tick < 1) tick = 1;
+                e->hp -= tick;
+                rogue_dmgnum_spawn(e->pos, tick, false);
+                Vec3 gp = e->pos; gp.y += 0.5f;
+                rogue_particle_burst(gp, 3, 1.6f, 0.35f, RGB(140,235,90), 0.05f);
+                if (e->hp <= 0) {
+                    e->alive = false;
+                    if (s_death_n < ROGUE_MAX_ENEMIES) {
+                        s_death_pos[s_death_n] = e->pos;
+                        s_death_type[s_death_n] = e->type;
+                        s_death_n++;
+                    }
+                    continue;
+                }
+            }
+        }
 
         float dx = p->pos.x - e->pos.x, dz = p->pos.z - e->pos.z;
         float dist = sqrtf(dx*dx + dz*dz);
@@ -441,6 +492,9 @@ void rogue_enemies_update(RoguePlayer *p, float dt, int floor_y) {
         e->anim += dt;                                     /* steady gait clock */
 
         if (e->calm) { e->moving = false; continue; }      /* shopkeeper at his post */
+
+        EnemyDef dslow;
+        if (e->slow_t > 0) { dslow = *d; dslow.speed *= 0.45f; d = &dslow; }
 
 #ifdef ROGUE_KEEPER_DEBUG
         if (e->type == EN_SHOPKEEPER) {

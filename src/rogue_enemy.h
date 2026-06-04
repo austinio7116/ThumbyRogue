@@ -40,6 +40,11 @@ void rogue_enemies_spawn(const int16_t *room_cx, const int16_t *room_cz,
 /* Advance AI + movement; apply telegraphed melee hits to the player. */
 void rogue_enemies_update(RoguePlayer *p, float dt, int floor_y);
 
+/* Element carried by the player's NEXT hits this tick (fire = burn bonus,
+ * frost = chilling slow, poison = damage over time). Reset automatically at
+ * the start of each enemy update so it never leaks into thorns/retaliation. */
+void rogue_enemies_set_strike_element(int elem, int power);
+
 /* Player melee: damage + knock every live enemy inside the facing arc.
  * Returns the number hit (for SFX/juice). */
 int rogue_enemies_hit_arc(Vec3 origin, float yaw, float range,
