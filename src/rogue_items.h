@@ -36,12 +36,20 @@ typedef enum { RAR_COMMON, RAR_MAGIC, RAR_RARE, RAR_LEGENDARY, RAR_COUNT } Rarit
 typedef enum {
     AFX_NONE, AFX_DMG, AFX_DMG_PCT, AFX_LIFE, AFX_ARMOR, AFX_CRIT,
     AFX_CRITDMG, AFX_ATKSPD, AFX_MOVESPD, AFX_LIFEONHIT, AFX_RESIST,
-    AFX_FIRE, AFX_FROST, AFX_POISON, AFX_COUNT
+    AFX_FIRE, AFX_FROST, AFX_POISON, AFX_LIGHTNING, AFX_HOLY,
+    AFX_SHADOW, AFX_VOID, AFX_ARCANE, AFX_COUNT
 } AffixType;
 
 /* Weapon element (from an elemental affix, or a gem socketed in the weapon:
  * ruby = fire, sapphire = frost, emerald = poison). */
-typedef enum { ELEM_NONE, ELEM_FIRE, ELEM_FROST, ELEM_POISON } ElementId;
+typedef enum {
+    ELEM_NONE, ELEM_FIRE, ELEM_FROST, ELEM_POISON,
+    ELEM_LIGHTNING,   /* arcs to a second enemy nearby */
+    ELEM_HOLY,        /* smites the undead (and demons) hard */
+    ELEM_SHADOW,      /* drains life back to the hero */
+    ELEM_VOID,        /* implodes — drags the victim toward the impact */
+    ELEM_ARCANE,      /* force — a massive knockback shove */
+} ElementId;
 typedef struct { uint8_t type; int16_t val; } Affix;
 #define MAX_AFFIX 3
 
@@ -57,7 +65,8 @@ typedef enum {
  * when socketed into armor instead). */
 typedef enum {
     GEM_NONE, GEM_RUBY, GEM_SAPPHIRE, GEM_EMERALD, GEM_TOPAZ,
-    GEM_FIREOPAL, GEM_GLACITE, GEM_VENOMSTONE,
+    GEM_FIREOPAL, GEM_GLACITE, GEM_VENOMSTONE, GEM_STORMCRYSTAL, GEM_SUNSTONE,
+    GEM_NIGHTSTONE, GEM_VOIDPEARL, GEM_AETHERITE,
     GEM_COUNT
 } GemType;
 

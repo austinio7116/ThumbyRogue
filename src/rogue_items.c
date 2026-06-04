@@ -87,6 +87,11 @@ const char *rogue_gem_name(GemType g) {
         case GEM_FIREOPAL:   return "Fire Opal";
         case GEM_GLACITE:    return "Glacite";
         case GEM_VENOMSTONE: return "Venomstone";
+        case GEM_STORMCRYSTAL: return "Stormcrystal";
+        case GEM_SUNSTONE:     return "Sunstone";
+        case GEM_NIGHTSTONE:   return "Nightstone";
+        case GEM_VOIDPEARL:    return "Voidpearl";
+        case GEM_AETHERITE:    return "Aetherite";
         default:           return "-";
     }
 }
@@ -104,6 +109,11 @@ static const char *afx_noun(AffixType t) {
         case AFX_FIRE:        return "Flames";
         case AFX_FROST:       return "the Frost";
         case AFX_POISON:      return "Venom";
+        case AFX_LIGHTNING:   return "the Storm";
+        case AFX_HOLY:        return "Radiance";
+        case AFX_SHADOW:      return "the Night";
+        case AFX_VOID:        return "the Void";
+        case AFX_ARCANE:      return "Force";
         default:              return "Power";
     }
 }
@@ -122,6 +132,11 @@ void rogue_affix_label(char *buf, int n, const Affix *a) {
         case AFX_FIRE:      snprintf(buf,n,"+%d Fire", a->val); break;
         case AFX_FROST:     snprintf(buf,n,"+%d Frost", a->val); break;
         case AFX_POISON:    snprintf(buf,n,"+%d Poison", a->val); break;
+        case AFX_LIGHTNING: snprintf(buf,n,"+%d Lightning", a->val); break;
+        case AFX_HOLY:      snprintf(buf,n,"+%d Holy", a->val); break;
+        case AFX_SHADOW:    snprintf(buf,n,"+%d Shadow", a->val); break;
+        case AFX_VOID:      snprintf(buf,n,"+%d Void", a->val); break;
+        case AFX_ARCANE:    snprintf(buf,n,"+%d Force", a->val); break;
         default:            snprintf(buf,n,"-"); break;
     }
 }
@@ -147,6 +162,11 @@ uint16_t rogue_gem_color(GemType g) {
         case GEM_FIREOPAL:   return RGB(255,120,40);
         case GEM_GLACITE:    return RGB(150,215,255);
         case GEM_VENOMSTONE: return RGB(120,235,90);
+        case GEM_STORMCRYSTAL: return RGB(250,245,130);
+        case GEM_SUNSTONE:     return RGB(255,215,80);
+        case GEM_NIGHTSTONE:   return RGB(150,70,210);
+        case GEM_VOIDPEARL:    return RGB(105,95,240);
+        case GEM_AETHERITE:    return RGB(255,95,235);
         default:           return RGB(200,200,200);
     }
 }
@@ -158,7 +178,9 @@ void rogue_item_make_gem(RogueItem *it, GemType g) {
 /* Roll one affix appropriate to the slot. */
 static Affix roll_affix(uint32_t *s, EquipSlot slot, int depth, Rarity rar) {
     static const uint8_t WPOOL[] = { AFX_DMG, AFX_DMG_PCT, AFX_CRIT, AFX_CRITDMG, AFX_ATKSPD, AFX_LIFEONHIT,
-                                     AFX_FIRE, AFX_FROST, AFX_POISON };
+                                     AFX_FIRE, AFX_FROST, AFX_POISON,
+                                     AFX_LIGHTNING, AFX_HOLY,
+                                     AFX_SHADOW, AFX_VOID, AFX_ARCANE };
     static const uint8_t APOOL[] = { AFX_LIFE, AFX_ARMOR, AFX_RESIST, AFX_LIFE, AFX_MOVESPD };
     static const uint8_t JPOOL[] = { AFX_DMG_PCT, AFX_CRIT, AFX_CRITDMG, AFX_RESIST, AFX_LIFE, AFX_MOVESPD };
     const uint8_t *pool; int pn;
@@ -179,12 +201,14 @@ static Affix roll_affix(uint32_t *s, EquipSlot slot, int depth, Rarity rar) {
         case AFX_MOVESPD:   v = rr(s,3,7); break;
         case AFX_LIFEONHIT: v = rr(s,1,4); break;
         case AFX_RESIST:    v = rr(s,4,10); break;
-        case AFX_FIRE: case AFX_FROST: case AFX_POISON: v = rr(s,3,7); break;
+        case AFX_FIRE: case AFX_FROST: case AFX_POISON:
+        case AFX_LIGHTNING: case AFX_HOLY:
+        case AFX_SHADOW: case AFX_VOID: case AFX_ARCANE: v = rr(s,3,7); break;
         default:            v = 1; break;
     }
     /* % stats scale gently with rarity; flats scale with depth too. */
     if (a.type==AFX_DMG || a.type==AFX_LIFE || a.type==AFX_ARMOR || a.type==AFX_LIFEONHIT ||
-        a.type==AFX_FIRE || a.type==AFX_FROST || a.type==AFX_POISON)
+        a.type >= AFX_FIRE)
         v = (int)(v * sc);
     else
         v = (int)(v * (1.0f + 0.18f * (int)rar));

@@ -34,6 +34,7 @@ typedef struct {
     float     slow_t;       /* frost chill — movement at 45% while > 0 */
     float     dot_t, dot_tick;  /* poison — ticking damage while dot_t > 0 */
     int       dot_pow;      /* total poison damage left to deal */
+    float     lava_tick;    /* burn cadence while standing in lava */
 } Enemy;
 
 static Enemy s_en[ROGUE_MAX_ENEMIES];
@@ -50,6 +51,10 @@ static int s_strike_elem, s_strike_pow;
 void rogue_enemies_set_strike_element(int elem, int power) {
     s_strike_elem = elem; s_strike_pow = power;
 }
+/* Shadow drain accumulator — the game harvests this once per frame and
+ * heals the hero by it. */
+static int s_drain_heal;
+int rogue_enemies_take_drain(void) { int h = s_drain_heal; s_drain_heal = 0; return h; }
 
 /* Death-event ring: combat records where/what died so the game can drop
  * loot without the enemy module knowing about items. */
@@ -311,19 +316,76 @@ void rogue_enemies_import(const RogueEnemySave *in, int n) {
 /* Apply damage + knockback to one enemy; record a death event if it dies. */
 static void en_apply_damage(Enemy *e, int dmg, float fromx, float fromz) {
     if (e->calm) { e->calm = false; e->state = AI_CHASE; e->state_t = 0; }
+    float knock = 0.30f;
     switch (s_strike_elem) {
     case ELEM_FIRE:   dmg += s_strike_pow; break;            /* burn bonus */
     case ELEM_FROST:  dmg += s_strike_pow / 2;               /* chill + slow */
                       e->slow_t = 1.4f; break;
     case ELEM_POISON: e->dot_t = 3.0f; e->dot_tick = 0.5f;   /* venom over time */
                       e->dot_pow = s_strike_pow; break;
+    case ELEM_LIGHTNING: {
+        /* the bolt ARCS to the nearest other enemy in range */
+        dmg += s_strike_pow / 2;
+        Enemy *t = NULL; float best = 3.0f * 3.0f;
+        for (int k = 0; k < ROGUE_MAX_ENEMIES; k++) {
+            Enemy *o = &s_en[k];
+            if (!o->alive || o == e || o->calm) continue;
+            float ax = o->pos.x - e->pos.x, az = o->pos.z - e->pos.z;
+            float d2 = ax*ax + az*az;
+            if (d2 < best) { best = d2; t = o; }
+        }
+        if (t) {
+            t->hp -= s_strike_pow;
+            t->hurt_flash = 0.22f;
+            rogue_dmgnum_spawn(t->pos, s_strike_pow, false);
+            if (t->state == AI_WANDER) { t->state = AI_CHASE; t->state_t = 0; }
+            /* jagged spark line between the two victims */
+            for (int k = 0; k < 6; k++) {
+                float f = (k + 1) / 7.0f;
+                Vec3 sp = v3(e->pos.x + (t->pos.x - e->pos.x) * f,
+                             e->pos.y + 0.55f + ((k & 1) ? 0.14f : -0.10f),
+                             e->pos.z + (t->pos.z - e->pos.z) * f);
+                rogue_particle_spawn(sp, 0, 0, 0, 0.16f, RGB(255,250,150), 0.05f, 0.0f);
+            }
+            if (t->hp <= 0) {
+                t->alive = false;
+                if (s_death_n < ROGUE_MAX_ENEMIES) {
+                    s_death_pos[s_death_n] = t->pos;
+                    s_death_type[s_death_n] = t->type;
+                    s_death_n++;
+                }
+            }
+        }
+        break; }
+    case ELEM_HOLY: {
+        /* radiance SMITES the unholy; everyone else just gets singed */
+        bool unholy = (e->type == EN_SKELETON || e->type == EN_ZOMBIE ||
+                       e->type == EN_ARCHER   || e->type == EN_DEMON);
+        dmg += unholy ? s_strike_pow * 2 : s_strike_pow / 2;
+        if (unholy) {
+            Vec3 gp = e->pos; gp.y += 0.7f;
+            rogue_particle_burst(gp, 8, 3.0f, 0.40f, RGB(255,230,110), 0.06f);
+        }
+        break; }
+    case ELEM_SHADOW:                                        /* drain life */
+        dmg += s_strike_pow / 2;
+        s_drain_heal += s_strike_pow / 2;
+        break;
+    case ELEM_VOID:                                          /* implode — drag in */
+        dmg += s_strike_pow / 3;
+        knock = -0.55f;
+        break;
+    case ELEM_ARCANE:                                        /* force — launch them */
+        dmg += s_strike_pow / 3;
+        knock = 1.2f;
+        break;
     }
     e->hp -= dmg;
     e->hurt_flash = 0.22f;
     rogue_dmgnum_spawn(e->pos, dmg, false);   /* green — damage you dealt */
     float dx = e->pos.x - fromx, dz = e->pos.z - fromz;
     float l = sqrtf(dx*dx + dz*dz);
-    if (l > 0.001f) { e->pos.x += dx/l * 0.30f; e->pos.z += dz/l * 0.30f; }
+    if (l > 0.001f) { e->pos.x += dx/l * knock; e->pos.z += dz/l * knock; }
     if (e->hp <= 0) {
         e->alive = false;
         if (s_death_n < ROGUE_MAX_ENEMIES) {
@@ -453,6 +515,39 @@ void rogue_enemies_update(RoguePlayer *p, float dt, int floor_y) {
         if (e->hurt_flash > 0) e->hurt_flash -= dt;
         if (e->atk_cd > 0) e->atk_cd -= dt;
         e->state_t += dt;
+
+        /* Lava burns whoever ends up standing in it (knockback can shove
+         * anyone in) — except fire creatures and flyers. Heavy, fast burn:
+         * the lake is lethal terrain for them just like for the hero. */
+        if (!d->flyer && e->type != EN_FIRESPRITE && e->type != EN_DEMON) {
+            int lx = (int)floorf(e->pos.x), lz = (int)floorf(e->pos.z);
+            uint8_t b1 = (uint8_t)craft_world_get(lx, floor_y - 1, lz);
+            uint8_t b2 = (uint8_t)craft_world_get(lx, floor_y - 2, lz);
+            /* lava directly underfoot, or one deeper with nothing solid in
+             * between (knocked out over a chasm — no bridge under them) */
+            if (craft_is_lava_id(b1) ||
+                (!craft_block_solid((BlockId)b1) && craft_is_lava_id(b2))) {
+                e->lava_tick -= dt;
+                if (e->lava_tick <= 0.0f) {
+                    e->lava_tick = 0.4f;
+                    int burn = (int)(8.0f * s_dmg_scale);
+                    e->hp -= burn;
+                    e->hurt_flash = 0.18f;
+                    rogue_dmgnum_spawn(e->pos, burn, false);
+                    Vec3 fp = e->pos; fp.y += 0.3f;
+                    rogue_particle_burst(fp, 5, 2.5f, 0.45f, RGB(255,140,30), 0.07f);
+                    if (e->hp <= 0) {
+                        e->alive = false;
+                        if (s_death_n < ROGUE_MAX_ENEMIES) {
+                            s_death_pos[s_death_n] = e->pos;
+                            s_death_type[s_death_n] = e->type;
+                            s_death_n++;
+                        }
+                        continue;
+                    }
+                }
+            } else e->lava_tick = 0.0f;
+        }
 
         /* --- elemental status -------------------------------------- */
         if (e->slow_t > 0) {

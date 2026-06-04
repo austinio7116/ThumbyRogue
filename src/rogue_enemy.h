@@ -44,6 +44,8 @@ void rogue_enemies_update(RoguePlayer *p, float dt, int floor_y);
  * frost = chilling slow, poison = damage over time). Reset automatically at
  * the start of each enemy update so it never leaks into thorns/retaliation. */
 void rogue_enemies_set_strike_element(int elem, int power);
+/* Life drained by shadow-element hits since last call (heals the hero). */
+int  rogue_enemies_take_drain(void);
 
 /* Player melee: damage + knock every live enemy inside the facing arc.
  * Returns the number hit (for SFX/juice). */

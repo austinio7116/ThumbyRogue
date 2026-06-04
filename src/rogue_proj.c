@@ -53,18 +53,28 @@ void rogue_proj_clear(void) {
 /* Elemental palettes — body + trail per element. */
 static uint16_t elem_body_col(int elem, uint16_t def) {
     switch (elem) {
-    case ELEM_FIRE:   return RGB(255,120,40);
-    case ELEM_FROST:  return RGB(130,210,255);
-    case ELEM_POISON: return RGB(120,235,90);
-    default:          return def;
+    case ELEM_FIRE:      return RGB(255,120,40);
+    case ELEM_FROST:     return RGB(130,210,255);
+    case ELEM_POISON:    return RGB(120,235,90);
+    case ELEM_LIGHTNING: return RGB(255,250,140);
+    case ELEM_HOLY:      return RGB(255,225,100);
+    case ELEM_SHADOW:    return RGB(150,70,210);
+    case ELEM_VOID:      return RGB(105,95,240);
+    case ELEM_ARCANE:    return RGB(255,95,235);
+    default:             return def;
     }
 }
 static uint16_t elem_trail_col(int elem, uint16_t def) {
     switch (elem) {
-    case ELEM_FIRE:   return RGB(255,185,70);
-    case ELEM_FROST:  return RGB(185,235,255);
-    case ELEM_POISON: return RGB(175,255,135);
-    default:          return def;
+    case ELEM_FIRE:      return RGB(255,185,70);
+    case ELEM_FROST:     return RGB(185,235,255);
+    case ELEM_POISON:    return RGB(175,255,135);
+    case ELEM_LIGHTNING: return RGB(205,225,255);
+    case ELEM_HOLY:      return RGB(255,245,185);
+    case ELEM_SHADOW:    return RGB(110,55,160);
+    case ELEM_VOID:      return RGB(70,60,185);
+    case ELEM_ARCANE:    return RGB(255,160,245);
+    default:             return def;
     }
 }
 

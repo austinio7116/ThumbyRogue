@@ -350,6 +350,10 @@ int main(int argc, char **argv) {
             CraftRawButtons d = {0}; d.down = true;
             for (int i = 0; i < 50; i++) rogue_game_tick(&d, 1.0f / 30.0f);
         }
+        if (getenv("ROGUE_LAVATEST")) {   /* enemies burn in lava (fire kin immune) */
+            extern void rogue_game_debug_lavatest(void);
+            rogue_game_debug_lavatest();
+        }
         if (getenv("ROGUE_ELEMTEST")) {   /* poison dot + frost slow checks */
             extern void rogue_game_debug_elemtest(void);
             rogue_game_debug_elemtest();

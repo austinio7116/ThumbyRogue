@@ -61,8 +61,14 @@ void rogue_game_toast(const char *msg) {
 static void melee_hit_fx(Vec3 hp, uint8_t wt, int elem) {
     if (elem != ELEM_NONE) {
         /* elemental weapons stamp their colour on every impact */
-        uint16_t c = (elem == ELEM_FIRE)  ? RGB(255,130,40)
-                   : (elem == ELEM_FROST) ? RGB(150,215,255) : RGB(130,235,90);
+        uint16_t c = (elem == ELEM_FIRE)      ? RGB(255,130,40)
+                   : (elem == ELEM_FROST)     ? RGB(150,215,255)
+                   : (elem == ELEM_POISON)    ? RGB(130,235,90)
+                   : (elem == ELEM_LIGHTNING) ? RGB(255,250,140)
+                   : (elem == ELEM_HOLY)      ? RGB(255,225,100)
+                   : (elem == ELEM_SHADOW)    ? RGB(150,70,210)
+                   : (elem == ELEM_VOID)      ? RGB(105,95,240)
+                   :                            RGB(255,95,235);
         rogue_particle_burst(hp, 12, 5.2f, 0.40f, c, 0.08f);
         if (elem == ELEM_FIRE) {            /* embers float up from a burn */
             for (int k = 0; k < 4; k++)
@@ -597,6 +603,13 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
 
     rogue_enemies_update(&s_player, dt, s_level.floor_y);
     rogue_proj_update(dt, s_level.floor_y);
+    {   /* shadow-element drain heals the hero */
+        int drain = rogue_enemies_take_drain();
+        if (drain > 0) {
+            s_player.hp += drain;
+            if (s_player.hp > s_player.max_hp) s_player.hp = s_player.max_hp;
+        }
+    }
     rogue_loot_update(&s_player, dt);
     rogue_particle_update(dt);
     rogue_dmgnum_update(dt);
@@ -1014,6 +1027,28 @@ void rogue_game_debug_elemtest(void) {
     }
     printf("[elemtest] chill: moved %.2f normally vs %.2f chilled\n",
            moved[0], moved[1]);
+    /* lightning: hit a zombie, the bolt must arc to the keeper beside it */
+    rogue_enemies_debug_showcase(EN_ZOMBIE, zx, (float)s_level.floor_y, zz, 0, 0);
+    rogue_enemies_add_shopkeeper(zx + 1.6f, (float)s_level.floor_y, zz, 0, false, s_depth);
+    n = rogue_enemies_export(es, ROGUE_MAX_ENEMIES);
+    int khp0 = -1;
+    for (int k = 0; k < n; k++) if (es[k].type == EN_SHOPKEEPER) khp0 = es[k].hp;
+    rogue_enemies_set_strike_element(ELEM_LIGHTNING, 8);
+    rogue_enemies_hit_point(zx, zz, 0.8f, 1);
+    rogue_enemies_set_strike_element(ELEM_NONE, 0);
+    n = rogue_enemies_export(es, ROGUE_MAX_ENEMIES);
+    int khp1 = -1;
+    for (int k = 0; k < n; k++) if (es[k].type == EN_SHOPKEEPER) khp1 = es[k].hp;
+    printf("[elemtest] lightning arc: bystander hp %d -> %d (expect -8)\n", khp0, khp1);
+    /* shadow: the drain must heal the hero */
+    rogue_enemies_debug_showcase(EN_ZOMBIE, zx, (float)s_level.floor_y, zz, 0, 0);
+    s_player.hp = 50;
+    rogue_enemies_set_strike_element(ELEM_SHADOW, 8);
+    rogue_enemies_hit_point(zx, zz, 0.8f, 1);
+    rogue_enemies_set_strike_element(ELEM_NONE, 0);
+    rogue_game_tick(&none, 1.0f / 30.0f);   /* harvest tick */
+    printf("[elemtest] shadow drain: hero hp 50 -> %d (expect 54)\n", s_player.hp);
+
     /* an elemental gem socketed in the weapon must imbue it */
     RogueItem *w = &s_player.equip[SLOT_WEAPON];
     w->sockets = 1; w->gem[0] = GEM_GLACITE;
@@ -1024,10 +1059,42 @@ void rogue_game_debug_elemtest(void) {
            s_player.stats.elem, s_player.stats.elem_pow);
 }
 
+/* Lava test (chasm level): a zombie over the lava must burn down; a fire
+ * sprite must shrug it off. */
+void rogue_game_debug_lavatest(void) {
+    int fy = s_level.floor_y;
+    for (int z = 0; z < CRAFT_WORLD_Z; z++)
+        for (int x = 0; x < CRAFT_WORLD_X; x++) {
+            uint8_t b1 = (uint8_t)craft_world_get(x, fy - 1, z);
+            uint8_t b2 = (uint8_t)craft_world_get(x, fy - 2, z);
+            bool surf = craft_is_lava_id(b1) ||
+                        (!craft_block_solid((BlockId)b1) && craft_is_lava_id(b2));
+            if (!surf) continue;
+            CraftRawButtons none = {0};
+            RogueEnemySave es[ROGUE_MAX_ENEMIES];
+            rogue_enemies_debug_showcase(EN_ZOMBIE, x + 0.5f, (float)fy, z + 0.5f, 0, 0);
+            for (int i = 0; i < 45; i++) rogue_game_tick(&none, 1.0f / 30.0f);
+            int n = rogue_enemies_export(es, ROGUE_MAX_ENEMIES);
+            int zhp = 0;   /* dead -> stays 0 */
+            for (int k = 0; k < n; k++) if (es[k].type == EN_ZOMBIE) zhp = es[k].hp;
+            rogue_enemies_debug_showcase(EN_FIRESPRITE, x + 0.5f, (float)fy, z + 0.5f, 0, 0);
+            for (int i = 0; i < 45; i++) rogue_game_tick(&none, 1.0f / 30.0f);
+            n = rogue_enemies_export(es, ROGUE_MAX_ENEMIES);
+            int fhp = 0;
+            for (int k = 0; k < n; k++) if (es[k].type == EN_FIRESPRITE) fhp = es[k].hp;
+            printf("[lavatest] zombie hp after 1.5s in lava: %d (expect <=0/dead);"
+                   " fire sprite: %d (expect 10)\n", zhp, fhp);
+            return;
+        }
+    printf("[lavatest] no lava on this level\n");
+}
+
 /* Force an element onto the equipped weapon (impact/projectile tints). */
 void rogue_game_debug_force_element(int elem, int pow) {
     RogueItem *w = &s_player.equip[SLOT_WEAPON];
-    w->affix[0].type = (elem == 1) ? AFX_FIRE : (elem == 2) ? AFX_FROST : AFX_POISON;
+    if (elem < 1) elem = 1;
+    if (elem > ELEM_ARCANE) elem = ELEM_ARCANE;
+    w->affix[0].type = (uint8_t)(AFX_FIRE + (elem - 1));
     w->affix[0].val = (int16_t)pow;
     if (w->n_affix < 1) w->n_affix = 1;
     rogue_player_recompute(&s_player);

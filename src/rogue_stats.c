@@ -7,6 +7,8 @@ static void add_gem(RogueStats *o, GemType g) {
         case GEM_EMERALD:  o->crit     += 4;  break;
         case GEM_TOPAZ:    o->armor    += 10; break;
         case GEM_FIREOPAL: case GEM_GLACITE: case GEM_VENOMSTONE:
+        case GEM_STORMCRYSTAL: case GEM_SUNSTONE:
+        case GEM_NIGHTSTONE: case GEM_VOIDPEARL: case GEM_AETHERITE:
             o->resist += 4; break;   /* elemental warding in armor sockets */
         default: break;
     }
@@ -38,9 +40,14 @@ void rogue_stats_compute(RogueStats *o, const RogueItem equip[SLOT_COUNT]) {
                 case AFX_MOVESPD:   o->move_spd    += a->val; break;
                 case AFX_LIFEONHIT: o->life_on_hit += a->val; break;
                 case AFX_RESIST:    o->resist      += a->val; break;
-                case AFX_FIRE:   if (s == SLOT_WEAPON) { o->elem = ELEM_FIRE;   o->elem_pow += a->val; } break;
-                case AFX_FROST:  if (s == SLOT_WEAPON) { o->elem = ELEM_FROST;  o->elem_pow += a->val; } break;
-                case AFX_POISON: if (s == SLOT_WEAPON) { o->elem = ELEM_POISON; o->elem_pow += a->val; } break;
+                case AFX_FIRE: case AFX_FROST: case AFX_POISON:
+                case AFX_LIGHTNING: case AFX_HOLY:
+                case AFX_SHADOW: case AFX_VOID: case AFX_ARCANE:
+                    if (s == SLOT_WEAPON) {
+                        o->elem = (uint8_t)(ELEM_FIRE + (a->type - AFX_FIRE));
+                        o->elem_pow += a->val;
+                    }
+                    break;
                 default: break;
             }
         }
@@ -51,10 +58,11 @@ void rogue_stats_compute(RogueStats *o, const RogueItem equip[SLOT_COUNT]) {
         if (s == SLOT_WEAPON && o->elem == ELEM_NONE)
             for (int g = 0; g < it->sockets && g < 2; g++) {
                 GemType gt = (GemType)it->gem[g];
-                if (gt == GEM_FIREOPAL)   { o->elem = ELEM_FIRE;   o->elem_pow = 3 + it->base_dmg / 6; }
-                if (gt == GEM_GLACITE)    { o->elem = ELEM_FROST;  o->elem_pow = 3 + it->base_dmg / 6; }
-                if (gt == GEM_VENOMSTONE) { o->elem = ELEM_POISON; o->elem_pow = 3 + it->base_dmg / 6; }
-                if (o->elem != ELEM_NONE) break;
+                if (gt >= GEM_FIREOPAL && gt <= GEM_AETHERITE) {
+                    o->elem = (uint8_t)(ELEM_FIRE + (gt - GEM_FIREOPAL));
+                    o->elem_pow = 3 + it->base_dmg / 6;
+                    break;
+                }
             }
     }
     if (o->resist > 75) o->resist = 75;
