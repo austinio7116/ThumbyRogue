@@ -15,6 +15,7 @@
 
 void rogue_shop_place(const RogueLevelInfo *lv, int depth, uint32_t seed);
 bool rogue_shop_pad_near(float x, float y, float z);
+int  rogue_shop_take_stock(RogueItem *out);   /* spill wares on merchant death */
 
 bool rogue_shop_is_open(void);
 void rogue_shop_open(void);

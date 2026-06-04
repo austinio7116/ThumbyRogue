@@ -37,6 +37,7 @@ static float s_hitstop;        /* >0 → world runs in slow-mo (melee impact) */
 static int   s_last_band = -1;
 static int   s_kills;
 static int   s_best_depth;
+static bool  s_merchants_hostile;  /* killed a shopkeeper — the guild remembers */
 static bool  s_title = true;
 
 /* Cheat: hold LB+RB together for ~5s to open a level-skip menu. */
@@ -120,20 +121,6 @@ static const RogueCuboid brazier_model[] = {
     { 0.0f,  0.62f,  0.0f,  0.09f, 0.07f, 0.09f, RGB(255, 225, 120) },/* flame */
 };
 
-/* The shopkeeper: a portly robed merchant who stands behind the counter.
- * Maroon robe with a gold-trimmed apron, tan head under a flat cap, and
- * stubby arms resting toward the counter. Drawn facing the customer. */
-static const RogueCuboid merchant_model[] = {
-    { 0.0f,  0.50f,  0.0f,  0.26f, 0.50f, 0.20f, RGB(122, 40, 46) },   /* robe body */
-    { 0.0f,  0.60f,  0.08f, 0.20f, 0.30f, 0.05f, RGB(214, 178, 84) },  /* gold apron */
-    { 0.0f,  1.18f,  0.0f,  0.14f, 0.15f, 0.13f, RGB(224, 178, 138) }, /* head */
-    { 0.0f,  1.36f,  0.0f,  0.16f, 0.04f, 0.15f, RGB(70, 28, 32) },    /* flat cap */
-    { -0.30f,0.66f,  0.10f, 0.06f, 0.22f, 0.06f, RGB(122, 40, 46) },   /* arms forward */
-    {  0.30f,0.66f,  0.10f, 0.06f, 0.22f, 0.06f, RGB(122, 40, 46) },
-    { -0.30f,0.46f,  0.17f, 0.055f,0.05f, 0.055f, RGB(224, 178, 138) },/* hands */
-    {  0.30f,0.46f,  0.17f, 0.055f,0.05f, 0.055f, RGB(224, 178, 138) },
-};
-
 /* Carry the full paperdoll + gold across floors; only rebuild on death. */
 static RogueItem s_keep_equip[SLOT_COUNT];
 static int s_keep_gold;
@@ -143,12 +130,13 @@ static bool s_have_keep;
 int rogue_plat_save(const uint8_t *data, int len);   /* platform-provided */
 int rogue_plat_load(uint8_t *data, int max);
 
-#define ROGUE_SAVE_MAGIC 0x52475634u   /* 'RGV4' — added full mid-level suspend */
+#define ROGUE_SAVE_MAGIC 0x52475635u   /* 'RGV5' — shopkeeper aggro + calm flag */
 typedef struct {
     uint32_t magic, version;
     uint32_t seed;
     int32_t  depth;        /* >0 = a live run to resume; <=0 = none */
     int32_t  kills, best, gold, hp;
+    int32_t  merchants_hostile;   /* killed a shopkeeper this run — all hostile */
     float    torch;
     RogueItem equip[SLOT_COUNT];
     int32_t  bag_n;
@@ -171,13 +159,14 @@ _Static_assert(sizeof(RogueSave) <= 8192, "suspend save must fit the standalone 
 /* Fill the common header/inventory fields shared by both save kinds. */
 static void save_fill_common(RogueSave *s, int run_active) {
     memset(s, 0, sizeof *s);
-    s->magic = ROGUE_SAVE_MAGIC; s->version = 4;
+    s->magic = ROGUE_SAVE_MAGIC; s->version = 5;
     s->seed = s_seed;
     s->depth = run_active ? s_depth : -1;
     s->kills = s_kills;
     s->best = (s_depth > s_best_depth) ? s_depth : s_best_depth;
     s->gold = s_player.gold;
     s->hp = s_player.hp;
+    s->merchants_hostile = s_merchants_hostile ? 1 : 0;
     s->torch = s_player.torch_fuel;
     for (int i = 0; i < SLOT_COUNT; i++) s->equip[i] = s_player.equip[i];
     s->bag_n = rogue_inventory_export(s->bag, ROGUE_BAG_N);
@@ -217,6 +206,7 @@ static bool try_resume(void) {
     s_seed = s.seed;
     s_depth = s.depth;
     s_kills = s.kills;
+    s_merchants_hostile = s.merchants_hostile != 0;
     load_level();                          /* regenerate the saved floor */
     for (int i = 0; i < SLOT_COUNT; i++) s_player.equip[i] = s.equip[i];
     rogue_player_recompute(&s_player);
@@ -269,6 +259,12 @@ static void load_level(void) {
                          s_depth, s_seed,
                          s_level.chasm_x, s_level.chasm_z, s_level.n_chasm);
     rogue_shop_place(&s_level, s_depth, s_seed);
+    if (s_level.has_shop)
+        rogue_enemies_add_shopkeeper(
+            s_level.shop_x + 0.5f - s_level.shop_dx, (float)s_level.floor_y,
+            s_level.shop_z + 0.5f - s_level.shop_dz,
+            atan2f((float)s_level.shop_dx, (float)s_level.shop_dz),
+            !s_merchants_hostile, s_depth);
     /* Bonus chest on each lava island — only reachable by riding the platform. */
     for (int c = 0; c < s_level.n_chasm; c++)
         rogue_loot_add_chest_at(s_level.island_x[c] + 0.5f, (float)s_level.floor_y,
@@ -314,6 +310,7 @@ void rogue_game_init(uint32_t seed) {
 
     s_kills = 0;
     s_best_depth = 0;
+    s_merchants_hostile = false;
     rogue_inventory_clear();
     rogue_sfx_init();
     /* Resume a saved run if there is one; otherwise start fresh at the title. */
@@ -367,6 +364,7 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
             s_depth = 1;
             s_have_keep = false;
             s_kills = 0;
+            s_merchants_hostile = false;
             rogue_inventory_clear();
             load_level();
             rogue_game_save(1);
@@ -601,6 +599,22 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
                     : (dtype == EN_DEMON) ? RGB(200,40,40) : RGB(170,160,150);
         rogue_particle_burst(pp, 12, 4.5f, 0.55f, pc, 0.09f);
         RogueItem it;
+        if (dtype == EN_SHOPKEEPER) {
+            /* his wares spill onto the floor — and every shopkeeper from
+             * now on attacks on sight */
+            int spilled = 0;
+            while (rogue_shop_take_stock(&it)) {
+                Vec3 sp = dpos;
+                sp.x += 0.5f * sinf(spilled * 2.1f);
+                sp.z += 0.5f * cosf(spilled * 2.1f);
+                rogue_loot_drop(&it, sp);
+                spilled++;
+            }
+            if (!s_merchants_hostile) {
+                s_merchants_hostile = true;
+                rogue_game_toast("The guild will remember this");
+            }
+        }
         EnemyLoot lk = rogue_enemy_loot(dtype);
         int goldmul = (lk == LOOT_RARE) ? 4 : (lk == LOOT_GOLD ? 2 : 1);
         rogue_item_make_gold(&it, 2 + (int)(loot_rng() % (5 + s_depth * 2)) * goldmul);
@@ -626,13 +640,17 @@ void rogue_game_tick(const CraftRawButtons *btn, float dt) {
         if (rogue_loot_chest_near(s_player.pos.x, s_player.pos.y, s_player.pos.z, &ci))
             rogue_loot_open_chest(ci, s_depth, loot_rng());
     }
-    /* Step onto the merchant pad → open the shop (rising edge). */
+    /* Walk up to the counter → open the shop (rising edge) — but only
+     * while the shopkeeper is alive and calm. */
     {
         static bool was_on_pad;
-        bool on = rogue_shop_pad_near(s_player.pos.x, s_player.pos.y, s_player.pos.z);
+        bool on = rogue_shop_pad_near(s_player.pos.x, s_player.pos.y, s_player.pos.z) &&
+                  rogue_enemies_shopkeeper_state() == 1;
         if (on && !was_on_pad) rogue_shop_open();
         was_on_pad = on;
     }
+    if (rogue_shop_is_open() && rogue_enemies_shopkeeper_state() != 1)
+        rogue_shop_close();
 
     /* Event SFX from state deltas this frame. */
     if (s_player.hp < hp0)   rogue_sfx_hurt();
@@ -941,12 +959,72 @@ void rogue_game_debug_step_into_trench(void) {
                       s_level.down_z + s_level.down_dz + 0.5f);
 }
 
+int rogue_game_debug_goto_shop(void);
+
+/* Provoke the shopkeeper and leave him alive (combat screenshots). */
+void rogue_game_debug_shoppoke(void) {
+    if (!s_level.has_shop) return;
+    rogue_enemies_hit_radius(s_level.shop_x + 0.5f - s_level.shop_dx,
+                             s_level.shop_z + 0.5f - s_level.shop_dz, 0.6f, 5);
+}
+
+/* Scripted shopkeeper-aggro test: provoke → he turns wizard; kill → wares
+ * spill + the guild goes hostile. Prints each step for the harness. */
+void rogue_game_debug_shoptest(void) {
+    if (!s_level.has_shop) { printf("[shoptest] no shop\n"); return; }
+    rogue_game_debug_goto_shop();          /* fight from the counter */
+    float mx = s_level.shop_x + 0.5f - s_level.shop_dx;
+    float mz = s_level.shop_z + 0.5f - s_level.shop_dz;
+    printf("[shoptest] state0=%d hostile0=%d\n",
+           rogue_enemies_shopkeeper_state(), s_merchants_hostile ? 1 : 0);
+    rogue_enemies_hit_radius(mx, mz, 0.6f, 5);          /* provoke */
+    printf("[shoptest] after-poke state=%d\n", rogue_enemies_shopkeeper_state());
+    CraftRawButtons none = {0};
+    for (int i = 0; i < 90; i++) {
+        rogue_game_tick(&none, 1.0f / 30.0f);
+        if ((i % 30) == 29) {
+            RogueEnemySave es[ROGUE_MAX_ENEMIES];
+            int n = rogue_enemies_export(es, ROGUE_MAX_ENEMIES);
+            for (int k = 0; k < n; k++)
+                if (es[k].type == EN_SHOPKEEPER)
+                    printf("[shoptest] t=%d keeper at (%.1f,%.1f) player (%.1f,%.1f)\n",
+                           i + 1, es[k].x, es[k].z, s_player.pos.x, s_player.pos.z);
+        }
+    }
+    printf("[shoptest] after-3s state=%d hp=%d\n",
+           rogue_enemies_shopkeeper_state(), s_player.hp);
+    /* hunt him down wherever he blinked to and finish him */
+    float ex, ez;
+    for (int tries = 0; tries < 50 && rogue_enemies_shopkeeper_state(); tries++) {
+        if (rogue_enemies_nearest(s_player.pos.x, s_player.pos.z, &ex, &ez))
+            rogue_enemies_hit_radius(ex, ez, 9.0f, 80);
+        rogue_game_tick(&none, 1.0f / 30.0f);
+    }
+    RogueGroundSave gr[ROGUE_MAX_GROUND];
+    printf("[shoptest] dead state=%d hostile=%d ground=%d\n",
+           rogue_enemies_shopkeeper_state(), s_merchants_hostile ? 1 : 0,
+           rogue_loot_export_ground(gr, ROGUE_MAX_GROUND));
+    /* the next floor's shopkeeper must spawn hostile on sight */
+    rogue_game_debug_set_depth(s_depth + 1);
+    printf("[shoptest] next-floor state=%d\n", rogue_enemies_shopkeeper_state());
+}
+
 /* Stand at the shop counter's customer side, camera facing the stall. */
 int rogue_game_debug_goto_shop(void) {
     if (!s_level.has_shop) return 0;
-    s_player.pos = v3(s_level.shop_x + 0.5f + s_level.shop_dx * 2.6f + s_level.shop_dz * 0.8f,
-                      (float)s_level.floor_y,
-                      s_level.shop_z + 0.5f + s_level.shop_dz * 2.6f + s_level.shop_dx * 0.8f);
+    /* back away from the counter to the farthest STANDABLE cell (shops can
+     * sit against the room edge — never bury the hero in the wall) */
+    {
+        float ox = 1.4f;
+        for (float t = 2.6f; t >= 1.4f; t -= 0.6f) {
+            int cx = (int)floorf(s_level.shop_x + 0.5f + s_level.shop_dx * t + s_level.shop_dz * 0.8f);
+            int cz = (int)floorf(s_level.shop_z + 0.5f + s_level.shop_dz * t + s_level.shop_dx * 0.8f);
+            if (dbg_standable(cx, cz)) { ox = t; break; }
+        }
+        s_player.pos = v3(s_level.shop_x + 0.5f + s_level.shop_dx * ox + s_level.shop_dz * 0.8f,
+                          (float)s_level.floor_y,
+                          s_level.shop_z + 0.5f + s_level.shop_dz * ox + s_level.shop_dx * 0.8f);
+    }
     rogue_camera_init(s_player.pos);
     /* camera view dir should be -shop_d (looking AT the counter) */
     int vx = -s_level.shop_dx, vz = -s_level.shop_dz;
@@ -1123,16 +1201,7 @@ void rogue_game_draw_overlay(uint16_t *fb) {
             rogue_render_model(&s_cam, fb, pp, 0.0f, brazier_model, 6, 0.30f, 0.72f, 0.0f, 256);
     }
 
-    /* The shopkeeper, behind the counter, facing the customer side. A slow
-     * idle bob keeps the stall feeling alive. */
-    if (s_level.has_shop) {
-        Vec3 mp = v3(s_level.shop_x + 0.5f - s_level.shop_dx,
-                     (float)s_level.floor_y + 0.02f * sinf(s_anim_t * 1.7f),
-                     s_level.shop_z + 0.5f - s_level.shop_dz);
-        float yaw = atan2f((float)s_level.shop_dx, (float)s_level.shop_dz);
-        rogue_render_model(&s_cam, fb, mp, yaw, merchant_model, 8,
-                           0.42f, 1.45f, 0.0f, 256);
-    }
+    /* (The shopkeeper is a real enemy now — rogue_enemy draws him.) */
 
     /* Spike traps — dark pad + steel spikes (telegraphed; pulses when armed). */
     for (int i = 0; i < s_n_trap; i++) {

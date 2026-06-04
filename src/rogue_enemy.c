@@ -2,6 +2,8 @@
 #include "rogue_render.h"
 #include "rogue_band.h"
 #include "rogue_dmgnum.h"
+#include "rogue_particle.h"
+#include <stdio.h>
 #include "craft_world.h"
 #include "craft_blocks.h"
 #include <math.h>
@@ -28,6 +30,7 @@ typedef struct {
     float     anim;         /* steady per-enemy clock — gait cycles + limb swing */
     float     sp;           /* per-type special timer (demon charge, strafe flips) */
     bool      moving;       /* displaced this tick → drive the walk animation */
+    bool      calm;         /* shopkeeper at his post — no AI until provoked */
 } Enemy;
 
 static Enemy s_en[ROGUE_MAX_ENEMIES];
@@ -83,10 +86,13 @@ static const EnemyDef DEFS[EN_TYPE_COUNT] = {
     [EN_ARCHER]    = { 2.6f, 13.f,  8.5f, 0.55f, 1.0f, 26,  9, 0.32f, 1.50f, 1,0, LOOT_GEAR   },
     [EN_FIRESPRITE]= { 3.0f, 11.f,  8.0f, 0.45f, 1.0f, 18, 10, 0.30f, 0.60f, 1,1, LOOT_GEM    },
     [EN_DEMON]     = { 2.9f, 12.f,  1.5f, 0.55f, 1.3f, 84, 20, 0.58f, 1.85f, 0,0, LOOT_RARE   },
+    /* The merchant turned battle wizard: tanky, hard-hitting triple spell
+     * bolts, and he BLINKS away when cornered. Provoke at your peril. */
+    [EN_SHOPKEEPER]= { 3.2f, 14.f,  7.5f, 0.50f, 1.2f,110, 15, 0.34f, 1.45f, 1,0, LOOT_RARE   },
 };
 static const char *NAMES[EN_TYPE_COUNT] = {
     "Rat","Slime","Skeleton","Spider","Bat","Kobold","Goblin","Zombie",
-    "Skeleton Archer","Fire Sprite","Demon"
+    "Skeleton Archer","Fire Sprite","Demon","Shopkeeper"
 };
 EnemyLoot rogue_enemy_loot(int t){ return (t>=0&&t<EN_TYPE_COUNT)?(EnemyLoot)DEFS[t].loot:LOOT_GOLD; }
 const char *rogue_enemy_name(int t){ return (t>=0&&t<EN_TYPE_COUNT)?NAMES[t]:"?"; }
@@ -199,13 +205,25 @@ static const RogueCuboid M_DEMON[] = {
 };
 
 #define MN(a) (int)(sizeof(a)/sizeof(RogueCuboid))
+static const RogueCuboid M_SHOPKEEPER[] = {
+    { 0.0f,  0.50f,  0.0f,  0.26f, 0.50f, 0.20f, RGB(122, 40, 46) },   /* robe body */
+    { 0.0f,  0.60f,  0.08f, 0.20f, 0.30f, 0.05f, RGB(214, 178, 84) },  /* gold apron */
+    { 0.0f,  1.18f,  0.0f,  0.14f, 0.15f, 0.13f, RGB(224, 178, 138) }, /* head */
+    { 0.0f,  1.36f,  0.0f,  0.16f, 0.04f, 0.15f, RGB(70, 28, 32) },    /* flat cap */
+    { -0.30f,0.66f,  0.10f, 0.06f, 0.22f, 0.06f, RGB(122, 40, 46) },   /* arms forward */
+    {  0.30f,0.66f,  0.10f, 0.06f, 0.22f, 0.06f, RGB(122, 40, 46) },
+    { -0.30f,0.46f,  0.17f, 0.055f,0.05f, 0.055f, RGB(224, 178, 138) },/* hands */
+    {  0.30f,0.46f,  0.17f, 0.055f,0.05f, 0.055f, RGB(224, 178, 138) },
+};
+
 static const RogueCuboid *MODEL[EN_TYPE_COUNT] = {
     M_RAT, M_SLIME, M_SKELETON, M_SPIDER, M_BAT, M_KOBOLD, M_GOBLIN,
-    M_ZOMBIE, M_ARCHER, M_FIRESPRITE, M_DEMON
+    M_ZOMBIE, M_ARCHER, M_FIRESPRITE, M_DEMON, M_SHOPKEEPER
 };
 static const int MODEL_N[EN_TYPE_COUNT] = {
     MN(M_RAT), MN(M_SLIME), MN(M_SKELETON), MN(M_SPIDER), MN(M_BAT),
-    MN(M_KOBOLD), MN(M_GOBLIN), MN(M_ZOMBIE), MN(M_ARCHER), MN(M_FIRESPRITE), MN(M_DEMON)
+    MN(M_KOBOLD), MN(M_GOBLIN), MN(M_ZOMBIE), MN(M_ARCHER), MN(M_FIRESPRITE),
+    MN(M_DEMON), MN(M_SHOPKEEPER)
 };
 
 /* --- RNG (local, for spawn jitter / wander) ---------------------- */
@@ -249,6 +267,7 @@ int rogue_enemies_export(RogueEnemySave *out, int max) {
         out[n].type  = (uint8_t)s_en[i].type;
         out[n].champ = s_en[i].champion ? 1 : 0;
         out[n].hp    = (int16_t)s_en[i].hp;
+        out[n].calm  = s_en[i].calm ? 1 : 0;
         out[n].x = s_en[i].pos.x; out[n].y = s_en[i].pos.y; out[n].z = s_en[i].pos.z;
         out[n].yaw = s_en[i].yaw;
         n++;
@@ -273,11 +292,13 @@ void rogue_enemies_import(const RogueEnemySave *in, int n) {
         e->anim = (float)i * 0.41f;        /* desync the gaits */
         e->sp = 2.0f;
         e->moving = false;
+        e->calm = in[i].calm != 0;
     }
 }
 
 /* Apply damage + knockback to one enemy; record a death event if it dies. */
 static void en_apply_damage(Enemy *e, int dmg, float fromx, float fromz) {
+    if (e->calm) { e->calm = false; e->state = AI_CHASE; e->state_t = 0; }
     e->hp -= dmg;
     e->hurt_flash = 0.22f;
     rogue_dmgnum_spawn(e->pos, dmg, false);   /* green — damage you dealt */
@@ -358,6 +379,7 @@ void rogue_enemies_spawn(const int16_t *room_cx, const int16_t *room_cz,
         e->anim = frand() * 3.0f;          /* desync the gaits */
         e->sp = 1.5f + frand() * 2.0f;
         e->moving = false;
+        e->calm = false;
         /* The first enemy on a band-end floor is a champion (mini-boss). */
         e->champion = (boss_floor && placed == 0);
         if (e->champion) e->hp *= 3;
@@ -418,6 +440,16 @@ void rogue_enemies_update(RoguePlayer *p, float dt, int floor_y) {
         float pre_x = e->pos.x, pre_z = e->pos.z;          /* movement → animation */
         e->anim += dt;                                     /* steady gait clock */
 
+        if (e->calm) { e->moving = false; continue; }      /* shopkeeper at his post */
+
+#ifdef ROGUE_KEEPER_DEBUG
+        if (e->type == EN_SHOPKEEPER) {
+            static int dbg;
+            if ((dbg++ % 30) == 0)
+                printf("[keeper] st=%d sp=%.2f dist=%.2f cd=%.2f pos=(%.1f,%.1f)\n",
+                       (int)e->state, e->sp, dist, e->atk_cd, e->pos.x, e->pos.z);
+        }
+#endif
         switch (e->state) {
         case AI_WANDER:
             if (p->alive && dist < aggro) { e->state = AI_CHASE; e->state_t = 0; break; }
@@ -441,7 +473,48 @@ void rogue_enemies_update(RoguePlayer *p, float dt, int floor_y) {
                  * archers/sprites are moving targets with a readable rhythm.
                  * No line of sight → never fire; advance to regain it. */
                 bool los = en_los(e->pos, p->pos, floor_y);
-                if (dist < d->atk_range * 0.45f)      en_move(e, -nx, -nz, d->speed * dt, floor_y);
+                if (e->type == EN_SHOPKEEPER) {
+                    /* BLINK: cornered (hero close) or sightline blocked (his
+                     * own counter!) → teleport to open ground a few cells
+                     * out, with a purple poof at both ends. */
+                    e->sp -= dt;
+                    if (e->sp <= 0.0f && (dist < 2.5f || !los)) {
+                        /* pick a spot that can actually SEE the hero (else he
+                         * blinks blind forever); fall back to any open cell */
+                        float bx = 0, bz = 0; int found = 0;
+                        for (int t = 0; t < 20; t++) {
+                            float a = frand() * 6.28f;
+                            float r = 2.6f + frand() * 1.7f;   /* stay inside small rooms */
+                            float tx = p->pos.x + sinf(a) * r;
+                            float tz = p->pos.z + cosf(a) * r;
+                            if (!en_passable((int)floorf(tx), floor_y,
+                                             (int)floorf(tz), false)) continue;
+                            if (!found) { bx = tx; bz = tz; found = 1; }
+                            Vec3 vp = v3(tx, e->pos.y, tz);
+                            if (en_los(vp, p->pos, floor_y)) {
+                                bx = tx; bz = tz; found = 2;
+                                break;
+                            }
+                        }
+                        if (found) {
+                            Vec3 poof = e->pos; poof.y += 0.7f;
+                            rogue_particle_burst(poof, 10, 3.5f, 0.4f, RGB(190,90,255), 0.08f);
+                            e->pos.x = bx; e->pos.z = bz;
+                            poof = e->pos; poof.y += 0.7f;
+                            rogue_particle_burst(poof, 10, 3.5f, 0.4f, RGB(190,90,255), 0.08f);
+                            e->sp = 2.6f;
+                            e->atk_cd = 0.30f;     /* spell follows the blink fast */
+                            los = en_los(e->pos, p->pos, floor_y);
+                            dx = p->pos.x - e->pos.x; dz = p->pos.z - e->pos.z;
+                            dist = sqrtf(dx*dx + dz*dz);
+                            nx = dist > 0.001f ? dx/dist : 0; nz = dist > 0.001f ? dz/dist : 0;
+                            e->yaw = atan2f(nx, nz);
+                        }
+                    }
+                }
+                /* the wizard holds his ground much closer than archers do */
+                float backoff = d->atk_range * (e->type == EN_SHOPKEEPER ? 0.28f : 0.45f);
+                if (dist < backoff)                   en_move(e, -nx, -nz, d->speed * dt, floor_y);
                 else if (dist > d->atk_range || !los) en_move(e, nx, nz, d->speed * dt, floor_y);
                 else {
                     float sgn = ((i & 1) ? 1.0f : -1.0f) *
@@ -511,9 +584,21 @@ void rogue_enemies_update(RoguePlayer *p, float dt, int floor_y) {
                 int dmg = (int)(d->base_dmg * d->dmg_mul * s_dmg_scale) * (e->champion ? 2 : 1);
                 if (s_dark) dmg = dmg * 3 / 2;     /* the dark bites harder */
                 if (d->ranged) {
-                    /* loose a projectile toward the hero */
-                    uint16_t col = (e->type == EN_FIRESPRITE) ? RGB(255,140,30) : RGB(230,230,210);
-                    eshot_fire(e->pos, p->pos.x, p->pos.z, dmg, col);
+                    if (e->type == EN_SHOPKEEPER) {
+                        /* a fan of three arcane bolts — dodge the spread */
+                        float bx = p->pos.x - e->pos.x, bz = p->pos.z - e->pos.z;
+                        for (int b = -1; b <= 1; b++) {
+                            float a = 0.30f * (float)b;
+                            float ca = cosf(a), sa = sinf(a);
+                            eshot_fire(e->pos, e->pos.x + bx * ca - bz * sa,
+                                       e->pos.z + bx * sa + bz * ca,
+                                       dmg, RGB(190, 90, 255));
+                        }
+                    } else {
+                        /* loose a projectile toward the hero */
+                        uint16_t col = (e->type == EN_FIRESPRITE) ? RGB(255,140,30) : RGB(230,230,210);
+                        eshot_fire(e->pos, p->pos.x, p->pos.z, dmg, col);
+                    }
                 } else if (p->alive && dist <= d->atk_range + (e->champion ? 0.8f : 0.4f)) {
                     if (rogue_player_damage(p, dmg, e->pos) &&
                         (p->stats.aspects & (1u << ASP_THORNS)))
@@ -649,10 +734,10 @@ void rogue_enemies_draw(const CraftCamera *cam, uint16_t *fb) {
             big[5].cy += 0.05f * sinf(a * 11.0f + 2.1f) * sc;
         } else if (e->moving) {
             /* leg stride (+ arm counter-swing) — part indices per model */
-            static const int8_t LEGA[EN_TYPE_COUNT] = { -1,-1, 7, 4,-1, 5, 8, 6, 6,-1, 8 };
-            static const int8_t LEGB[EN_TYPE_COUNT] = { -1,-1, 8, 5,-1, 6, 9, 7, 7,-1, 9 };
-            static const int8_t ARMA[EN_TYPE_COUNT] = { -1,-1, 5, 6,-1,-1, 6, 4, 4,-1, 6 };
-            static const int8_t ARMB[EN_TYPE_COUNT] = { -1,-1, 6, 7,-1,-1, 7, 5, 5,-1, 7 };
+            static const int8_t LEGA[EN_TYPE_COUNT] = { -1,-1, 7, 4,-1, 5, 8, 6, 6,-1, 8,-1 };
+            static const int8_t LEGB[EN_TYPE_COUNT] = { -1,-1, 8, 5,-1, 6, 9, 7, 7,-1, 9,-1 };
+            static const int8_t ARMA[EN_TYPE_COUNT] = { -1,-1, 5, 6,-1,-1, 6, 4, 4,-1, 6, 4 };
+            static const int8_t ARMB[EN_TYPE_COUNT] = { -1,-1, 6, 7,-1,-1, 7, 5, 5,-1, 7, 5 };
             float rate = 7.0f + d->speed * 3.0f;
             float sw = sinf(a * rate) * 0.085f * sc;
             int la = LEGA[e->type], lb = LEGB[e->type];
@@ -688,8 +773,45 @@ void rogue_enemies_draw(const CraftCamera *cam, uint16_t *fb) {
 
 int rogue_enemies_alive_count(void) {
     int n = 0;
-    for (int i = 0; i < ROGUE_MAX_ENEMIES; i++) if (s_en[i].alive) n++;
+    for (int i = 0; i < ROGUE_MAX_ENEMIES; i++)
+        if (s_en[i].alive && !s_en[i].calm) n++;
     return n;
+}
+
+/* Spawn the merchant at his stall. Calm unless the player's reputation
+ * precedes them (a shopkeeper was killed on an earlier floor). Takes a
+ * free slot, or evicts the last regular enemy on a packed floor. */
+void rogue_enemies_add_shopkeeper(float x, float y, float z, float yaw,
+                                  bool calm, int depth) {
+    int slot = -1;
+    for (int i = 0; i < ROGUE_MAX_ENEMIES; i++)
+        if (!s_en[i].alive) { slot = i; break; }
+    if (slot < 0) {
+        for (int i = ROGUE_MAX_ENEMIES - 1; i >= 0; i--)
+            if (!s_en[i].champion) { slot = i; break; }
+        if (slot < 0) return;
+    }
+    Enemy *e = &s_en[slot];
+    e->alive = true;
+    e->type = EN_SHOPKEEPER;
+    e->pos = v3(x, y, z);
+    e->yaw = yaw;
+    e->hp = (int)(DEFS[EN_SHOPKEEPER].base_hp * (1.0f + 0.18f * depth) * 2.0f);
+    e->state = calm ? AI_WANDER : AI_CHASE;
+    e->state_t = 0.0f;
+    e->wander_dx = e->wander_dz = 0.0f;
+    e->hurt_flash = 0.0f; e->atk_cd = 0.0f;
+    e->anim = 0.0f; e->sp = 0.0f;
+    e->moving = false;
+    e->champion = false;
+    e->calm = calm;
+}
+
+int rogue_enemies_shopkeeper_state(void) {
+    for (int i = 0; i < ROGUE_MAX_ENEMIES; i++)
+        if (s_en[i].alive && s_en[i].type == EN_SHOPKEEPER)
+            return s_en[i].calm ? 1 : 2;
+    return 0;
 }
 
 bool rogue_enemies_nearest(float x, float z, float *ex, float *ez) {

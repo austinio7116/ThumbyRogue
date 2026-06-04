@@ -310,6 +310,14 @@ int main(int argc, char **argv) {
             extern int rogue_game_debug_goto_deco(void);
             printf("[deco] found scenery: %d\n", rogue_game_debug_goto_deco());
         }
+        if (getenv("ROGUE_SHOPPOKE")) {  /* anger the shopkeeper, then settle */
+            extern void rogue_game_debug_shoppoke(void);
+            rogue_game_debug_shoppoke();
+        }
+        if (getenv("ROGUE_SHOPTEST")) {  /* provoke + kill the shopkeeper */
+            extern void rogue_game_debug_shoptest(void);
+            rogue_game_debug_shoptest();
+        }
         if (getenv("ROGUE_SHOPGO")) {   /* stand at the shop counter (visuals) */
             extern int rogue_game_debug_goto_shop(void);
             printf("[shop] found: %d\n", rogue_game_debug_goto_shop());

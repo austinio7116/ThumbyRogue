@@ -19,6 +19,7 @@ typedef enum {
     EN_RAT, EN_SLIME, EN_SKELETON, EN_SPIDER,
     EN_BAT, EN_KOBOLD, EN_GOBLIN, EN_ZOMBIE,
     EN_ARCHER, EN_FIRESPRITE, EN_DEMON,
+    EN_SHOPKEEPER,   /* the merchant — peaceful until attacked, then a wizard */
     EN_TYPE_COUNT
 } EnemyType;
 
@@ -65,12 +66,19 @@ bool rogue_enemies_nearest(float x, float z, float *ex, float *ez);
  * Capture/restore the live enemy pool so quitting to the lobby and resuming
  * puts every creature back where it was (position + hp), not freshly spawned. */
 typedef struct {
-    uint8_t type, champ;
+    uint8_t type, champ, calm;
     int16_t hp;
     float   x, y, z, yaw;
 } RogueEnemySave;
 int  rogue_enemies_export(RogueEnemySave *out, int max);   /* count of live enemies */
 void rogue_enemies_import(const RogueEnemySave *in, int n);
+
+/* The shopkeeper: spawned at the stall, peaceful (stands at his post,
+ * untargeted by nothing — but any hit turns him into a blink-casting
+ * battle wizard). state: 0 = none/dead, 1 = calm, 2 = hostile. */
+void rogue_enemies_add_shopkeeper(float x, float y, float z, float yaw,
+                                  bool calm, int depth);
+int  rogue_enemies_shopkeeper_state(void);
 
 /* Debug: pose one enemy for animation-sheet captures. */
 void rogue_enemies_debug_showcase(int type, float x, float y, float z,

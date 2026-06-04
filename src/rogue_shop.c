@@ -68,6 +68,18 @@ bool rogue_shop_pad_near(float x, float y, float z) {
     return fabsf(along) < 1.5f && out > -0.5f && out < 0.65f &&
            fabsf(y - s_pad.y) < 1.2f;
 }
+/* Pop one unsold stock item (marks it sold). Used when the shopkeeper is
+ * slain: his wares spill onto the floor as ordinary pickups. */
+int rogue_shop_take_stock(RogueItem *out) {
+    for (int i = 0; i < N_STOCK; i++) {
+        if (s_sold[i]) continue;
+        *out = s_stock[i];
+        s_sold[i] = true;
+        return 1;
+    }
+    return 0;
+}
+
 bool rogue_shop_is_open(void){ return s_open; }
 void rogue_shop_open(void){ s_open = true; s_cur = 0; }
 void rogue_shop_close(void){ s_open = false; }
