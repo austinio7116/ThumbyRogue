@@ -1,5 +1,7 @@
 build_host/
 build_device/
+build_funkey/
+dist/
 *.o
 *.elf
 *.bin
